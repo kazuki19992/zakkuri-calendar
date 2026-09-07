@@ -33,6 +33,9 @@ yarn-error.*
 # local env files
 .env*.local
 
+# git gtr worktrees
+/.worktrees/
+
 # typescript
 *.tsbuildinfo
 

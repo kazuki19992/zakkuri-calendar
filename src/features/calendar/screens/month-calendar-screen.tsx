@@ -1,27 +1,14 @@
-import type { HolidayProvider } from '@/domain/calendar/holiday';
-import type { WeekStartsOn } from '@/domain/calendar/month';
 import { ScrollView, StyleSheet } from 'react-native';
-import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { CalendarLoadState } from '../components/calendar-load-state';
 import { MonthGrid } from '../components/month-grid';
 import { SelectedDayAgenda } from '../components/selected-day-agenda';
-import { useMonthCalendar } from '../hooks/use-month-calendar';
+import type { MonthCalendarState } from '../hooks/use-month-calendar';
 
 export type MonthCalendarScreenProps = Readonly<{
-  holidayProvider: HolidayProvider;
-  weekStartsOn: WeekStartsOn;
+  state: MonthCalendarState;
 }>;
 
-export function MonthCalendarScreen({ holidayProvider, weekStartsOn }: MonthCalendarScreenProps) {
-  const { calendars, events, temporalDefinitions } = useRepositories();
-  const state = useMonthCalendar({
-    calendars,
-    events,
-    temporalDefinitions,
-    holidayProvider,
-    weekStartsOn,
-  });
-
+export function MonthCalendarScreen({ state }: MonthCalendarScreenProps) {
   return (
     <CalendarLoadState status={state.status} onRetry={state.retry}>
       <ScrollView

@@ -31,10 +31,16 @@ describe('月表示の表示用モデル', () => {
           temporalType: 'allDay',
         },
       ],
-      holidayResult: {
-        status: 'available',
-        holidays: [{ date: '2026-09-21', name: '敬老の日' }],
-      },
+      holidayCoverage: [
+        {
+          from: '2026-09-01',
+          through: '2026-09-30',
+          result: {
+            status: 'available',
+            holidays: [{ date: '2026-09-21', name: '敬老の日' }],
+          },
+        },
+      ],
     });
 
     expect(result).toEqual([
@@ -43,6 +49,7 @@ describe('月表示の表示用モデル', () => {
         isToday: true,
         isSelected: true,
         hasEvents: true,
+        holidaySupport: 'available',
         holidayName: '敬老の日',
         accessibilityLabel: '2026年9月21日、敬老の日、今日、選択中、予定あり',
       },
@@ -55,10 +62,20 @@ describe('月表示の表示用モデル', () => {
       selectedDate: '2026-09-20',
       today: '2026-09-20',
       events: [],
-      holidayResult: { status: 'unsupported' },
+      holidayCoverage: [
+        {
+          from: '2026-09-01',
+          through: '2026-09-30',
+          result: { status: 'unsupported' },
+        },
+      ],
     });
 
-    expect(result[0]).toMatchObject({ holidayName: null, accessibilityLabel: '2026年9月21日' });
+    expect(result[0]).toMatchObject({
+      holidaySupport: 'unsupported',
+      holidayName: null,
+      accessibilityLabel: '2026年9月21日、祝日情報未対応',
+    });
   });
 
   it('正確な予定は開始時刻を表示する', () => {

@@ -10,8 +10,15 @@ export type MonthDayViewModel = Readonly<{
   isToday: boolean;
   isSelected: boolean;
   hasEvents: boolean;
+  holidaySupport: 'available' | 'unsupported';
   holidayName: string | null;
   accessibilityLabel: string;
+}>;
+
+export type HolidayRangeCoverage = Readonly<{
+  from: string;
+  through: string;
+  result: HolidayRangeResult;
 }>;
 
 export type AgendaItemViewModel = Readonly<{
@@ -26,20 +33,31 @@ function formatJapaneseDate(date: string): string {
   return `${year}年${month}月${day}日`;
 }
 
-function getHolidayName(date: string, holidayResult: HolidayRangeResult): string | null {
-  if (holidayResult.status === 'unsupported') return null;
-  return holidayResult.holidays.find((holiday) => holiday.date === date)?.name ?? null;
+function getHolidayInfo(
+  date: string,
+  holidayCoverage: readonly HolidayRangeCoverage[],
+): Readonly<{ support: 'available' | 'unsupported'; name: string | null }> {
+  const coverage = holidayCoverage.find((item) => item.from <= date && date <= item.through);
+  if (coverage === undefined || coverage.result.status === 'unsupported') {
+    return { support: 'unsupported', name: null };
+  }
+  return {
+    support: 'available',
+    name: coverage.result.holidays.find((holiday) => holiday.date === date)?.name ?? null,
+  };
 }
 
 function createAccessibilityLabel(
   date: string,
   holidayName: string | null,
+  holidaySupport: 'available' | 'unsupported',
   isToday: boolean,
   isSelected: boolean,
   hasEvents: boolean,
 ): string {
   const labels = [formatJapaneseDate(date)];
   if (holidayName !== null) labels.push(holidayName);
+  if (holidaySupport === 'unsupported') labels.push('祝日情報未対応');
   if (isToday) labels.push('今日');
   if (isSelected) labels.push('選択中');
   if (hasEvents) labels.push('予定あり');
@@ -51,23 +69,25 @@ export function createMonthDayViewModels(input: Readonly<{
   selectedDate: string;
   today: string;
   events: readonly CalendarEvent[];
-  holidayResult: HolidayRangeResult;
+  holidayCoverage: readonly HolidayRangeCoverage[];
 }>): readonly MonthDayViewModel[] {
   return input.grid.map((gridDate) => {
     const isToday = gridDate.date === input.today;
     const isSelected = gridDate.date === input.selectedDate;
     const hasEvents = input.events.some((event) => event.anchorDate === gridDate.date);
-    const holidayName = getHolidayName(gridDate.date, input.holidayResult);
+    const holiday = getHolidayInfo(gridDate.date, input.holidayCoverage);
 
     return {
       ...gridDate,
       isToday,
       isSelected,
       hasEvents,
-      holidayName,
+      holidaySupport: holiday.support,
+      holidayName: holiday.name,
       accessibilityLabel: createAccessibilityLabel(
         gridDate.date,
-        holidayName,
+        holiday.name,
+        holiday.support,
         isToday,
         isSelected,
         hasEvents,

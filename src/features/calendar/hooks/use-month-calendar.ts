@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CalendarEvent } from '@/domain/calendar/event';
-import type { HolidayProvider, HolidayRangeResult } from '@/domain/calendar/holiday';
+import type { HolidayProvider } from '@/domain/calendar/holiday';
 import {
   getMonthGrid,
   getMonthRange,
@@ -18,6 +18,7 @@ import {
   createAgendaItems,
   createMonthDayViewModels,
   type AgendaItemViewModel,
+  type HolidayRangeCoverage,
   type MonthDayViewModel,
 } from '../month-view-model';
 
@@ -48,10 +49,19 @@ export type MonthCalendarState = Readonly<{
   retry(): void;
 }>;
 
-const unsupportedHolidays: HolidayRangeResult = { status: 'unsupported' };
-
 function getSystemTime(): Date {
   return new Date();
+}
+
+function createHolidayCoverage(
+  grid: readonly Readonly<{ date: string }>[],
+  holidayProvider: HolidayProvider,
+): readonly HolidayRangeCoverage[] {
+  const monthStarts = [...new Set(grid.map((day) => getMonthStart(day.date)))];
+  return monthStarts.map((month) => {
+    const range = getMonthRange(month);
+    return { ...range, result: holidayProvider.list(range.from, range.through) };
+  });
 }
 
 export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarState {
@@ -61,12 +71,16 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
   const [selectedDate, setSelectedDate] = useState(today);
   const [status, setStatus] = useState<MonthCalendarStatus>('loading');
   const [monthEvents, setMonthEvents] = useState<readonly CalendarEvent[]>([]);
-  const [holidayResult, setHolidayResult] = useState<HolidayRangeResult>(unsupportedHolidays);
+  const [holidayCoverage, setHolidayCoverage] = useState<readonly HolidayRangeCoverage[]>([]);
   const [definitionLabels, setDefinitionLabels] = useState<ReadonlyMap<string, string>>(
     () => new Map(),
   );
   const [retryKey, setRetryKey] = useState(0);
   const requestIdRef = useRef(0);
+  const monthGrid = useMemo(
+    () => getMonthGrid(visibleMonth, input.weekStartsOn),
+    [input.weekStartsOn, visibleMonth],
+  );
 
   useEffect(() => {
     const requestId = ++requestIdRef.current;
@@ -78,7 +92,7 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
         if (requestId !== requestIdRef.current) return;
         const events = await input.events.listByAnchorRange(calendar.id, range.from, range.through);
         if (requestId !== requestIdRef.current) return;
-        const holidays = input.holidayProvider.list(range.from, range.through);
+        const holidays = createHolidayCoverage(monthGrid, input.holidayProvider);
         const fuzzyDefinitionIds = [
           ...new Set(
             events
@@ -91,7 +105,7 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
         );
         if (requestId !== requestIdRef.current) return;
         setMonthEvents(events);
-        setHolidayResult(holidays);
+        setHolidayCoverage(holidays);
         setDefinitionLabels(
           new Map(
             definitions.flatMap((definition) =>
@@ -103,7 +117,7 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
       } catch {
         if (requestId !== requestIdRef.current) return;
         setMonthEvents([]);
-        setHolidayResult(unsupportedHolidays);
+        setHolidayCoverage([]);
         setDefinitionLabels(new Map());
         setStatus('error');
       }
@@ -117,6 +131,7 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
     input.events,
     input.holidayProvider,
     input.temporalDefinitions,
+    monthGrid,
     retryKey,
     visibleMonth,
   ]);
@@ -124,13 +139,13 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
   const days = useMemo(
     () =>
       createMonthDayViewModels({
-        grid: getMonthGrid(visibleMonth, input.weekStartsOn),
+        grid: monthGrid,
         selectedDate,
         today,
         events: monthEvents,
-        holidayResult,
+        holidayCoverage,
       }),
-    [holidayResult, input.weekStartsOn, monthEvents, selectedDate, today, visibleMonth],
+    [holidayCoverage, monthEvents, monthGrid, selectedDate, today],
   );
   const agendaItems = useMemo(
     () =>
@@ -144,7 +159,7 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
     requestIdRef.current += 1;
     setStatus('loading');
     setMonthEvents([]);
-    setHolidayResult(unsupportedHolidays);
+    setHolidayCoverage([]);
     setDefinitionLabels(new Map());
   }, []);
   const showPreviousMonth = useCallback(() => {
@@ -180,6 +195,7 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
     prepareForLoad();
     setRetryKey((key) => key + 1);
   }, [prepareForLoad]);
+  const selectedDay = days.find((day) => day.date === selectedDate);
 
   return {
     status,
@@ -188,11 +204,8 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
     today,
     days,
     agendaItems,
-    selectedHolidayName:
-      holidayResult.status === 'available'
-        ? holidayResult.holidays.find((holiday) => holiday.date === selectedDate)?.name ?? null
-        : null,
-    holidaySupport: holidayResult.status,
+    selectedHolidayName: selectedDay?.holidayName ?? null,
+    holidaySupport: selectedDay?.holidaySupport ?? 'unsupported',
     showPreviousMonth,
     showNextMonth,
     showToday,

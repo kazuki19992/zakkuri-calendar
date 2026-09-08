@@ -105,6 +105,19 @@ function createHolidayProvider(): jest.Mocked<HolidayProvider> {
   };
 }
 
+function createBoundaryHolidayProvider(): jest.Mocked<HolidayProvider> {
+  return {
+    list: jest.fn((from, _through) => {
+      const year = Number(from.slice(0, 4));
+      if (year < 1970 || year > 2050) return { status: 'unsupported' };
+      return {
+        status: 'available',
+        holidays: year === 1970 ? [{ date: '1970-01-01', name: '元日' }] : [],
+      };
+    }),
+  };
+}
+
 describe('月カレンダーの状態調整', () => {
   it('今日を選択して当月の予定と祝日を読み込む', async () => {
     const repositories = createRepositories();
@@ -151,6 +164,56 @@ describe('月カレンダーの状態調整', () => {
       '2026-09-30',
     );
     expect(holidayProvider.list).toHaveBeenCalledWith('2026-09-01', '2026-09-30');
+  });
+
+  it('2050年12月では対応中の日と2051年の未対応日を区別する', async () => {
+    const repositories = createRepositories([]);
+    const holidayProvider = createBoundaryHolidayProvider();
+    const { result } = await renderHook(() =>
+      useMonthCalendar({
+        ...repositories,
+        holidayProvider,
+        weekStartsOn: 1,
+        now: () => new Date(2050, 11, 1, 12),
+      }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.days.find((day) => day.date === '2050-12-01')).toMatchObject({
+      holidaySupport: 'available',
+    });
+    expect(result.current.days.find((day) => day.date === '2051-01-01')).toMatchObject({
+      holidaySupport: 'unsupported',
+      accessibilityLabel: '2051年1月1日、祝日情報未対応',
+    });
+    expect(result.current.holidaySupport).toBe('available');
+  });
+
+  it('1970年1月では1969年の未対応日と元日を区別する', async () => {
+    const repositories = createRepositories([]);
+    const holidayProvider = createBoundaryHolidayProvider();
+    const { result } = await renderHook(() =>
+      useMonthCalendar({
+        ...repositories,
+        holidayProvider,
+        weekStartsOn: 1,
+        now: () => new Date(1970, 0, 1, 12),
+      }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.days.find((day) => day.date === '1969-12-29')).toMatchObject({
+      holidaySupport: 'unsupported',
+      accessibilityLabel: '1969年12月29日、祝日情報未対応',
+    });
+    expect(result.current.days.find((day) => day.date === '1970-01-01')).toMatchObject({
+      holidaySupport: 'available',
+      holidayName: '元日',
+      accessibilityLabel: '1970年1月1日、元日、今日、選択中',
+    });
+    expect(result.current.holidaySupport).toBe('available');
   });
 
   it('次月へ移動すると月初を選択して移動先の予定を読み込む', async () => {

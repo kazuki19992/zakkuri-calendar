@@ -1,18 +1,9 @@
 import { render, screen, userEvent } from '@testing-library/react-native';
 
 import { MonthCalendarScreen } from '../month-calendar-screen';
-import { useRepositories } from '@/data/sqlite/app-database-provider';
-import { useMonthCalendar, type MonthCalendarState } from '../../hooks/use-month-calendar';
+import type { MonthCalendarState } from '../../hooks/use-month-calendar';
 
 jest.mock('@/global.css', () => ({}));
-
-jest.mock('@/data/sqlite/app-database-provider', () => ({
-  useRepositories: jest.fn(),
-}));
-
-jest.mock('../../hooks/use-month-calendar', () => ({
-  useMonthCalendar: jest.fn(),
-}));
 
 jest.mock('../../components/month-grid', () => {
   const React = jest.requireActual<typeof import('react')>('react');
@@ -80,20 +71,6 @@ jest.mock('../../components/selected-day-agenda', () => ({
   },
 }));
 
-const mockUseRepositories = jest.mocked(useRepositories);
-const mockUseMonthCalendar = jest.mocked(useMonthCalendar);
-
-const repositoryContainer = {
-  calendars: { getDefault: jest.fn() },
-  events: { listByAnchorRange: jest.fn(), create: jest.fn(), getById: jest.fn(), update: jest.fn(), delete: jest.fn() },
-  temporalDefinitions: { listEnabled: jest.fn(), getById: jest.fn(), disable: jest.fn() },
-  settings: {
-    getDefaultExactDuration: jest.fn(),
-    setDefaultExactDuration: jest.fn(),
-    getUndeterminedFadeMinutes: jest.fn(),
-  },
-};
-
 const stateCallbacks = {
   showPreviousMonth: jest.fn(),
   showNextMonth: jest.fn(),
@@ -120,31 +97,26 @@ function createState(overrides: Partial<MonthCalendarState> = {}): MonthCalendar
 describe('月カレンダー画面', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseRepositories.mockReturnValue(repositoryContainer);
   });
 
   it('読み込み中はカレンダー操作を表示しない', async () => {
-    mockUseMonthCalendar.mockReturnValue(createState({ status: 'loading' }));
-
-    await render(<MonthCalendarScreen holidayProvider={{ list: jest.fn() }} weekStartsOn={1} />);
+    await render(<MonthCalendarScreen state={createState({ status: 'loading' })} />);
 
     expect(screen.getByLabelText('カレンダーを読み込んでいます')).toBeTruthy();
     expect(screen.queryByText('月グリッド:2026-09-01')).toBeNull();
   });
 
   it('読み込みエラー時は再試行操作を表示する', async () => {
-    mockUseMonthCalendar.mockReturnValue(createState({ status: 'error' }));
-
-    await render(<MonthCalendarScreen holidayProvider={{ list: jest.fn() }} weekStartsOn={1} />);
+    await render(<MonthCalendarScreen state={createState({ status: 'error' })} />);
 
     expect(screen.getByText('データを読み込めませんでした')).toBeTruthy();
     expect(screen.getByRole('button', { name: '再試行' })).toBeTruthy();
   });
 
   it('予定がない準備完了時は選択日の空の予定一覧を表示する', async () => {
-    mockUseMonthCalendar.mockReturnValue(createState({ selectedHolidayName: null, agendaItems: [] }));
-
-    await render(<MonthCalendarScreen holidayProvider={{ list: jest.fn() }} weekStartsOn={1} />);
+    await render(
+      <MonthCalendarScreen state={createState({ selectedHolidayName: null, agendaItems: [] })} />,
+    );
 
     expect(screen.getByText('月グリッド:2026-09-01')).toBeTruthy();
     expect(screen.getByText('予定日:2026-09-21')).toBeTruthy();
@@ -152,12 +124,10 @@ describe('月カレンダー画面', () => {
 
   it('予定がある準備完了時は画面状態と操作を表示コンポーネントへ渡す', async () => {
     const user = userEvent.setup();
-    const holidayProvider = { list: jest.fn() };
     const agendaItems = [
       { id: 'event-1', title: '敬老会', temporalLabel: '終日', accessibilityLabel: '敬老会、終日' },
     ];
-    mockUseMonthCalendar.mockReturnValue(
-      createState({
+    const state = createState({
         days: [
           {
             date: '2026-09-21',
@@ -167,23 +137,16 @@ describe('月カレンダー画面', () => {
             isToday: false,
             isSelected: true,
             hasEvents: true,
+            holidaySupport: 'available',
             holidayName: '敬老の日',
             accessibilityLabel: '2026年9月21日、敬老の日、選択中、予定あり',
           },
         ],
         agendaItems,
-      }),
-    );
+      });
 
-    await render(<MonthCalendarScreen holidayProvider={holidayProvider} weekStartsOn={1} />);
+    await render(<MonthCalendarScreen state={state} />);
 
-    expect(mockUseMonthCalendar).toHaveBeenCalledWith({
-      calendars: repositoryContainer.calendars,
-      events: repositoryContainer.events,
-      temporalDefinitions: repositoryContainer.temporalDefinitions,
-      holidayProvider,
-      weekStartsOn: 1,
-    });
     expect(screen.getByText('月グリッド:2026-09-01')).toBeTruthy();
     expect(screen.getByText('日付モデル:2026-09-21')).toBeTruthy();
     expect(screen.getByText('月変更通知:なし')).toBeTruthy();
@@ -208,9 +171,7 @@ describe('月カレンダー画面', () => {
       temporalLabel: '終日',
       accessibilityLabel: `予定${index}、終日`,
     }));
-    mockUseMonthCalendar.mockReturnValue(createState({ agendaItems }));
-
-    await render(<MonthCalendarScreen holidayProvider={{ list: jest.fn() }} weekStartsOn={1} />);
+    await render(<MonthCalendarScreen state={createState({ agendaItems })} />);
 
     expect(screen.getByTestId('month-calendar.scroll')).toBeTruthy();
     expect(screen.getByText('予定29')).toBeTruthy();

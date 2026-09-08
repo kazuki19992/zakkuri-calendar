@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react-native';
 
 import IndexRoute from '../index';
+import { useRepositories } from '@/data/sqlite/app-database-provider';
+import { useMonthCalendar, type MonthCalendarState } from '@/features/calendar/hooks/use-month-calendar';
 
 jest.mock('@/global.css', () => ({}));
 
@@ -14,17 +16,16 @@ jest.mock('@/data/holidays/japanese-holiday-provider', () => ({
   },
 }));
 
+jest.mock('@/data/sqlite/app-database-provider', () => ({ useRepositories: jest.fn() }));
+
+jest.mock('@/features/calendar/hooks/use-month-calendar', () => ({ useMonthCalendar: jest.fn() }));
+
 jest.mock('@/features/calendar/screens/month-calendar-screen', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    MonthCalendarScreen: ({
-      holidayProvider,
-      weekStartsOn,
-    }: {
-      holidayProvider: { constructor: { name: string } };
-      weekStartsOn: number;
-    }) => React.createElement(Text, null, `月画面:${holidayProvider.constructor.name}:${weekStartsOn}`),
+    MonthCalendarScreen: ({ state }: { state: MonthCalendarState }) =>
+      React.createElement(Text, null, `月画面:${state.visibleMonth}`),
   };
 });
 
@@ -37,9 +38,40 @@ jest.mock('@/components/themed-view', () => ({
 jest.mock('@/components/web-badge', () => ({ WebBadge: () => null }));
 
 describe('ホームルート', () => {
-  it('日本の祝日providerと月曜始まりで月画面を組み立てる', async () => {
+  it('Repositoryと祝日providerを組み立てて画面へ状態だけを渡す', async () => {
+    const repositories = {
+      calendars: { getDefault: jest.fn() },
+      events: {
+        create: jest.fn(),
+        getById: jest.fn(),
+        listByAnchorRange: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      temporalDefinitions: {
+        listEnabled: jest.fn(),
+        getById: jest.fn(),
+        disable: jest.fn(),
+      },
+      settings: {
+        getDefaultExactDuration: jest.fn(),
+        setDefaultExactDuration: jest.fn(),
+        getUndeterminedFadeMinutes: jest.fn(),
+      },
+    };
+    const state = { visibleMonth: '2026-09-01' } as MonthCalendarState;
+    jest.mocked(useRepositories).mockReturnValue(repositories);
+    jest.mocked(useMonthCalendar).mockReturnValue(state);
+
     await render(<IndexRoute />);
 
-    expect(screen.getByText('月画面:JapaneseHolidayProvider:1')).toBeTruthy();
+    expect(useMonthCalendar).toHaveBeenCalledWith({
+      calendars: repositories.calendars,
+      events: repositories.events,
+      temporalDefinitions: repositories.temporalDefinitions,
+      holidayProvider: expect.objectContaining({ constructor: expect.any(Function) }),
+      weekStartsOn: 1,
+    });
+    expect(screen.getByText('月画面:2026-09-01')).toBeTruthy();
   });
 });

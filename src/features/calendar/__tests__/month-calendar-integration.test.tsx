@@ -137,6 +137,7 @@ describe('月カレンダーの統合操作', () => {
       ),
     );
     await waitFor(() => expect(view.getByTestId('calendar-status')).toHaveTextContent('ready'));
+    expect(view.getByLabelText('2026年10月1日、選択中')).toBeOnTheScreen();
     await user.press(view.getByRole('button', { name: '今日' }));
     await waitFor(() => expect(view.getByTestId('calendar-status')).toHaveTextContent('ready'));
 

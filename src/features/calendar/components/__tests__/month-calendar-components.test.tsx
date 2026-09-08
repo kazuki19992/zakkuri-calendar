@@ -27,6 +27,7 @@ function createDays(): readonly MonthDayViewModel[] {
       isToday: calendarDate === '2026-09-08',
       isSelected: calendarDate === '2026-09-21',
       hasEvents: calendarDate === '2026-09-21',
+      holidaySupport: 'available',
       holidayName: isHoliday ? '敬老の日' : null,
       accessibilityLabel: isHoliday
         ? '2026年9月21日、敬老の日、選択中、予定あり'
@@ -125,6 +126,17 @@ describe('月カレンダー表示コンポーネント', () => {
     const button = view.getByRole('button');
     expect(button).toHaveAccessibleName('2026年9月21日、敬老の日、選択中、予定あり');
     expect(button.props.accessibilityState).toEqual({ selected: true });
+  });
+
+  it('選択日を色以外でも識別できるよう日付へ下線を表示する', async () => {
+    const day = createDays().find((item) => item.date === '2026-09-21');
+    if (day === undefined) throw new Error('テスト用の日付がありません');
+
+    const view = await render(<MonthDayCell day={day} onPress={jest.fn()} />);
+
+    expect(StyleSheet.flatten(view.getByText('21').props.style)).toMatchObject({
+      textDecorationLine: 'underline',
+    });
   });
 
   it('今日かつ選択中で予定がある日も枠と予定印を対比色で表示する', async () => {

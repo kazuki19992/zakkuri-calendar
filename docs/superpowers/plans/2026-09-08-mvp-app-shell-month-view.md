@@ -497,7 +497,7 @@ task固有の一時ディレクトリを作り、その実パスを使って実�
 
 Expected: 両方がbundle errorなしで完了し、生成物をrepositoryへ含めない。
 
-- [x] **Step 5: native runtimeを確認する**
+- [x] **Step 5: native runtimeの利用可否を確認する**
 
     xcrun simctl list devices booted
     adb devices

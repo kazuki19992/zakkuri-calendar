@@ -36,6 +36,7 @@ export function MonthDayCell({ day, onPress }: MonthDayCellProps) {
           isSaturday && { color: theme.calendarSaturday },
           isHoliday && { color: theme.calendarHoliday },
           day.isSelected && { color: theme.background },
+          day.isSelected && styles.selectedDayNumber,
         ]}
       >
         {day.dayNumber}
@@ -65,6 +66,7 @@ const styles = StyleSheet.create({
     marginVertical: 1,
   },
   dayNumber: { fontSize: 15, fontWeight: '600', lineHeight: 18 },
+  selectedDayNumber: { textDecorationLine: 'underline' },
   eventDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
   hidden: { opacity: 0 },
   inactive: { opacity: 0.45 },

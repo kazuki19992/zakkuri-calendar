@@ -1,3 +1,4 @@
+import { forwardRef, useImperativeHandle } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -8,18 +9,28 @@ export type MonthToolbarProps = Readonly<{
   onNextMonth(): void;
 }>;
 
+/** react-native-calendars が月スワイプ時に呼び出すヘッダー操作。 */
+export type MonthToolbarHandle = Readonly<{
+  onPressLeft(): void;
+  onPressRight(): void;
+}>;
+
 function formatMonth(visibleMonth: string): string {
   const [year, month] = visibleMonth.split('-');
   return `${year}年${Number(month)}月`;
 }
 
-export function MonthToolbar({
-  visibleMonth,
-  onPreviousMonth,
-  onToday,
-  onNextMonth,
-}: MonthToolbarProps) {
+export const MonthToolbar = forwardRef<MonthToolbarHandle, MonthToolbarProps>(function MonthToolbar(
+  { visibleMonth, onPreviousMonth, onToday, onNextMonth },
+  ref,
+) {
   const theme = useTheme();
+
+  useImperativeHandle(
+    ref,
+    () => ({ onPressLeft: onPreviousMonth, onPressRight: onNextMonth }),
+    [onNextMonth, onPreviousMonth],
+  );
 
   return (
     <View style={[styles.container, { borderBottomColor: theme.calendarBorder }]}>
@@ -54,7 +65,9 @@ export function MonthToolbar({
       </View>
     </View>
   );
-}
+});
+
+MonthToolbar.displayName = 'MonthToolbar';
 
 const styles = StyleSheet.create({
   container: {

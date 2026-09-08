@@ -1,9 +1,11 @@
-import { render, userEvent } from '@testing-library/react-native';
+import { render, userEvent, waitFor } from '@testing-library/react-native';
+import { createRef, useState } from 'react';
+import { Text, View } from 'react-native';
 import type { AgendaItemViewModel, MonthDayViewModel } from '../../month-view-model';
 import { CalendarLoadState } from '../calendar-load-state';
 import { MonthDayCell } from '../month-day-cell';
 import { MonthGrid } from '../month-grid';
-import { MonthToolbar } from '../month-toolbar';
+import { MonthToolbar, type MonthToolbarHandle } from '../month-toolbar';
 import { SelectedDayAgenda } from '../selected-day-agenda';
 
 jest.mock('@/global.css', () => ({}));
@@ -33,6 +35,33 @@ function createDays(): readonly MonthDayViewModel[] {
   });
 }
 
+function MonthGridInteractionHarness() {
+  const [visibleMonth, setVisibleMonth] = useState('2026-09-01');
+  const [selectedDate, setSelectedDate] = useState('2026-09-21');
+
+  return (
+    <View>
+      <Text testID="visible-month">{visibleMonth}</Text>
+      <Text testID="selected-date">{selectedDate}</Text>
+      <MonthGrid
+        visibleMonth={visibleMonth}
+        days={createDays()}
+        onSelectDate={(date) => {
+          setSelectedDate(date);
+          setVisibleMonth(`${date.slice(0, 7)}-01`);
+        }}
+        onVisibleMonthChange={(date) => setVisibleMonth(`${date.slice(0, 7)}-01`)}
+        onPreviousMonth={() => undefined}
+        onToday={() => {
+          setSelectedDate('2026-10-08');
+          setVisibleMonth('2026-10-01');
+        }}
+        onNextMonth={() => undefined}
+      />
+    </View>
+  );
+}
+
 const agendaItems: readonly AgendaItemViewModel[] = [
   {
     id: 'event-1',
@@ -51,6 +80,7 @@ describe('月カレンダー表示コンポーネント', () => {
         visibleMonth="2026-09-01"
         days={createDays()}
         onSelectDate={onSelectDate}
+        onVisibleMonthChange={jest.fn()}
         onPreviousMonth={jest.fn()}
         onToday={jest.fn()}
         onNextMonth={jest.fn()}
@@ -76,6 +106,17 @@ describe('月カレンダー表示コンポーネント', () => {
     expect(button.props.accessibilityState).toEqual({ selected: true });
   });
 
+  it('日付セルの押下領域を縦横ともに44pt以上にする', async () => {
+    const day = createDays().find((item) => item.date === '2026-09-21');
+    if (day === undefined) throw new Error('テスト用の日付がありません');
+    const view = await render(<MonthDayCell day={day} onPress={jest.fn()} />);
+    const button = view.getByRole('button');
+
+    expect(button.props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ minHeight: 44, minWidth: 44 })]),
+    );
+  });
+
   it('前月と今日と次月の操作をツールバーから実行する', async () => {
     const onPreviousMonth = jest.fn();
     const onToday = jest.fn();
@@ -98,6 +139,66 @@ describe('月カレンダー表示コンポーネント', () => {
     expect(onPreviousMonth).toHaveBeenCalledTimes(1);
     expect(onToday).toHaveBeenCalledTimes(1);
     expect(onNextMonth).toHaveBeenCalledTimes(1);
+  });
+
+  it('カスタムヘッダーがスワイプ用の左右操作をrefへ公開する', async () => {
+    const ref = createRef<MonthToolbarHandle>();
+    const onPreviousMonth = jest.fn();
+    const onNextMonth = jest.fn();
+
+    await render(
+      <MonthToolbar
+        ref={ref}
+        visibleMonth="2026-09-01"
+        onPreviousMonth={onPreviousMonth}
+        onToday={jest.fn()}
+        onNextMonth={onNextMonth}
+      />,
+    );
+
+    ref.current?.onPressLeft();
+    ref.current?.onPressRight();
+
+    expect(onPreviousMonth).toHaveBeenCalledTimes(1);
+    expect(onNextMonth).toHaveBeenCalledTimes(1);
+  });
+
+  it('カスタムヘッダーの月移動経路から可視月だけを更新する', async () => {
+    const onVisibleMonthChange = jest.fn();
+    const onNextMonth = jest.fn();
+    const user = userEvent.setup();
+    const view = await render(
+      <MonthGrid
+        visibleMonth="2026-09-01"
+        days={createDays()}
+        onSelectDate={jest.fn()}
+        onVisibleMonthChange={onVisibleMonthChange}
+        onPreviousMonth={jest.fn()}
+        onToday={jest.fn()}
+        onNextMonth={onNextMonth}
+      />,
+    );
+
+    await user.press(view.getByRole('button', { name: '次月' }));
+
+    await waitFor(() => {
+      expect(onNextMonth).toHaveBeenCalledTimes(1);
+      expect(onVisibleMonthChange).toHaveBeenCalledWith('2026-10-01');
+    });
+  });
+
+  it('月外日選択と今日への移動で選択した日付を月初に上書きしない', async () => {
+    const user = userEvent.setup();
+    const view = await render(<MonthGridInteractionHarness />);
+
+    await user.press(view.getByLabelText('2026年8月31日'));
+    await waitFor(() => expect(view.getByTestId('selected-date')).toHaveTextContent('2026-08-31'));
+    await user.press(view.getByRole('button', { name: '今日' }));
+
+    await waitFor(() => {
+      expect(view.getByTestId('visible-month')).toHaveTextContent('2026-10-01');
+      expect(view.getByTestId('selected-date')).toHaveTextContent('2026-10-08');
+    });
   });
 
   it('祝日情報が未対応でも選択日の予定と空状態を表示する', async () => {

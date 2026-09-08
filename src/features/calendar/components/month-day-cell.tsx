@@ -50,6 +50,7 @@ export function MonthDayCell({ day, onPress }: MonthDayCellProps) {
 const styles = StyleSheet.create({
   cell: {
     minHeight: 44,
+    minWidth: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,

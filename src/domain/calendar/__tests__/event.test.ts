@@ -23,6 +23,7 @@ describe('parseEventDraft', () => {
     { ...validExact, startTime: null },
     { ...validExact, duration: null },
     { ...validExact, duration: { type: 'fixed', minutes: 45 } },
+    { ...validExact, duration: { type: 'fixed', minutes: '10' } },
     { ...validExact, startTime: '24:00' },
   ])('rejects invalid exact event data', (draft) => {
     expect(parseEventDraft(draft).ok).toBe(false);

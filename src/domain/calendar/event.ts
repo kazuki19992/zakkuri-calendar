@@ -47,7 +47,11 @@ export function parseExactDuration(value: unknown): Result<ExactDuration, EventV
   if (value.type === 'instant' || value.type === 'undetermined') {
     return { ok: true, value: { type: value.type } };
   }
-  if (value.type === 'fixed' && [10, 15, 30, 60].includes(Number(value.minutes))) {
+  if (
+    value.type === 'fixed' &&
+    typeof value.minutes === 'number' &&
+    [10, 15, 30, 60].includes(value.minutes)
+  ) {
     return { ok: true, value: { type: 'fixed', minutes: value.minutes as 10 | 15 | 30 | 60 } };
   }
   return fail('duration', 'invalid exact duration');

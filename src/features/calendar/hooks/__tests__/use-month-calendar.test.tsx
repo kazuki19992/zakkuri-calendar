@@ -256,6 +256,42 @@ describe('月カレンダーの状態調整', () => {
     expect(result.current.selectedDate).toBe('2026-09-08');
   });
 
+  it('日付をまたいだ後に今日へ戻すと現在日と今日の印を更新する', async () => {
+    const repositories = createRepositories([]);
+    const holidayProvider = createHolidayProvider();
+    let currentTime = new Date(2026, 8, 30, 23, 59);
+    const { result } = await renderHook(() =>
+      useMonthCalendar({
+        ...repositories,
+        holidayProvider,
+        weekStartsOn: 1,
+        now: () => currentTime,
+      }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    currentTime = new Date(2026, 9, 1, 0, 1);
+
+    await act(() => {
+      result.current.showToday();
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current).toMatchObject({
+      visibleMonth: '2026-10-01',
+      selectedDate: '2026-10-01',
+      today: '2026-10-01',
+    });
+    expect(result.current.days.find((day) => day.date === '2026-10-01')).toMatchObject({
+      isToday: true,
+      isSelected: true,
+    });
+    expect(repositories.events.listByAnchorRange).toHaveBeenLastCalledWith(
+      calendar.id,
+      '2026-10-01',
+      '2026-10-31',
+    );
+  });
+
   it('読み込み失敗後に同じ月を再試行する', async () => {
     const repositories = createRepositories([]);
     const holidayProvider = createHolidayProvider();

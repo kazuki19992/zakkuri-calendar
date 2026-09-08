@@ -1,4 +1,4 @@
-import { getMonthGrid, getMonthRange, moveMonth } from '../month';
+import { getMonthGrid, getMonthRange, getMonthStart, moveMonth, toCalendarDate } from '../month';
 
 describe('月カレンダーの日付計算', () => {
   it('閏年2月の月初と月末を返す', () => {
@@ -19,5 +19,28 @@ describe('月カレンダーの日付計算', () => {
     expect(grid).toHaveLength(42);
     expect(grid[0]?.date).toBe('2026-08-31');
     expect(grid[41]?.date).toBe('2026-10-11');
+  });
+
+  it('時差で前日になる時刻も端末の壁時計日付として返す', () => {
+    expect(toCalendarDate(new Date(2026, 8, 8, 0, 30))).toBe('2026-09-08');
+    expect(getMonthStart('2026-09-30')).toBe('2026-09-01');
+  });
+
+  it('日曜始まりのグリッド属性を月境界でも正しく返す', () => {
+    const grid = getMonthGrid('2026-02-15', 0);
+
+    expect(grid).toHaveLength(42);
+    expect(grid[0]).toEqual({
+      date: '2026-02-01',
+      dayNumber: 1,
+      weekday: 0,
+      isCurrentMonth: true,
+    });
+    expect(grid[41]).toEqual({
+      date: '2026-03-14',
+      dayNumber: 14,
+      weekday: 6,
+      isCurrentMonth: false,
+    });
   });
 });

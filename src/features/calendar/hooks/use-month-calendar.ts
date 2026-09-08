@@ -50,8 +50,13 @@ export type MonthCalendarState = Readonly<{
 
 const unsupportedHolidays: HolidayRangeResult = { status: 'unsupported' };
 
+function getSystemTime(): Date {
+  return new Date();
+}
+
 export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarState {
-  const [today] = useState(() => toCalendarDate((input.now ?? (() => new Date()))()));
+  const now = input.now ?? getSystemTime;
+  const [today, setToday] = useState(() => toCalendarDate(now()));
   const [visibleMonth, setVisibleMonth] = useState(() => getMonthStart(today));
   const [selectedDate, setSelectedDate] = useState(today);
   const [status, setStatus] = useState<MonthCalendarStatus>('loading');
@@ -155,10 +160,13 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
     setSelectedDate(nextMonth);
   }, [prepareForLoad, visibleMonth]);
   const showToday = useCallback(() => {
-    if (visibleMonth !== getMonthStart(today)) prepareForLoad();
-    setVisibleMonth(getMonthStart(today));
-    setSelectedDate(today);
-  }, [prepareForLoad, today, visibleMonth]);
+    const currentToday = toCalendarDate(now());
+    const currentMonth = getMonthStart(currentToday);
+    if (visibleMonth !== currentMonth) prepareForLoad();
+    setToday(currentToday);
+    setVisibleMonth(currentMonth);
+    setSelectedDate(currentToday);
+  }, [now, prepareForLoad, visibleMonth]);
   const selectDate = useCallback(
     (date: string) => {
       const selectedMonth = getMonthStart(date);

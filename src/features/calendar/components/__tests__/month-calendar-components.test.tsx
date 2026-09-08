@@ -1,11 +1,11 @@
 import { render, userEvent, waitFor } from '@testing-library/react-native';
-import { createRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import type { AgendaItemViewModel, MonthDayViewModel } from '../../month-view-model';
+import { Colors } from '@/constants/theme';
 import { CalendarLoadState } from '../calendar-load-state';
 import { MonthDayCell } from '../month-day-cell';
 import { MonthGrid } from '../month-grid';
-import { MonthToolbar, type MonthToolbarHandle } from '../month-toolbar';
+import { MonthToolbar } from '../month-toolbar';
 import { SelectedDayAgenda } from '../selected-day-agenda';
 
 jest.mock('@/global.css', () => ({}));
@@ -35,31 +35,53 @@ function createDays(): readonly MonthDayViewModel[] {
   });
 }
 
-function MonthGridInteractionHarness() {
-  const [visibleMonth, setVisibleMonth] = useState('2026-09-01');
-  const [selectedDate, setSelectedDate] = useState('2026-09-21');
-
-  return (
-    <View>
-      <Text testID="visible-month">{visibleMonth}</Text>
-      <Text testID="selected-date">{selectedDate}</Text>
-      <MonthGrid
-        visibleMonth={visibleMonth}
-        days={createDays()}
-        onSelectDate={(date) => {
-          setSelectedDate(date);
-          setVisibleMonth(`${date.slice(0, 7)}-01`);
-        }}
-        onVisibleMonthChange={(date) => setVisibleMonth(`${date.slice(0, 7)}-01`)}
-        onPreviousMonth={() => undefined}
-        onToday={() => {
-          setSelectedDate('2026-10-08');
-          setVisibleMonth('2026-10-01');
-        }}
-        onNextMonth={() => undefined}
-      />
-    </View>
-  );
+function createGestureEvents(dx: number, dy: number, duration: number) {
+  const startPageX = 120;
+  const startPageY = 120;
+  const startEvent = {
+    nativeEvent: { touches: [{ pageX: startPageX, pageY: startPageY }], timestamp: 0 },
+    touchHistory: {
+      touchBank: [
+        {
+          touchActive: true,
+          startPageX,
+          startPageY,
+          previousPageX: startPageX,
+          previousPageY: startPageY,
+          currentPageX: startPageX,
+          currentPageY: startPageY,
+          currentTimeStamp: 0,
+        },
+      ],
+      numberActiveTouches: 1,
+      indexOfSingleActiveTouch: 0,
+      mostRecentTimeStamp: 0,
+    },
+  };
+  const moveEvent = {
+    nativeEvent: {
+      touches: [{ pageX: startPageX + dx, pageY: startPageY + dy }],
+      timestamp: duration,
+    },
+    touchHistory: {
+      touchBank: [
+        {
+          touchActive: true,
+          startPageX,
+          startPageY,
+          previousPageX: startPageX,
+          previousPageY: startPageY,
+          currentPageX: startPageX + dx,
+          currentPageY: startPageY + dy,
+          currentTimeStamp: duration,
+        },
+      ],
+      numberActiveTouches: 1,
+      indexOfSingleActiveTouch: 0,
+      mostRecentTimeStamp: duration,
+    },
+  };
+  return { startEvent, moveEvent };
 }
 
 const agendaItems: readonly AgendaItemViewModel[] = [
@@ -80,7 +102,6 @@ describe('月カレンダー表示コンポーネント', () => {
         visibleMonth="2026-09-01"
         days={createDays()}
         onSelectDate={onSelectDate}
-        onVisibleMonthChange={jest.fn()}
         onPreviousMonth={jest.fn()}
         onToday={jest.fn()}
         onNextMonth={jest.fn()}
@@ -104,6 +125,29 @@ describe('月カレンダー表示コンポーネント', () => {
     const button = view.getByRole('button');
     expect(button).toHaveAccessibleName('2026年9月21日、敬老の日、選択中、予定あり');
     expect(button.props.accessibilityState).toEqual({ selected: true });
+  });
+
+  it('今日かつ選択中で予定がある日も枠と予定印を対比色で表示する', async () => {
+    const baseDay = createDays().find((item) => item.date === '2026-09-21');
+    if (baseDay === undefined) throw new Error('テスト用の日付がありません');
+    const day = {
+      ...baseDay,
+      isToday: true,
+      accessibilityLabel: '2026年9月21日、敬老の日、今日、選択中、予定あり',
+    };
+    const view = await render(<MonthDayCell day={day} onPress={jest.fn()} />);
+
+    expect(StyleSheet.flatten(view.getByRole('button').props.style)).toMatchObject({
+      backgroundColor: Colors.light.calendarAccent,
+      borderColor: Colors.light.background,
+    });
+    const dotStyle = StyleSheet.flatten(
+      view.getByTestId('month-calendar.event-dot.2026-09-21', {
+        includeHiddenElements: true,
+      }).props.style,
+    );
+    expect(dotStyle).toMatchObject({ backgroundColor: Colors.light.background });
+    expect(dotStyle).not.toHaveProperty('opacity');
   });
 
   it('日付セルの押下領域を縦横ともに44pt以上にする', async () => {
@@ -141,30 +185,22 @@ describe('月カレンダー表示コンポーネント', () => {
     expect(onNextMonth).toHaveBeenCalledTimes(1);
   });
 
-  it('カスタムヘッダーがライブラリの月スワイプ経路用操作をrefへ公開する', async () => {
-    const ref = createRef<MonthToolbarHandle>();
-    const onPreviousMonth = jest.fn();
-    const onNextMonth = jest.fn();
-
-    await render(
+  it('カスタムヘッダーに月曜日から日曜日までの見出しを順に表示する', async () => {
+    const view = await render(
       <MonthToolbar
-        ref={ref}
         visibleMonth="2026-09-01"
-        onPreviousMonth={onPreviousMonth}
+        onPreviousMonth={jest.fn()}
         onToday={jest.fn()}
-        onNextMonth={onNextMonth}
+        onNextMonth={jest.fn()}
       />,
     );
 
-    ref.current?.onPressLeft();
-    ref.current?.onPressRight();
-
-    expect(onPreviousMonth).toHaveBeenCalledTimes(1);
-    expect(onNextMonth).toHaveBeenCalledTimes(1);
+    expect(
+      view.getAllByTestId('month-calendar.weekday').map((weekday) => weekday.props.children),
+    ).toEqual(['月', '火', '水', '木', '金', '土', '日']);
   });
 
-  it('カスタムヘッダーの月移動経路から可視月だけを更新する', async () => {
-    const onVisibleMonthChange = jest.fn();
+  it('カスタムヘッダーの月移動操作を次月コールバックへ直接渡す', async () => {
     const onNextMonth = jest.fn();
     const user = userEvent.setup();
     const view = await render(
@@ -172,7 +208,6 @@ describe('月カレンダー表示コンポーネント', () => {
         visibleMonth="2026-09-01"
         days={createDays()}
         onSelectDate={jest.fn()}
-        onVisibleMonthChange={onVisibleMonthChange}
         onPreviousMonth={jest.fn()}
         onToday={jest.fn()}
         onNextMonth={onNextMonth}
@@ -183,84 +218,79 @@ describe('月カレンダー表示コンポーネント', () => {
 
     await waitFor(() => {
       expect(onNextMonth).toHaveBeenCalledTimes(1);
-      expect(onVisibleMonthChange).toHaveBeenCalledWith('2026-10-01');
     });
   });
 
-  it('水平スワイプで可視月だけを次月へ移動する', async () => {
-    const onVisibleMonthChange = jest.fn();
+  it('左スワイプで次月コールバックを直接実行する', async () => {
+    const onNextMonth = jest.fn();
     const view = await render(
       <MonthGrid
         visibleMonth="2026-09-01"
         days={createDays()}
         onSelectDate={jest.fn()}
-        onVisibleMonthChange={onVisibleMonthChange}
         onPreviousMonth={jest.fn()}
         onToday={jest.fn()}
-        onNextMonth={jest.fn()}
+        onNextMonth={onNextMonth}
       />,
     );
     const swipeContainer = view.getByTestId('month-calendar.swipe');
-    const startEvent = {
-      nativeEvent: { touches: [{ pageX: 120, pageY: 10 }], timestamp: 0 },
-      touchHistory: {
-        touchBank: [
-          {
-            touchActive: true,
-            startPageX: 120,
-            startPageY: 10,
-            previousPageX: 120,
-            previousPageY: 10,
-            currentPageX: 120,
-            currentPageY: 10,
-            currentTimeStamp: 0,
-          },
-        ],
-        numberActiveTouches: 1,
-        indexOfSingleActiveTouch: 0,
-        mostRecentTimeStamp: 0,
-      },
-    };
-    const moveEvent = {
-      nativeEvent: { touches: [{ pageX: 20, pageY: 18 }], timestamp: 100 },
-      touchHistory: {
-        touchBank: [
-          {
-            touchActive: true,
-            startPageX: 120,
-            startPageY: 10,
-            previousPageX: 120,
-            previousPageY: 10,
-            currentPageX: 20,
-            currentPageY: 18,
-            currentTimeStamp: 100,
-          },
-        ],
-        numberActiveTouches: 1,
-        indexOfSingleActiveTouch: 0,
-        mostRecentTimeStamp: 100,
-      },
-    };
+    const { startEvent, moveEvent } = createGestureEvents(-100, 8, 100);
 
     swipeContainer.props.onStartShouldSetResponderCapture(startEvent);
     swipeContainer.props.onMoveShouldSetResponderCapture(moveEvent);
     swipeContainer.props.onResponderRelease(moveEvent);
 
-    await waitFor(() => expect(onVisibleMonthChange).toHaveBeenCalledWith('2026-10-01'));
+    await waitFor(() => expect(onNextMonth).toHaveBeenCalledTimes(1));
   });
 
-  it('月外日選択と今日への移動で選択した日付を月初に上書きしない', async () => {
-    const user = userEvent.setup();
-    const view = await render(<MonthGridInteractionHarness />);
+  it('右スワイプで前月コールバックを直接実行する', async () => {
+    const onPreviousMonth = jest.fn();
+    const view = await render(
+      <MonthGrid
+        visibleMonth="2026-09-01"
+        days={createDays()}
+        onSelectDate={jest.fn()}
+        onPreviousMonth={onPreviousMonth}
+        onToday={jest.fn()}
+        onNextMonth={jest.fn()}
+      />,
+    );
+    const swipeContainer = view.getByTestId('month-calendar.swipe');
+    const { startEvent, moveEvent } = createGestureEvents(100, 8, 100);
 
-    await user.press(view.getByLabelText('2026年8月31日'));
-    await waitFor(() => expect(view.getByTestId('selected-date')).toHaveTextContent('2026-08-31'));
-    await user.press(view.getByRole('button', { name: '今日' }));
+    swipeContainer.props.onStartShouldSetResponderCapture(startEvent);
+    swipeContainer.props.onMoveShouldSetResponderCapture(moveEvent);
+    swipeContainer.props.onResponderRelease(moveEvent);
 
-    await waitFor(() => {
-      expect(view.getByTestId('visible-month')).toHaveTextContent('2026-10-01');
-      expect(view.getByTestId('selected-date')).toHaveTextContent('2026-10-08');
-    });
+    await waitFor(() => expect(onPreviousMonth).toHaveBeenCalledTimes(1));
+  });
+
+  it.each([
+    ['縦方向', 8, 100, 100],
+    ['短距離', 20, 0, 100],
+    ['低速', 100, 0, 1000],
+  ])('%sのジェスチャーでは月を移動しない', async (_kind, dx, dy, duration) => {
+    const onPreviousMonth = jest.fn();
+    const onNextMonth = jest.fn();
+    const view = await render(
+      <MonthGrid
+        visibleMonth="2026-09-01"
+        days={createDays()}
+        onSelectDate={jest.fn()}
+        onPreviousMonth={onPreviousMonth}
+        onToday={jest.fn()}
+        onNextMonth={onNextMonth}
+      />,
+    );
+    const swipeContainer = view.getByTestId('month-calendar.swipe');
+    const { startEvent, moveEvent } = createGestureEvents(dx, dy, duration);
+
+    swipeContainer.props.onStartShouldSetResponderCapture(startEvent);
+    swipeContainer.props.onMoveShouldSetResponderCapture(moveEvent);
+    swipeContainer.props.onResponderRelease(moveEvent);
+
+    expect(onPreviousMonth).not.toHaveBeenCalled();
+    expect(onNextMonth).not.toHaveBeenCalled();
   });
 
   it('祝日情報が未対応でも選択日の予定と空状態を表示する', async () => {
@@ -273,7 +303,7 @@ describe('月カレンダー表示コンポーネント', () => {
       />,
     );
 
-    expect(view.getByText('祝日情報を表示できません')).toBeOnTheScreen();
+    expect(view.getByText('祝日情報未対応')).toBeOnTheScreen();
     expect(view.getByLabelText('敬老会、終日')).toBeOnTheScreen();
 
     await view.rerender(

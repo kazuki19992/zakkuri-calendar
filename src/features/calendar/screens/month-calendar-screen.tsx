@@ -1,5 +1,6 @@
 import type { HolidayProvider } from '@/domain/calendar/holiday';
 import type { WeekStartsOn } from '@/domain/calendar/month';
+import { ScrollView, StyleSheet } from 'react-native';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { CalendarLoadState } from '../components/calendar-load-state';
 import { MonthGrid } from '../components/month-grid';
@@ -23,21 +24,32 @@ export function MonthCalendarScreen({ holidayProvider, weekStartsOn }: MonthCale
 
   return (
     <CalendarLoadState status={state.status} onRetry={state.retry}>
-      <MonthGrid
-        visibleMonth={state.visibleMonth}
-        days={state.days}
-        onSelectDate={state.selectDate}
-        onVisibleMonthChange={state.selectDate}
-        onPreviousMonth={state.showPreviousMonth}
-        onToday={state.showToday}
-        onNextMonth={state.showNextMonth}
-      />
-      <SelectedDayAgenda
-        selectedDate={state.selectedDate}
-        holidayName={state.selectedHolidayName}
-        holidaySupport={state.holidaySupport}
-        items={state.agendaItems}
-      />
+      <ScrollView
+        testID="month-calendar.scroll"
+        style={styles.scroll}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.content}
+      >
+        <MonthGrid
+          visibleMonth={state.visibleMonth}
+          days={state.days}
+          onSelectDate={state.selectDate}
+          onPreviousMonth={state.showPreviousMonth}
+          onToday={state.showToday}
+          onNextMonth={state.showNextMonth}
+        />
+        <SelectedDayAgenda
+          selectedDate={state.selectedDate}
+          holidayName={state.selectedHolidayName}
+          holidaySupport={state.holidaySupport}
+          items={state.agendaItems}
+        />
+      </ScrollView>
     </CalendarLoadState>
   );
 }
+
+const styles = StyleSheet.create({
+  scroll: { flex: 1 },
+  content: { flexGrow: 1 },
+});

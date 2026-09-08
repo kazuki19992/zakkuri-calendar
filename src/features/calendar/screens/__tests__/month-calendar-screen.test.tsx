@@ -20,8 +20,9 @@ jest.mock('../../components/month-grid', () => {
   return {
     MonthGrid: (props: {
       visibleMonth: string;
+      days: readonly { date: string }[];
       onSelectDate(date: string): void;
-      onVisibleMonthChange(date: string): void;
+      onVisibleMonthChange?(date: string): void;
       onPreviousMonth(): void;
       onToday(): void;
       onNextMonth(): void;
@@ -30,15 +31,16 @@ jest.mock('../../components/month-grid', () => {
         View,
         null,
         React.createElement(Text, null, `月グリッド:${props.visibleMonth}`),
+        React.createElement(Text, null, `日付モデル:${props.days.map((day) => day.date).join(',')}`),
+        React.createElement(
+          Text,
+          null,
+          `月変更通知:${props.onVisibleMonthChange === undefined ? 'なし' : 'あり'}`,
+        ),
         React.createElement(
           Pressable,
           { accessibilityRole: 'button', accessibilityLabel: '日付選択', onPress: () => props.onSelectDate('2026-09-22') },
           React.createElement(Text, null, '日付選択'),
-        ),
-        React.createElement(
-          Pressable,
-          { accessibilityRole: 'button', accessibilityLabel: '月変更', onPress: () => props.onVisibleMonthChange('2026-10-01') },
-          React.createElement(Text, null, '月変更'),
         ),
         React.createElement(
           Pressable,
@@ -60,13 +62,20 @@ jest.mock('../../components/month-grid', () => {
 });
 
 jest.mock('../../components/selected-day-agenda', () => ({
-  SelectedDayAgenda: (props: { selectedDate: string; items: readonly { title: string }[] }) => {
+  SelectedDayAgenda: (props: {
+    selectedDate: string;
+    holidayName: string | null;
+    holidaySupport: 'available' | 'unsupported';
+    items: readonly { id: string; title: string }[];
+  }) => {
     const React = jest.requireActual<typeof import('react')>('react');
-    const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
+    const { Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
     return React.createElement(
-      Text,
+      View,
       null,
-      `予定:${props.selectedDate}:${props.items.map((item) => item.title).join(',')}`,
+      React.createElement(Text, null, `予定日:${props.selectedDate}`),
+      React.createElement(Text, null, `祝日:${props.holidayName ?? 'なし'}:${props.holidaySupport}`),
+      ...props.items.map((item) => React.createElement(Text, { key: item.id }, item.title)),
     );
   },
 }));
@@ -138,7 +147,7 @@ describe('月カレンダー画面', () => {
     await render(<MonthCalendarScreen holidayProvider={{ list: jest.fn() }} weekStartsOn={1} />);
 
     expect(screen.getByText('月グリッド:2026-09-01')).toBeTruthy();
-    expect(screen.getByText('予定:2026-09-21:')).toBeTruthy();
+    expect(screen.getByText('予定日:2026-09-21')).toBeTruthy();
   });
 
   it('予定がある準備完了時は画面状態と操作を表示コンポーネントへ渡す', async () => {
@@ -147,7 +156,24 @@ describe('月カレンダー画面', () => {
     const agendaItems = [
       { id: 'event-1', title: '敬老会', temporalLabel: '終日', accessibilityLabel: '敬老会、終日' },
     ];
-    mockUseMonthCalendar.mockReturnValue(createState({ agendaItems }));
+    mockUseMonthCalendar.mockReturnValue(
+      createState({
+        days: [
+          {
+            date: '2026-09-21',
+            dayNumber: 21,
+            weekday: 1,
+            isCurrentMonth: true,
+            isToday: false,
+            isSelected: true,
+            hasEvents: true,
+            holidayName: '敬老の日',
+            accessibilityLabel: '2026年9月21日、敬老の日、選択中、予定あり',
+          },
+        ],
+        agendaItems,
+      }),
+    );
 
     await render(<MonthCalendarScreen holidayProvider={holidayProvider} weekStartsOn={1} />);
 
@@ -159,16 +185,34 @@ describe('月カレンダー画面', () => {
       weekStartsOn: 1,
     });
     expect(screen.getByText('月グリッド:2026-09-01')).toBeTruthy();
-    expect(screen.getByText('予定:2026-09-21:敬老会')).toBeTruthy();
+    expect(screen.getByText('日付モデル:2026-09-21')).toBeTruthy();
+    expect(screen.getByText('月変更通知:なし')).toBeTruthy();
+    expect(screen.getByText('予定日:2026-09-21')).toBeTruthy();
+    expect(screen.getByText('祝日:敬老の日:available')).toBeTruthy();
+    expect(screen.getByText('敬老会')).toBeTruthy();
     await user.press(screen.getByRole('button', { name: '日付選択' }));
-    await user.press(screen.getByRole('button', { name: '月変更' }));
     await user.press(screen.getByRole('button', { name: '前月' }));
     await user.press(screen.getByRole('button', { name: '今日' }));
     await user.press(screen.getByRole('button', { name: '次月' }));
     expect(stateCallbacks.selectDate).toHaveBeenCalledWith('2026-09-22');
-    expect(stateCallbacks.selectDate).toHaveBeenCalledWith('2026-10-01');
+    expect(stateCallbacks.selectDate).toHaveBeenCalledTimes(1);
     expect(stateCallbacks.showPreviousMonth).toHaveBeenCalledTimes(1);
     expect(stateCallbacks.showToday).toHaveBeenCalledTimes(1);
     expect(stateCallbacks.showNextMonth).toHaveBeenCalledTimes(1);
+  });
+
+  it('小さい画面や文字拡大と多数の予定でも末尾へ到達できる構造にする', async () => {
+    const agendaItems = Array.from({ length: 30 }, (_, index) => ({
+      id: `event-${index}`,
+      title: `予定${index}`,
+      temporalLabel: '終日',
+      accessibilityLabel: `予定${index}、終日`,
+    }));
+    mockUseMonthCalendar.mockReturnValue(createState({ agendaItems }));
+
+    await render(<MonthCalendarScreen holidayProvider={{ list: jest.fn() }} weekStartsOn={1} />);
+
+    expect(screen.getByTestId('month-calendar.scroll')).toBeTruthy();
+    expect(screen.getByText('予定29')).toBeTruthy();
   });
 });

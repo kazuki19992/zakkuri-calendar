@@ -18,4 +18,20 @@ describe('日本の祝日provider', () => {
       status: 'unsupported',
     });
   });
+
+  it('収録範囲の両端年を対応済みとして扱う', () => {
+    expect(new JapaneseHolidayProvider().list('1970-01-01', '1970-01-01')).toMatchObject({
+      status: 'available',
+    });
+    expect(new JapaneseHolidayProvider().list('2050-01-01', '2050-01-01')).toMatchObject({
+      status: 'available',
+    });
+  });
+
+  it('年境界をまたぐ範囲から翌年の元日を返す', () => {
+    expect(new JapaneseHolidayProvider().list('2026-12-31', '2027-01-01')).toEqual({
+      status: 'available',
+      holidays: [expect.objectContaining({ date: '2027-01-01', name: '元日' })],
+    });
+  });
 });

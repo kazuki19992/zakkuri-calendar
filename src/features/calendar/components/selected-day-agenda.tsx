@@ -30,7 +30,7 @@ export function SelectedDayAgenda({
       {holidayName !== null ? (
         <Text style={[styles.holiday, { color: theme.calendarHoliday }]}>{holidayName}</Text>
       ) : holidaySupport === 'unsupported' ? (
-        <Text style={[styles.support, { color: theme.textSecondary }]}>祝日情報を表示できません</Text>
+        <Text style={[styles.support, { color: theme.textSecondary }]}>祝日情報未対応</Text>
       ) : null}
       {items.length === 0 ? (
         <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text>

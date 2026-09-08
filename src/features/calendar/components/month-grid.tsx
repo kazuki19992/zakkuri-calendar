@@ -1,18 +1,13 @@
-import { forwardRef, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Calendar, type CalendarProps } from 'react-native-calendars';
 import { PanResponder, View, type PanResponderGestureState } from 'react-native';
 import type { MonthDayViewModel } from '../month-view-model';
 import { useTheme } from '@/hooks/use-theme';
 import { MonthDayCell } from './month-day-cell';
-import { MonthToolbar, type MonthToolbarHandle } from './month-toolbar';
+import { MonthToolbar } from './month-toolbar';
 
 const HORIZONTAL_SWIPE_DISTANCE = 40;
 const HORIZONTAL_SWIPE_VELOCITY = 0.3;
-
-function moveMonth(month: string, offset: number): string {
-  const [year, monthNumber] = month.split('-').map(Number);
-  return new Date(Date.UTC(year, monthNumber - 1 + offset, 1)).toISOString().slice(0, 10);
-}
 
 function isHorizontalSwipe(gesture: PanResponderGestureState): boolean {
   return (
@@ -26,7 +21,6 @@ export type MonthGridProps = Readonly<{
   visibleMonth: string;
   days: readonly MonthDayViewModel[];
   onSelectDate(date: string): void;
-  onVisibleMonthChange?(date: string): void;
   onPreviousMonth(): void;
   onToday(): void;
   onNextMonth(): void;
@@ -36,7 +30,6 @@ export function MonthGrid({
   visibleMonth,
   days,
   onSelectDate,
-  onVisibleMonthChange,
   onPreviousMonth,
   onToday,
   onNextMonth,
@@ -51,32 +44,22 @@ export function MonthGrid({
           Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onPanResponderRelease: (_, gesture) => {
           if (!isHorizontalSwipe(gesture)) return;
-          const offset = gesture.dx < 0 ? 1 : -1;
-          onVisibleMonthChange?.(moveMonth(visibleMonth, offset));
+          if (gesture.dx < 0) onNextMonth();
+          else onPreviousMonth();
         },
       }),
-    [onVisibleMonthChange, visibleMonth],
+    [onNextMonth, onPreviousMonth],
   );
-  const CalendarHeader: NonNullable<CalendarProps['customHeader']> = forwardRef<
-    MonthToolbarHandle,
-    { addMonth?: (count: number) => void }
-  >(function CalendarHeader({ addMonth }, ref) {
+  const CalendarHeader: NonNullable<CalendarProps['customHeader']> = function CalendarHeader() {
     return (
       <MonthToolbar
-        ref={ref}
         visibleMonth={visibleMonth}
-        onPreviousMonth={() => {
-          addMonth?.(-1);
-          onPreviousMonth();
-        }}
+        onPreviousMonth={onPreviousMonth}
         onToday={onToday}
-        onNextMonth={() => {
-          addMonth?.(1);
-          onNextMonth();
-        }}
+        onNextMonth={onNextMonth}
       />
     );
-  });
+  };
   const DayComponent: NonNullable<CalendarProps['dayComponent']> = ({ date }) => {
     const day = date === undefined ? undefined : daysByDate.get(date.dateString);
     return day === undefined ? null : <MonthDayCell day={day} onPress={onSelectDate} />;
@@ -90,12 +73,8 @@ export function MonthGrid({
         firstDay={1}
         showSixWeeks
         hideExtraDays={false}
-        enableSwipeMonths
         customHeader={CalendarHeader}
         dayComponent={DayComponent}
-        onMonthChange={(date) => {
-          onVisibleMonthChange?.(`${date.dateString.slice(0, 7)}-01`);
-        }}
         theme={{
           calendarBackground: theme.background,
           dayTextColor: theme.text,

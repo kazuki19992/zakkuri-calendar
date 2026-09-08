@@ -23,10 +23,11 @@ export function CalendarLoadState({ status, onRetry, children }: CalendarLoadSta
 
   if (status === 'error') return <DatabaseErrorState onRetry={onRetry} />;
 
-  return <View>{children}</View>;
+  return <View style={styles.ready}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
+  ready: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   loadingLabel: { fontSize: 15 },
 });

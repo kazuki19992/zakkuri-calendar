@@ -1,4 +1,3 @@
-import { forwardRef, useImperativeHandle } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -9,74 +8,89 @@ export type MonthToolbarProps = Readonly<{
   onNextMonth(): void;
 }>;
 
-/** react-native-calendars が月スワイプ時に呼び出すヘッダー操作。 */
-export type MonthToolbarHandle = Readonly<{
-  onPressLeft(): void;
-  onPressRight(): void;
-}>;
-
 function formatMonth(visibleMonth: string): string {
   const [year, month] = visibleMonth.split('-');
   return `${year}年${Number(month)}月`;
 }
 
-export const MonthToolbar = forwardRef<MonthToolbarHandle, MonthToolbarProps>(function MonthToolbar(
-  { visibleMonth, onPreviousMonth, onToday, onNextMonth },
-  ref,
-) {
+const WEEKDAY_LABELS = ['月', '火', '水', '木', '金', '土', '日'] as const;
+
+export function MonthToolbar({
+  visibleMonth,
+  onPreviousMonth,
+  onToday,
+  onNextMonth,
+}: MonthToolbarProps) {
   const theme = useTheme();
 
-  useImperativeHandle(
-    ref,
-    () => ({ onPressLeft: onPreviousMonth, onPressRight: onNextMonth }),
-    [onNextMonth, onPreviousMonth],
-  );
-
   return (
-    <View style={[styles.container, { borderBottomColor: theme.calendarBorder }]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="前月"
-        onPress={onPreviousMonth}
-        style={({ pressed }) => [styles.button, pressed && styles.pressed]}
-      >
-        <Text style={[styles.buttonLabel, { color: theme.calendarAccent }]}>前月</Text>
-      </Pressable>
-      <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-        {formatMonth(visibleMonth)}
-      </Text>
-      <View style={styles.actions}>
+    <View>
+      <View style={styles.container}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="今日"
-          onPress={onToday}
-          style={({ pressed }) => [styles.todayButton, pressed && styles.pressed]}
-        >
-          <Text style={[styles.buttonLabel, { color: theme.calendarAccent }]}>今日</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="次月"
-          onPress={onNextMonth}
+          accessibilityLabel="前月"
+          onPress={onPreviousMonth}
           style={({ pressed }) => [styles.button, pressed && styles.pressed]}
         >
-          <Text style={[styles.buttonLabel, { color: theme.calendarAccent }]}>次月</Text>
+          <Text style={[styles.buttonLabel, { color: theme.calendarAccent }]}>前月</Text>
         </Pressable>
+        <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
+          {formatMonth(visibleMonth)}
+        </Text>
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="今日"
+            onPress={onToday}
+            style={({ pressed }) => [styles.todayButton, pressed && styles.pressed]}
+          >
+            <Text style={[styles.buttonLabel, { color: theme.calendarAccent }]}>今日</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="次月"
+            onPress={onNextMonth}
+            style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+          >
+            <Text style={[styles.buttonLabel, { color: theme.calendarAccent }]}>次月</Text>
+          </Pressable>
+        </View>
+      </View>
+      <View style={[styles.weekdays, { borderBottomColor: theme.calendarBorder }]}>
+        {WEEKDAY_LABELS.map((label, index) => (
+          <Text
+            key={label}
+            testID="month-calendar.weekday"
+            accessibilityLabel={`${label}曜日`}
+            style={[
+              styles.weekday,
+              { color: theme.textSecondary },
+              index === 5 && { color: theme.calendarSaturday },
+              index === 6 && { color: theme.calendarHoliday },
+            ]}
+          >
+            {label}
+          </Text>
+        ))}
       </View>
     </View>
   );
-});
-
-MonthToolbar.displayName = 'MonthToolbar';
+}
 
 const styles = StyleSheet.create({
   container: {
     minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 4,
   },
+  weekdays: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 2,
+    paddingBottom: 4,
+  },
+  weekday: { flex: 1, textAlign: 'center', fontSize: 13, fontWeight: '600' },
   actions: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center' },
   title: { fontSize: 18, fontWeight: '700', marginLeft: 4 },
   button: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },

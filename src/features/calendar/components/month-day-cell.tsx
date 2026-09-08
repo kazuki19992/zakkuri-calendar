@@ -21,7 +21,9 @@ export function MonthDayCell({ day, onPress }: MonthDayCellProps) {
       style={({ pressed }) => [
         styles.cell,
         day.isSelected && { backgroundColor: theme.calendarAccent },
-        day.isToday && { borderColor: theme.calendarAccent },
+        day.isToday && {
+          borderColor: day.isSelected ? theme.background : theme.calendarAccent,
+        },
         !day.isToday && { borderColor: 'transparent' },
         !day.isCurrentMonth && styles.inactive,
         pressed && styles.pressed,
@@ -39,9 +41,14 @@ export function MonthDayCell({ day, onPress }: MonthDayCellProps) {
         {day.dayNumber}
       </Text>
       <View
+        testID={`month-calendar.event-dot.${day.date}`}
         accessibilityElementsHidden
         importantForAccessibility="no"
-        style={[styles.eventDot, { backgroundColor: theme.calendarAccent }, !day.hasEvents && styles.hidden]}
+        style={[
+          styles.eventDot,
+          { backgroundColor: day.isSelected ? theme.background : theme.calendarAccent },
+          !day.hasEvents && styles.hidden,
+        ]}
       />
     </Pressable>
   );

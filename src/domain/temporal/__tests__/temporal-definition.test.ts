@@ -36,6 +36,10 @@ describe('parseTemporalDefinition', () => {
     },
   );
 
+  it('rejects non-finite fade ratios', () => {
+    expect(parseTemporalDefinition({ ...base, fadeInRatio: Number.NaN }).ok).toBe(false);
+  });
+
   it('accepts a cross-midnight time range', () => {
     expect(
       parseTemporalDefinition({

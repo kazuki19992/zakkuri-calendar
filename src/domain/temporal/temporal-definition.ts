@@ -171,10 +171,20 @@ export function parseTemporalDefinition(
   if (input.granularity !== 'day' && input.granularity !== 'week' && input.granularity !== 'month') {
     return fail('granularity', 'invalid granularity');
   }
-  if (typeof input.fadeInRatio !== 'number' || input.fadeInRatio < 0 || input.fadeInRatio > 1) {
+  if (
+    typeof input.fadeInRatio !== 'number' ||
+    !Number.isFinite(input.fadeInRatio) ||
+    input.fadeInRatio < 0 ||
+    input.fadeInRatio > 1
+  ) {
     return fail('fadeInRatio', 'fadeInRatio must be between 0 and 1');
   }
-  if (typeof input.fadeOutRatio !== 'number' || input.fadeOutRatio < 0 || input.fadeOutRatio > 1) {
+  if (
+    typeof input.fadeOutRatio !== 'number' ||
+    !Number.isFinite(input.fadeOutRatio) ||
+    input.fadeOutRatio < 0 ||
+    input.fadeOutRatio > 1
+  ) {
     return fail('fadeOutRatio', 'fadeOutRatio must be between 0 and 1');
   }
   if (input.fadeInRatio + input.fadeOutRatio > 1) {

@@ -91,7 +91,8 @@ build_platform() {
     eas build \
       --platform "${target_platform}" \
       --profile "${PROFILE}" \
-      --local
+      --local \
+      --non-interactive
 }
 
 if [[ "${PLATFORM}" == "all" ]]; then

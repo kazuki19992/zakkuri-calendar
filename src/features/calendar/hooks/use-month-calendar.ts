@@ -30,6 +30,7 @@ export type UseMonthCalendarInput = Readonly<{
   temporalDefinitions: TemporalDefinitionRepository;
   holidayProvider: HolidayProvider;
   weekStartsOn: WeekStartsOn;
+  refreshRevision?: number;
   now?: () => Date;
 }>;
 
@@ -130,6 +131,7 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
     input.calendars,
     input.events,
     input.holidayProvider,
+    input.refreshRevision,
     input.temporalDefinitions,
     monthGrid,
     retryKey,

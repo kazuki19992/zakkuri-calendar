@@ -119,6 +119,29 @@ function createBoundaryHolidayProvider(): jest.Mocked<HolidayProvider> {
 }
 
 describe('月カレンダーの状態調整', () => {
+  it('refreshRevisionが変わると表示月を再取得する', async () => {
+    const repositories = createRepositories([]);
+    const holidayProvider = createHolidayProvider();
+    const { result, rerender } = await renderHook(
+      ({ refreshRevision }: { refreshRevision: number }) =>
+        useMonthCalendar({
+          ...repositories,
+          holidayProvider,
+          weekStartsOn: 1,
+          refreshRevision,
+          now: () => new Date(2026, 8, 8, 12),
+        }),
+      { initialProps: { refreshRevision: 0 } },
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(repositories.events.listByAnchorRange).toHaveBeenCalledTimes(1);
+
+    await rerender({ refreshRevision: 1 });
+
+    await waitFor(() => expect(repositories.events.listByAnchorRange).toHaveBeenCalledTimes(2));
+  });
+
   it('今日を選択して当月の予定と祝日を読み込む', async () => {
     const repositories = createRepositories();
     const holidayProvider = createHolidayProvider();

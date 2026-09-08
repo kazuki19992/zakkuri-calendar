@@ -4,6 +4,7 @@ import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AppDatabaseProvider } from '@/data/sqlite/app-database-provider';
+import { CalendarRefreshProvider } from '@/features/calendar/calendar-refresh-context';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -13,7 +14,9 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
       <AppDatabaseProvider>
-        <Stack screenOptions={{ headerShown: false }} />
+        <CalendarRefreshProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </CalendarRefreshProvider>
       </AppDatabaseProvider>
     </ThemeProvider>
   );

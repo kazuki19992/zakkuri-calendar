@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 
 import IndexRoute from '../index';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
+import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
 import { useMonthCalendar, type MonthCalendarState } from '@/features/calendar/hooks/use-month-calendar';
 
 jest.mock('@/global.css', () => ({}));
@@ -19,6 +20,7 @@ jest.mock('@/data/holidays/japanese-holiday-provider', () => ({
 jest.mock('@/data/sqlite/app-database-provider', () => ({ useRepositories: jest.fn() }));
 
 jest.mock('@/features/calendar/hooks/use-month-calendar', () => ({ useMonthCalendar: jest.fn() }));
+jest.mock('@/features/calendar/calendar-refresh-context', () => ({ useCalendarRefresh: jest.fn() }));
 
 jest.mock('@/features/calendar/screens/month-calendar-screen', () => {
   const React = jest.requireActual<typeof import('react')>('react');
@@ -61,6 +63,7 @@ describe('ホームルート', () => {
     };
     const state = { visibleMonth: '2026-09-01' } as MonthCalendarState;
     jest.mocked(useRepositories).mockReturnValue(repositories);
+    jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 4, notifyChanged: jest.fn() });
     jest.mocked(useMonthCalendar).mockReturnValue(state);
 
     await render(<IndexRoute />);
@@ -70,6 +73,7 @@ describe('ホームルート', () => {
       events: repositories.events,
       temporalDefinitions: repositories.temporalDefinitions,
       holidayProvider: expect.objectContaining({ constructor: expect.any(Function) }),
+      refreshRevision: 4,
       weekStartsOn: 1,
     });
     expect(screen.getByText('月画面:2026-09-01')).toBeTruthy();

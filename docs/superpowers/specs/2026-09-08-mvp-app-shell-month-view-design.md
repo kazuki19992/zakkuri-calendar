@@ -13,7 +13,7 @@ MVPタスク3として、後続の予定作成、日ビュー、週ビューを�
 5. 選択日の予定と日本の祝日名を確認する
 6. 読み込みに失敗した場合は再試行する
 
-関連Issue: [#1](https://github.com/kazuki19992/zakkuri-calendar/issues/1)、[#8](https://github.com/kazuki19992/zakkuri-calendar/issues/8)、[#9](https://github.com/kazuki19992/zakkuri-calendar/issues/9)
+関連Issue: [#1](https://github.com/kazuki19992/zakkuri-calendar/issues/1)、[#8](https://github.com/kazuki19992/zakkuri-calendar/issues/8)、[#9](https://github.com/kazuki19992/zakkuri-calendar/issues/9)、[#10](https://github.com/kazuki19992/zakkuri-calendar/issues/10)
 
 ## 2. スコープ
 
@@ -125,7 +125,13 @@ src/app/index.tsx
 
 ## 7. 表示仕様
 
-月グリッドは月曜始まりの6週間固定とする。月の高さを安定させ、同一画面下部の予定一覧へ到達しやすくする。
+月グリッドはMVPでは月曜始まりの6週間固定とする。月の高さを安定させ、同一画面下部の予定一覧へ到達しやすくする。
+
+v1では月曜日始まりと日曜日始まりをユーザー設定で選べるようにする。このタスクでは設定や永続化を先行実装せず、`MonthGrid`へ固定値を渡すcomposition pointに次の追跡コメントを残す。
+
+```ts
+// TODO(v1, #10): Read the first day of week from persisted calendar settings.
+```
 
 - 今日: 枠とスクリーンリーダー文言で示す
 - 選択日: 背景、選択状態、スクリーンリーダー文言で示す
@@ -197,4 +203,5 @@ src/app/index.tsx
 - 外部ライブラリの型、Jest、Metro、iOS・Android bundleとの互換性が確認できる。
 - UIからSQLite、祝日ライブラリ、日付ライブラリへ直接アクセスしていない。
 - v1の設定化がIssue #9と`TODO(v1, #9)`で追跡できる。
+- v1の週開始曜日設定がIssue #10と`TODO(v1, #10)`で追跡できる。
 - 自動テスト結果と実機・Simulator確認結果を区別してPRへ記載する。

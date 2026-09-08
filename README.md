@@ -24,6 +24,25 @@ npm run typecheck
 npm run lint
 ```
 
+## ローカルdevelopment build
+
+EASのdevelopment profileでiOSとAndroidを順番にローカルビルドします。
+
+```bash
+./scripts/build-local.sh development
+```
+
+片方のplatformだけをビルドする場合は、第2引数へ指定します。
+
+```bash
+./scripts/build-local.sh development ios
+./scripts/build-local.sh development android
+```
+
+第1引数には`development`、`preview`、`production`を指定できます。成果物は`builds/<profile>/<platform>/`へ保存され、Gitの追跡対象にはなりません。
+
+実行前に`eas login`を済ませてください。iOSのローカルビルドにはmacOS、Xcode、CocoaPodsが、AndroidにはAndroid SDKとNDKが必要です。
+
 ## MVPカレンダー
 
 MVPでは、アプリ起動時に当月の月ビューを表示し、前月・次月・今日への移動と日付選択を提供します。表示月の予定は端末内SQLiteからローカルに取得し、選択日の予定一覧と日本の祝日名を表示します。

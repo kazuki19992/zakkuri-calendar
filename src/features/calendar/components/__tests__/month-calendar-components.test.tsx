@@ -187,6 +187,68 @@ describe('月カレンダー表示コンポーネント', () => {
     });
   });
 
+  it('水平スワイプで可視月だけを次月へ移動する', async () => {
+    const onVisibleMonthChange = jest.fn();
+    const view = await render(
+      <MonthGrid
+        visibleMonth="2026-09-01"
+        days={createDays()}
+        onSelectDate={jest.fn()}
+        onVisibleMonthChange={onVisibleMonthChange}
+        onPreviousMonth={jest.fn()}
+        onToday={jest.fn()}
+        onNextMonth={jest.fn()}
+      />,
+    );
+    const swipeContainer = view.getByTestId('month-calendar.swipe');
+    const startEvent = {
+      nativeEvent: { touches: [{ pageX: 120, pageY: 10 }], timestamp: 0 },
+      touchHistory: {
+        touchBank: [
+          {
+            touchActive: true,
+            startPageX: 120,
+            startPageY: 10,
+            previousPageX: 120,
+            previousPageY: 10,
+            currentPageX: 120,
+            currentPageY: 10,
+            currentTimeStamp: 0,
+          },
+        ],
+        numberActiveTouches: 1,
+        indexOfSingleActiveTouch: 0,
+        mostRecentTimeStamp: 0,
+      },
+    };
+    const moveEvent = {
+      nativeEvent: { touches: [{ pageX: 20, pageY: 18 }], timestamp: 100 },
+      touchHistory: {
+        touchBank: [
+          {
+            touchActive: true,
+            startPageX: 120,
+            startPageY: 10,
+            previousPageX: 120,
+            previousPageY: 10,
+            currentPageX: 20,
+            currentPageY: 18,
+            currentTimeStamp: 100,
+          },
+        ],
+        numberActiveTouches: 1,
+        indexOfSingleActiveTouch: 0,
+        mostRecentTimeStamp: 100,
+      },
+    };
+
+    swipeContainer.props.onStartShouldSetResponderCapture(startEvent);
+    swipeContainer.props.onMoveShouldSetResponderCapture(moveEvent);
+    swipeContainer.props.onResponderRelease(moveEvent);
+
+    await waitFor(() => expect(onVisibleMonthChange).toHaveBeenCalledWith('2026-10-01'));
+  });
+
   it('月外日選択と今日への移動で選択した日付を月初に上書きしない', async () => {
     const user = userEvent.setup();
     const view = await render(<MonthGridInteractionHarness />);

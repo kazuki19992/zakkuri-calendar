@@ -1,12 +1,21 @@
 import { render, screen } from '@testing-library/react-native';
 
-import TabLayout from '../_layout';
+import RootLayout from '../_layout';
 
-jest.mock('expo-router', () => ({
-  DarkTheme: {},
-  DefaultTheme: {},
-  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
+jest.mock('@/global.css', () => ({}));
+
+jest.mock('expo-router', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    DarkTheme: {},
+    DefaultTheme: {},
+    ThemeProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(View, { testID: 'theme-provider' }, children),
+    Stack: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(View, { testID: 'router-stack' }, children),
+  };
+});
 
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn(),
@@ -14,27 +23,30 @@ jest.mock('expo-splash-screen', () => ({
 
 jest.mock('@/components/animated-icon', () => {
   const React = jest.requireActual<typeof import('react')>('react');
-  const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    AnimatedSplashOverlay: () => React.createElement(Text, null, 'animated splash overlay'),
+    AnimatedSplashOverlay: () => React.createElement(View, { testID: 'animated-splash-overlay' }),
   };
 });
-
-jest.mock('@/components/app-tabs', () => () => null);
 
 jest.mock('@/data/sqlite/app-database-provider', () => {
   const React = jest.requireActual<typeof import('react')>('react');
-  const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    AppDatabaseProvider: () => React.createElement(Text, null, 'database initialization failed'),
+    AppDatabaseProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(View, { testID: 'database-provider' }, children),
   };
 });
 
-describe('TabLayout', () => {
-  it('keeps the splash overlay mounted when database initialization fails', async () => {
-    await render(<TabLayout />);
+describe('ルートレイアウト', () => {
+  it('データベースproviderの外にスプラッシュを維持し通常のStackを内側に置く', async () => {
+    await render(<RootLayout />);
 
-    expect(screen.getByText('database initialization failed')).toBeTruthy();
-    expect(screen.getByText('animated splash overlay')).toBeTruthy();
+    const splashOverlay = screen.getByTestId('animated-splash-overlay');
+    const databaseProvider = screen.getByTestId('database-provider');
+    const stack = screen.getByTestId('router-stack');
+
+    expect(splashOverlay.parent).toBe(databaseProvider.parent);
+    expect(stack.parent).toBe(databaseProvider);
   });
 });

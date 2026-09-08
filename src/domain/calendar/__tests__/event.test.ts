@@ -37,6 +37,10 @@ describe('parseEventDraft', () => {
     expect(parseEventDraft({ ...validAllDay, anchorDate }).ok).toBe(false);
   });
 
+  it('accepts a valid leap day before the year 0100', () => {
+    expect(parseEventDraft({ ...validAllDay, anchorDate: '0096-02-29' }).ok).toBe(true);
+  });
+
   it('keeps wall-clock values and creation zone as metadata', () => {
     expect(parseEventDraft(validExact)).toEqual({ ok: true, value: validExact });
   });

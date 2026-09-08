@@ -8,7 +8,7 @@ import type {
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
-import { useMonthCalendar } from '../use-month-calendar';
+import { useMonthCalendar, type MonthCalendarState } from '../use-month-calendar';
 
 const calendar: Calendar = {
   id: 'personal-default',
@@ -320,6 +320,78 @@ describe('月カレンダーの状態調整', () => {
     ]);
   });
 
+  it.each([
+    ['次月への移動', (state: MonthCalendarState) => state.showNextMonth()],
+    ['別月の日付選択', (state: MonthCalendarState) => state.selectDate('2026-10-02')],
+    ['再試行', (state: MonthCalendarState) => state.retry()],
+  ])('%sの直後に旧応答が完了しても読み込み中を維持する', async (_operation, startLoad) => {
+    const repositories = createRepositories([]);
+    const holidayProvider = createHolidayProvider();
+    const oldRequest = createDeferred<CalendarEvent[]>();
+    const currentRequest = createDeferred<CalendarEvent[]>();
+    repositories.events.listByAnchorRange
+      .mockReturnValueOnce(oldRequest.promise)
+      .mockReturnValueOnce(currentRequest.promise);
+    const { result, unmount } = await renderHook(() =>
+      useMonthCalendar({
+        ...repositories,
+        holidayProvider,
+        weekStartsOn: 1,
+        now: () => new Date(2026, 8, 8, 12),
+      }),
+    );
+
+    await act(async () => {
+      startLoad(result.current);
+      oldRequest.resolve([event]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.status).toBe('loading');
+    expect(holidayProvider.list).not.toHaveBeenCalled();
+    await unmount();
+  });
+
+  it('今日へ戻す直後に旧月の応答が完了しても読み込み中を維持する', async () => {
+    const repositories = createRepositories([]);
+    const holidayProvider = createHolidayProvider();
+    const octoberRequest = createDeferred<CalendarEvent[]>();
+    const septemberRequest = createDeferred<CalendarEvent[]>();
+    repositories.events.listByAnchorRange
+      .mockResolvedValueOnce([])
+      .mockReturnValueOnce(octoberRequest.promise)
+      .mockReturnValueOnce(septemberRequest.promise);
+    const { result, unmount } = await renderHook(() =>
+      useMonthCalendar({
+        ...repositories,
+        holidayProvider,
+        weekStartsOn: 1,
+        now: () => new Date(2026, 8, 8, 12),
+      }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(() => {
+      result.current.showNextMonth();
+    });
+    holidayProvider.list.mockClear();
+
+    await act(async () => {
+      result.current.showToday();
+      octoberRequest.resolve([event]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current).toMatchObject({
+      status: 'loading',
+      visibleMonth: '2026-09-01',
+      selectedDate: '2026-09-08',
+    });
+    expect(holidayProvider.list).not.toHaveBeenCalled();
+    await unmount();
+  });
+
   it('ざっくり定義IDを重複排除して無効化済み定義も解決する', async () => {
     const repositories = createRepositories([
       fuzzyEvent,
@@ -373,12 +445,11 @@ describe('月カレンダーの状態調整', () => {
     expect(result.current.selectedDate).toBe('2026-10-01');
   });
 
-  it('破棄後に遅い応答が完了しても状態更新を試みない', async () => {
+  it('破棄後にカレンダー取得が完了しても予定取得へ進まない', async () => {
     const repositories = createRepositories([]);
     const holidayProvider = createHolidayProvider();
-    const deferred = createDeferred<CalendarEvent[]>();
-    repositories.events.listByAnchorRange.mockReturnValue(deferred.promise);
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    const deferred = createDeferred<Calendar>();
+    repositories.calendars.getDefault.mockReturnValue(deferred.promise);
     const { unmount } = await renderHook(() =>
       useMonthCalendar({
         ...repositories,
@@ -388,12 +459,38 @@ describe('月カレンダーの状態調整', () => {
       }),
     );
 
+    expect(repositories.calendars.getDefault).toHaveBeenCalledTimes(1);
     await unmount();
     await act(() => {
-      deferred.resolve([event]);
+      deferred.resolve(calendar);
     });
 
-    expect(errorSpy).not.toHaveBeenCalled();
-    errorSpy.mockRestore();
+    expect(repositories.events.listByAnchorRange).not.toHaveBeenCalled();
+    expect(holidayProvider.list).not.toHaveBeenCalled();
+    expect(repositories.temporalDefinitions.getById).not.toHaveBeenCalled();
+  });
+
+  it('破棄後に予定取得が完了しても祝日と時間定義の取得へ進まない', async () => {
+    const repositories = createRepositories([]);
+    const holidayProvider = createHolidayProvider();
+    const deferred = createDeferred<CalendarEvent[]>();
+    repositories.events.listByAnchorRange.mockReturnValue(deferred.promise);
+    const { unmount } = await renderHook(() =>
+      useMonthCalendar({
+        ...repositories,
+        holidayProvider,
+        weekStartsOn: 1,
+        now: () => new Date(2026, 8, 8, 12),
+      }),
+    );
+
+    expect(repositories.events.listByAnchorRange).toHaveBeenCalledTimes(1);
+    await unmount();
+    await act(() => {
+      deferred.resolve([fuzzyEvent]);
+    });
+
+    expect(holidayProvider.list).not.toHaveBeenCalled();
+    expect(repositories.temporalDefinitions.getById).not.toHaveBeenCalled();
   });
 });

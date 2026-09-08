@@ -70,7 +70,9 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
     void (async () => {
       try {
         const calendar = await input.calendars.getDefault();
+        if (requestId !== requestIdRef.current) return;
         const events = await input.events.listByAnchorRange(calendar.id, range.from, range.through);
+        if (requestId !== requestIdRef.current) return;
         const holidays = input.holidayProvider.list(range.from, range.through);
         const fuzzyDefinitionIds = [
           ...new Set(
@@ -134,6 +136,7 @@ export function useMonthCalendar(input: UseMonthCalendarInput): MonthCalendarSta
     [definitionLabels, monthEvents, selectedDate],
   );
   const prepareForLoad = useCallback(() => {
+    requestIdRef.current += 1;
     setStatus('loading');
     setMonthEvents([]);
     setHolidayResult(unsupportedHolidays);

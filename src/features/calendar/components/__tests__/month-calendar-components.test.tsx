@@ -141,7 +141,7 @@ describe('月カレンダー表示コンポーネント', () => {
     expect(onNextMonth).toHaveBeenCalledTimes(1);
   });
 
-  it('カスタムヘッダーがスワイプ用の左右操作をrefへ公開する', async () => {
+  it('カスタムヘッダーがライブラリの月スワイプ経路用操作をrefへ公開する', async () => {
     const ref = createRef<MonthToolbarHandle>();
     const onPreviousMonth = jest.fn();
     const onNextMonth = jest.fn();

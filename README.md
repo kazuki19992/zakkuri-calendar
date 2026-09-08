@@ -24,7 +24,7 @@ npm run typecheck
 npm run lint
 ```
 
-## ローカルdevelopment build
+## ローカルEAS Build
 
 EASのdevelopment profileでiOSとAndroidを順番にローカルビルドします。
 
@@ -41,7 +41,7 @@ EASのdevelopment profileでiOSとAndroidを順番にローカルビルドしま
 
 第1引数には`development`、`preview`、`production`を指定できます。成果物は`builds/<profile>/<platform>/`へ保存され、Gitの追跡対象にはなりません。
 
-実行前に`eas login`を済ませてください。iOSのローカルビルドにはmacOS、Xcode、CocoaPodsが、AndroidにはAndroid SDKとNDKが必要です。
+スクリプトは`.env.local`があれば`KEY=value`または`export KEY=value`形式の環境変数を展開してビルドへ渡します。ファイルがない場合は警告を表示して続行します。`eas-cli`をローカルへインストールし、`eas login`を済ませてください。iOSのローカルビルドにはmacOS、Xcode、CocoaPodsが、AndroidにはAndroid SDKとNDKが必要です。
 
 ## MVPカレンダー
 

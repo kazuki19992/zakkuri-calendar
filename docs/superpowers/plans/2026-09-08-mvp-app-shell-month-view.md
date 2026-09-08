@@ -468,17 +468,17 @@ _layout.tsxはAnimatedSplashOverlayをDB provider外に維持し、provider内�
 - Modify: docs/superpowers/plans/2026-09-08-mvp-app-shell-month-view.md
 - GitHub: Issue #8 and develop PR
 
-- [ ] **Step 1: READMEへ境界を追記する**
+- [x] **Step 1: READMEへ境界を追記する**
 
 月ビュー、ローカル予定取得、日本の祝日表示、1970〜2050の祝日範囲、MVPは月曜始まり固定、Issue #9/#10、Web対象外を記載する。
 
-- [ ] **Step 2: 日本語規約を確認する**
+- [x] **Step 2: 日本語規約を確認する**
 
     rg -n "TODO|//|/\\*|describe\\(|it\\(|test\\(" src/domain/calendar/month.ts src/data/holidays src/features/calendar src/app/index.tsx src/app/__tests__
 
 Expected: 新規コメントとテスト説明文が日本語で、TODOがIssue #9/#10を参照する。既存テストの英語説明文は一括変更しない。
 
-- [ ] **Step 3: 全体を検証する**
+- [x] **Step 3: 全体を検証する**
 
     git diff --check
     npm run typecheck
@@ -487,7 +487,7 @@ Expected: 新規コメントとテスト説明文が日本語で、TODOがIssue 
 
 Expected: typecheck/lintは終了コード0、全suiteはfailure 0。
 
-- [ ] **Step 4: iOSとAndroidをbundleする**
+- [x] **Step 4: iOSとAndroidをbundleする**
 
 task固有の一時ディレクトリを作り、その実パスを使って実行する。
 
@@ -497,14 +497,14 @@ task固有の一時ディレクトリを作り、その実パスを使って実�
 
 Expected: 両方がbundle errorなしで完了し、生成物をrepositoryへ含めない。
 
-- [ ] **Step 5: native runtimeを確認する**
+- [x] **Step 5: native runtimeを確認する**
 
     xcrun simctl list devices booted
     adb devices
 
 起動中のSimulatorまたはEmulatorがある場合だけ、月移動、今日、日付選択、祝日名、空状態を確認する。なければnative layout未確認とPRへ明記する。
 
-- [ ] **Step 6: documentationをコミットする**
+- [x] **Step 6: documentationをコミットする**
 
     git add README.md docs/superpowers/plans/2026-09-08-mvp-app-shell-month-view.md
     git commit -m "docs: document MVP month calendar"

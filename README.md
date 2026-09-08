@@ -1,6 +1,6 @@
 # ざっくりカレンダー
 
-曖昧な時間表現を扱える、Expo + React Native製のlocal-firstカレンダーです。現在はMVPのデータ基盤を実装しています。
+曖昧な時間表現を扱える、Expo + React Native製のlocal-firstカレンダーです。現在はMVPのデータ基盤と月ビューを実装しています。
 
 ## 開発
 
@@ -23,6 +23,34 @@ npm test -- --runInBand
 npm run typecheck
 npm run lint
 ```
+
+## ローカルEAS Build
+
+EASのdevelopment profileでiOSとAndroidを順番にローカルビルドします。
+
+```bash
+./scripts/build-local.sh development
+```
+
+片方のplatformだけをビルドする場合は、第2引数へ指定します。
+
+```bash
+./scripts/build-local.sh development ios
+./scripts/build-local.sh development android
+```
+
+第1引数には`development`、`preview`、`production`を指定できます。成果物は`builds/<profile>/<platform>/`へ保存され、Gitの追跡対象にはなりません。
+
+スクリプトは`.env.local`があれば`KEY=value`または`export KEY=value`形式の環境変数を展開してビルドへ渡します。ファイルがない場合は警告を表示して続行します。`eas-cli`をローカルへインストールし、`eas login`を済ませてください。iOSのローカルビルドにはmacOS、Xcode、CocoaPodsが、AndroidにはAndroid SDKとNDKが必要です。
+
+## MVPカレンダー
+
+MVPでは、アプリ起動時に当月の月ビューを表示し、前月・次月・今日への移動と日付選択を提供します。表示月の予定は端末内SQLiteからローカルに取得し、選択日の予定一覧と日本の祝日名を表示します。
+
+- 月グリッドは6週間固定、月曜始まり固定です。週の開始曜日を設定できる機能はIssue [#10](https://github.com/kazuki19992/zakkuri-calendar/issues/10)で追跡します。
+- 日本の祝日は端末内で判定し、1970年から2050年までを表示対象とします。この範囲外は祝日なしではなく「祝日情報未対応」として扱います。
+- 予定の作成・編集・削除と日ビュー・週ビューは製品MVPの対象ですが、この月ビュータスクの現在画面では未実装です。祝日を考慮した期間・業務日計算と祝日カレンダーの設定化も現在画面では未実装で、Issue [#9](https://github.com/kazuki19992/zakkuri-calendar/issues/9)で追跡します。
+- 対象プラットフォームはiOSとAndroidです。Webの動作は保証しません。
 
 ## データ境界
 

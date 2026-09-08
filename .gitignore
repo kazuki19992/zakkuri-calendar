@@ -44,3 +44,8 @@ example
 # generated native folders
 /ios
 /android
+
+# local EAS build artifacts
+/builds/
+*.ipa
+*.apk

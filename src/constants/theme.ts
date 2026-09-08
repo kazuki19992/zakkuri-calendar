@@ -14,6 +14,10 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    calendarSaturday: '#2563EB',
+    calendarHoliday: '#C2410C',
+    calendarAccent: '#2563EB',
+    calendarBorder: '#94A3B8',
   },
   dark: {
     text: '#ffffff',
@@ -21,6 +25,10 @@ export const Colors = {
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
+    calendarSaturday: '#93C5FD',
+    calendarHoliday: '#FDBA74',
+    calendarAccent: '#93C5FD',
+    calendarBorder: '#64748B',
   },
 } as const;
 

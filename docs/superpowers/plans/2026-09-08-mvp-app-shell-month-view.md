@@ -509,18 +509,18 @@ Expected: 両方がbundle errorなしで完了し、生成物をrepositoryへ含
     git add README.md docs/superpowers/plans/2026-09-08-mvp-app-shell-month-view.md
     git commit -m "docs: document MVP month calendar"
 
-- [ ] **Step 7: Issue #8を更新する**
+- [x] **Step 7: Issue #8を更新する**
 
 実行済み証跡がある条件だけをcheckedへ変更し、native確認結果を追記する。Issue #9/#10はopenのまま維持する。
 
-- [ ] **Step 8: pushしてdevelop向けPRを作る**
+- [x] **Step 8: pushしてdevelop向けPRを作る**
 
     git push -u origin codex/mvp-month-view
     gh pr create --base develop --head codex/mvp-month-view --title "feat: MVPのアプリシェルと月ビューを実装" --body $'Closes #8\n\n## 概要\n- Stackベースのアプリシェルと月ビュー\n- ローカル予定一覧と日本の祝日表示\n- v1設定化を#9・#10で追跡\n\n## 検証\n- npm run typecheck\n- npm run lint\n- npm test -- --runInBand\n- iOS / Android export\n\nNative runtimeの確認結果はIssue #8の検証結果を参照してください。'
 
 PR本文へCloses #8、採用ライブラリ、MVP境界、TODO #9/#10、正確な検証結果、native確認結果を記載する。
 
-- [ ] **Step 9: PR状態を確認する**
+- [x] **Step 9: PR状態を確認する**
 
     gh pr view --json number,url,state,headRefName,baseRefName,headRefOid,statusCheckRollup
     git status --short --branch

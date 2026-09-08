@@ -79,7 +79,7 @@ interface HolidayProvider {
 MVPの実装には次の追跡コメントをproviderのcomposition pointへ残す。
 
 ```ts
-// TODO(v1, #9): Make the holiday calendar and its effect on fuzzy/business-day resolution configurable.
+// TODO(v1, #9): 祝日カレンダーと、ざっくり期間・業務日計算への反映を設定可能にする。
 ```
 
 ## 4. 画面とナビゲーション
@@ -130,7 +130,7 @@ src/app/index.tsx
 v1では月曜日始まりと日曜日始まりをユーザー設定で選べるようにする。このタスクでは設定や永続化を先行実装せず、`MonthGrid`へ固定値を渡すcomposition pointに次の追跡コメントを残す。
 
 ```ts
-// TODO(v1, #10): Read the first day of week from persisted calendar settings.
+// TODO(v1, #10): 永続化したカレンダー設定から週の開始曜日を取得する。
 ```
 
 - 今日: 枠とスクリーンリーダー文言で示す
@@ -149,7 +149,13 @@ v1では月曜日始まりと日曜日始まりをユーザー設定で選べる
 
 このタスクでは祝日を表示情報としてのみ扱う。「来週前半」などの範囲から祝日を除外しない。
 
-## 8. エラーとプライバシー
+## 8. コード表記
+
+- コードコメントは日本語で記述する。
+- Jestの`describe`、`it`、`test`に渡す説明文は日本語で記述する。
+- 型、関数、変数、ファイル名などのコード識別子は既存方針どおり英語で記述する。
+
+## 9. エラーとプライバシー
 
 - 初回読み込み中はカレンダー操作を成功状態として見せない。
 - 読み込み失敗時は予定タイトルやSQLを表示せず、再試行ボタンを表示する。
@@ -159,7 +165,7 @@ v1では月曜日始まりと日曜日始まりをユーザー設定で選べる
 - 予定本文と選択履歴をログや外部サービスへ送信しない。
 - 祝日判定は端末内だけで完結する。
 
-## 9. テスト
+## 10. テスト
 
 実装はTDDで進める。
 
@@ -197,7 +203,7 @@ v1では月曜日始まりと日曜日始まりをユーザー設定で選べる
 
 最後にrepository全体のtypecheck、lint、testと、iOS・Android exportを実行する。SimulatorまたはEmulatorが利用できる場合だけ実画面を確認し、未確認の場合はPRへ明記する。
 
-## 10. 完了条件
+## 11. 完了条件
 
 - Issue #8の受け入れ条件を満たす。
 - 外部ライブラリの型、Jest、Metro、iOS・Android bundleとの互換性が確認できる。

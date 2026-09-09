@@ -31,21 +31,21 @@
 - Produces: `ResolvedEventTime = { kind: 'allDay' } | { kind: 'timed'; startMinute; endMinute; fadeInRatio; fadeOutRatio; isInstant } | { kind: 'unresolved' }`
 - Produces: `resolveEventTime({ event, definition, undeterminedFadeMinutes }): ResolvedEventTime`
 
-- [ ] **Step 1: 失敗テストを書く**
+- [x] **Step 1: 失敗テストを書く**
 
 日本語テストで、瞬間、固定10/15/30/60分、未定、00:00、23:59からの日跨ぎ、4種類の定義フェード、定義不在、日粒度以外、終日を固定する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/domain/temporal/__tests__/resolve-event-time.test.ts`
 
 Expected: moduleが存在しないためFAIL。
 
-- [ ] **Step 3: 最小実装する**
+- [x] **Step 3: 最小実装する**
 
 正確な予定の`HH:mm`を分へ変換し、durationから終了を決める。未定は設定値と`fadeInRatio: 0`、`fadeOutRatio: 1`を使う。fuzzyは同じIDの日粒度`timeOfDay`定義だけを使い、入力を変形しない。
 
-- [ ] **Step 4: GREENを確認する**
+- [x] **Step 4: GREENを確認する**
 
 Run: `npm test -- --runInBand src/domain/temporal/__tests__/resolve-event-time.test.ts`
 

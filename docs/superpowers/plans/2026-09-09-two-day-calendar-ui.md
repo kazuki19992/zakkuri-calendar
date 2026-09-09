@@ -95,8 +95,8 @@ Commit: `feat: 2日カレンダーの表示モデルを追加`
 **Files:**
 - Create: `src/features/calendar/hooks/use-calendar-view.ts`
 - Create: `src/features/calendar/hooks/__tests__/use-calendar-view.test.tsx`
-- Delete: `src/features/calendar/hooks/use-month-calendar.ts`
-- Delete: `src/features/calendar/hooks/__tests__/use-month-calendar.test.tsx`
+- Delete with the route integration in Task 6: `src/features/calendar/hooks/use-month-calendar.ts`
+- Delete with the route integration in Task 6: `src/features/calendar/hooks/__tests__/use-month-calendar.test.tsx`
 - Modify: `src/features/calendar/__tests__/month-calendar-integration.test.tsx`
 
 **Interfaces:**
@@ -104,7 +104,7 @@ Commit: `feat: 2日カレンダーの表示モデルを追加`
 - Produces: `CalendarViewState` with `status`、`mode`、`today`、`anchorDate`、`visibleMonth`、`selectedDate`、`twoDayDays`、`monthDays`、`selectedAgendaItems`、`selectedHolidayName`、`holidaySupport`、`isPeriodLoading`、`periodError`。
 - Produces callbacks: `selectMode(mode)`、`showPreviousPeriod(): Promise<boolean>`、`showNextPeriod(): Promise<boolean>`、`showToday(): Promise<boolean>`、`selectDate(date)`、`retry()`。
 
-- [ ] **Step 1: hookの失敗テストを書く**
+- [x] **Step 1: hookの失敗テストを書く**
 
 日本語テストで次を固定する。
 
@@ -116,17 +116,17 @@ Commit: `feat: 2日カレンダーの表示モデルを追加`
 - 古い非同期応答は新しい表示を上書きしない。
 - `refreshRevision`変更時に現在範囲を再取得する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/hooks/__tests__/use-calendar-view.test.tsx`
 
 Expected: `useCalendarView`が存在しないためFAIL。
 
-- [ ] **Step 3: 取得成功後だけ期間をcommitするhookを実装する**
+- [x] **Step 3: 取得成功後だけ期間をcommitするhookを実装する**
 
 初回のみ`status: 'loading'`を使う。期間移動中は現在の表示を保持して`isPeriodLoading: true`にし、対象rangeのRepository取得と表示モデル生成が完了したときだけ日付・snapshotを同時に更新する。失敗時は現在snapshotを維持し`periodError`を設定する。request IDで古い応答を無視する。
 
-- [ ] **Step 4: GREENと既存integrationを確認してコミットする**
+- [x] **Step 4: GREENと既存integrationを確認してコミットする**
 
 Run: `npm test -- --runInBand src/features/calendar/hooks/__tests__/use-calendar-view.test.tsx src/features/calendar/__tests__/month-calendar-integration.test.tsx`
 

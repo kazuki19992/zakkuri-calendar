@@ -1,0 +1,5 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: ja-JP
+tone_instructions: >-
+  レビューの要約、指摘、提案、質問、返信を含むすべての内容を日本語で記述してください。

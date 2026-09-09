@@ -20,9 +20,9 @@ export function MonthDayCell({ day, onPress }: MonthDayCellProps) {
       onPress={() => onPress(day.date)}
       style={({ pressed }) => [
         styles.cell,
-        day.isSelected && { backgroundColor: theme.calendarAccent },
+        day.isSelected && { backgroundColor: theme.backgroundSelected },
         day.isToday && {
-          borderColor: day.isSelected ? theme.background : theme.calendarAccent,
+          borderColor: theme.calendarAccent,
         },
         !day.isToday && { borderColor: 'transparent' },
         !day.isCurrentMonth && styles.inactive,
@@ -35,7 +35,6 @@ export function MonthDayCell({ day, onPress }: MonthDayCellProps) {
           { color: theme.text },
           isSaturday && { color: theme.calendarSaturday },
           isHoliday && { color: theme.calendarHoliday },
-          day.isSelected && { color: theme.background },
           day.isSelected && styles.selectedDayNumber,
         ]}
       >
@@ -47,7 +46,7 @@ export function MonthDayCell({ day, onPress }: MonthDayCellProps) {
         importantForAccessibility="no"
         style={[
           styles.eventDot,
-          { backgroundColor: day.isSelected ? theme.background : theme.calendarAccent },
+          { backgroundColor: theme.calendarAccent },
           !day.hasEvents && styles.hidden,
         ]}
       />

@@ -175,7 +175,7 @@ Commit: `feat: カレンダーの横スワイプanimationを追加`
 - Create: `src/features/calendar/components/two-day-column.tsx`
 - Modify: `src/features/calendar/components/month-grid.tsx`
 - Modify: `src/features/calendar/components/month-day-cell.tsx`
-- Delete: `src/features/calendar/components/month-toolbar.tsx`
+- Delete with the old screen in Task 6: `src/features/calendar/components/month-toolbar.tsx`
 - Modify: `src/features/calendar/components/__tests__/month-calendar-components.test.tsx`
 - Create: `src/features/calendar/components/__tests__/two-day-calendar-components.test.tsx`
 - Modify: `package.json`
@@ -187,27 +187,27 @@ Commit: `feat: カレンダーの横スワイプanimationを追加`
 - `TwoDayView` consumes exactly 2 `TwoDayViewModel`、`onAddEvent(date)`。
 - `MonthGrid` consumes 42 `MonthDayViewModel` and `onSelectDate` only; external calendar UI propsを持たない。
 
-- [ ] **Step 1: presentationの失敗テストを書く**
+- [x] **Step 1: presentationの失敗テストを書く**
 
 横2列、各列の日付・祝日・予定・空状態・追加日付、2日／月のselected state、44pt操作領域、7列×6行の月グリッド、テーマ追従を日本語テストで固定する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/components/__tests__/two-day-calendar-components.test.tsx src/features/calendar/components/__tests__/month-calendar-components.test.tsx`
 
 Expected: 新規componentsがなく、MonthGridが`react-native-calendars`に依存しているためFAIL。
 
-- [ ] **Step 3: React Native標準componentsで最小実装する**
+- [x] **Step 3: React Native標準componentsで最小実装する**
 
 月グリッドはweekday headerと42個の`MonthDayCell`を7等分で描画する。2日列は各50%幅とし、列内予定が増えても親screenの縦ScrollViewで到達可能にする。時間軸やgradient用の座標計算は追加しない。
 
-- [ ] **Step 4: 外部calendar依存を削除する**
+- [x] **Step 4: 外部calendar依存を削除する**
 
 Run: `npm uninstall react-native-calendars`
 
 `rg 'react-native-calendars' src package.json package-lock.json`が0件になることを確認する。
 
-- [ ] **Step 5: GREENを確認してコミットする**
+- [x] **Step 5: GREENを確認してコミットする**
 
 Run: `npm test -- --runInBand src/features/calendar/components/__tests__/two-day-calendar-components.test.tsx src/features/calendar/components/__tests__/month-calendar-components.test.tsx`
 

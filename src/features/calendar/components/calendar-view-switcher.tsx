@@ -42,7 +42,7 @@ export function CalendarViewSwitcher({
 
 const styles = StyleSheet.create({
   container: { flexDirection: 'row', alignSelf: 'center', borderRadius: 8, padding: 2 },
-  button: { minHeight: 40, minWidth: 64, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+  button: { minHeight: 44, minWidth: 64, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
   label: { fontSize: 14, fontWeight: '600' },
   pressed: { opacity: 0.65 },
 });

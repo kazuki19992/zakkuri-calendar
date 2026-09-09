@@ -259,11 +259,11 @@ Commit: `feat: 2日ビューをカレンダー初期画面に統合`
 **Files:**
 - Modify: `docs/superpowers/plans/2026-09-09-two-day-calendar-ui.md`
 
-- [ ] **Step 1: plan checkboxと差分を確認する**
+- [x] **Step 1: plan checkboxと差分を確認する**
 
 Run: `git diff --check && git status --short && git diff --stat origin/develop...HEAD`
 
-- [ ] **Step 2: repository全体を検証する**
+- [x] **Step 2: repository全体を検証する**
 
 Run:
 

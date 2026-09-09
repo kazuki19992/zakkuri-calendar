@@ -8,11 +8,6 @@ const weekdayLabels = ['月', '火', '水', '木', '金', '土', '日'] as const
 export type MonthGridProps = Readonly<{
   days: readonly MonthDayViewModel[];
   onSelectDate(date: string): void;
-  /** Task 6で旧screenを削除するまでの移行用。 */
-  visibleMonth?: string;
-  onPreviousMonth?(): void;
-  onToday?(): void;
-  onNextMonth?(): void;
 }>;
 
 export function MonthGrid({ days, onSelectDate }: MonthGridProps) {

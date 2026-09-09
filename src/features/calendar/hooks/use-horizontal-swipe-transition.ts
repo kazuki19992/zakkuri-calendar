@@ -98,16 +98,18 @@ export function useHorizontalSwipeTransition(
         onPanResponderRelease: (_, gesture) => {
           const direction = getSwipeDirection(gesture);
           if (direction === null) {
-            void runAnimation(translateX, 0);
+            if (input.reduceMotion) translateX.setValue(0);
+            else void runAnimation(translateX, 0);
             return;
           }
           void move(direction);
         },
         onPanResponderTerminate: () => {
-          void runAnimation(translateX, 0);
+          if (input.reduceMotion) translateX.setValue(0);
+          else void runAnimation(translateX, 0);
         },
       }),
-    [isAnimating, move, translateX],
+    [input.reduceMotion, isAnimating, move, translateX],
   );
 
   return {

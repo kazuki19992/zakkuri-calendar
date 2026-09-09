@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   arrow: { fontSize: 30, lineHeight: 34 },
   center: { flex: 1, alignItems: 'center' },
   period: { fontSize: 17, fontWeight: '700' },
-  today: { minHeight: 32, minWidth: 52, alignItems: 'center', justifyContent: 'center' },
+  today: { minHeight: 44, minWidth: 52, alignItems: 'center', justifyContent: 'center' },
   todayLabel: { fontSize: 13, fontWeight: '600' },
   pressed: { opacity: 0.6 },
 });

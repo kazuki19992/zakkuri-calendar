@@ -39,6 +39,9 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
     onPrevious: state.showPreviousPeriod,
     onNext: state.showNextPeriod,
     reduceMotion,
+    // 2日ビューの前後移動は基準日を1日分(画面の半分)だけ動かすため、
+    // 見た目のスワイプ距離も画面全体ではなく半分にして更新範囲と一致させる。
+    stepRatio: state.mode === 'twoDay' ? 0.5 : 1,
   });
   const periodLabel = state.mode === 'twoDay'
     ? formatTwoDayPeriod(state.twoDayDays[0].date, state.twoDayDays[1].date)

@@ -55,6 +55,54 @@ describe('カレンダーの横スワイプ遷移', () => {
     expect(result.current.isAnimating).toBe(false);
   });
 
+  it('stepRatioを指定するとその比率分の距離だけ退場・入場させる', async () => {
+    const onNext = jest.fn().mockResolvedValue(true);
+    const timing = jest.spyOn(Animated, 'timing');
+    const { result } = await renderHook(() =>
+      useHorizontalSwipeTransition({
+        onPrevious: jest.fn().mockResolvedValue(true),
+        onNext,
+        reduceMotion: false,
+        stepRatio: 0.5,
+      }),
+    );
+    await act(() => result.current.onLayout(320));
+
+    await act(async () => expect(await result.current.moveNext()).toBe(true));
+
+    expect(timing).toHaveBeenNthCalledWith(
+      1,
+      result.current.translateX,
+      expect.objectContaining({ toValue: -160 }),
+    );
+    expect(timing).toHaveBeenNthCalledWith(
+      2,
+      result.current.translateX,
+      expect.objectContaining({ toValue: 0 }),
+    );
+  });
+
+  it('stepRatioを省略すると従来通り画面全体分の距離で退場・入場させる', async () => {
+    const onPrevious = jest.fn().mockResolvedValue(true);
+    const timing = jest.spyOn(Animated, 'timing');
+    const { result } = await renderHook(() =>
+      useHorizontalSwipeTransition({
+        onPrevious,
+        onNext: jest.fn().mockResolvedValue(true),
+        reduceMotion: false,
+      }),
+    );
+    await act(() => result.current.onLayout(320));
+
+    await act(async () => expect(await result.current.movePrevious()).toBe(true));
+
+    expect(timing).toHaveBeenNthCalledWith(
+      1,
+      result.current.translateX,
+      expect.objectContaining({ toValue: 320 }),
+    );
+  });
+
   it('取得失敗時は元位置へ戻し、視差効果を減らす場合はanimationを省略する', async () => {
     const onPrevious = jest.fn().mockResolvedValue(false);
     const timing = jest.spyOn(Animated, 'timing');

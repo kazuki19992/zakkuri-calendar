@@ -78,9 +78,16 @@ describe('カレンダー画面', () => {
       onPrevious: state.showPreviousPeriod,
       onNext: state.showNextPeriod,
       reduceMotion: false,
+      stepRatio: 0.5,
     });
     await user.press(screen.getByRole('button', { name: '9月9日に予定を追加' }));
     expect(onAddEvent).toHaveBeenCalledWith('2026-09-09');
+  });
+
+  it('月表示では画面全体分の距離でスワイプ遷移させる', async () => {
+    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
+
+    expect(useHorizontalSwipeTransition).toHaveBeenCalledWith(expect.objectContaining({ stepRatio: 1 }));
   });
 
   it('表示切替と期間ツールバーの操作を状態へ渡す', async () => {

@@ -40,6 +40,12 @@ export type UseHorizontalSwipeTransitionInput = Readonly<{
   onPrevious(): Promise<boolean>;
   onNext(): Promise<boolean>;
   reduceMotion: boolean;
+  /**
+   * 1回の遷移で退場・入場させる距離を、計測した画面幅に対する比率で指定する。
+   * 省略時は1(画面全体)。2日ビューのように1回の移動が画面の一部(1日分)しか
+   * 更新しない場合は、その割合(例: 0.5)を指定して、更新範囲と見た目の移動量を一致させる。
+   */
+  stepRatio?: number;
 }>;
 
 export type HorizontalSwipeTransition = Readonly<{
@@ -69,13 +75,15 @@ export function useHorizontalSwipeTransition(
   const [width, setWidth] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
   const [transitionGate] = useState(() => createTransitionGate());
+  const stepRatio = input.stepRatio ?? 1;
 
   const move = useCallback(
     async (direction: SwipeDirection): Promise<boolean> => {
       if (!transitionGate.tryEnter()) return false;
       setIsAnimating(true);
       const callback = direction === 'previous' ? input.onPrevious : input.onNext;
-      const exitPosition = direction === 'previous' ? width : -width;
+      const stepWidth = width * stepRatio;
+      const exitPosition = direction === 'previous' ? stepWidth : -stepWidth;
       try {
         if (!input.reduceMotion) await runAnimation(translateX, exitPosition);
         const succeeded = await callback();
@@ -96,7 +104,7 @@ export function useHorizontalSwipeTransition(
         setIsAnimating(false);
       }
     },
-    [input.onNext, input.onPrevious, input.reduceMotion, transitionGate, translateX, width],
+    [input.onNext, input.onPrevious, input.reduceMotion, stepRatio, transitionGate, translateX, width],
   );
 
   const movePrevious = useCallback(() => move('previous'), [move]);

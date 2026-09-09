@@ -1,4 +1,4 @@
-import { render, screen, userEvent } from '@testing-library/react-native';
+import { render, screen, userEvent, within } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
@@ -23,9 +23,14 @@ jest.mock('@/global.css', () => ({}));
 jest.mock('@/hooks/use-reduce-motion', () => ({ useReduceMotion: () => false }));
 jest.mock('../../hooks/use-horizontal-swipe-transition', () => {
   const { Animated } = jest.requireActual<typeof import('react-native')>('react-native');
+  // 再レンダーのたびに新しいインスタンスを作ると参照が変わってしまうため、
+  // モック全体で共有し、実際のhookと同様に安定した参照を返す。
+  const translateX = new Animated.Value(0);
+  const contentOpacity = new Animated.Value(1);
   return {
     useHorizontalSwipeTransition: jest.fn(() => ({
-      translateX: new Animated.Value(0),
+      translateX,
+      contentOpacity,
       panHandlers: { onStartShouldSetResponder: () => true },
       movePrevious: jest.fn(),
       moveNext: jest.fn(),
@@ -142,6 +147,21 @@ describe('カレンダー画面', () => {
     expect(screen.getByTestId('calendar.scroll')).toBeOnTheScreen();
     expect(StyleSheet.flatten(screen.getByTestId('calendar.animated-content').props.style).flex)
       .toBeUndefined();
+  });
+
+  it('月表示では横スワイプの受付領域をスクロール領域の祖先にし、縦スクロールと競合しない', async () => {
+    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
+
+    const swipeArea = screen.getByTestId('calendar.swipe-area');
+    expect(swipeArea.props.onStartShouldSetResponder).toBeDefined();
+    expect(within(swipeArea).getByTestId('calendar.scroll')).toBeOnTheScreen();
+  });
+
+  it.each([['twoDay'], ['month']] as const)('%s表示でも入場時の瞬間移動を隠す不透明度をスワイプ内容へ適用する', async (mode) => {
+    await renderWithSafeArea(<CalendarScreen state={createState({ mode })} onAddEvent={jest.fn()} />);
+
+    expect(StyleSheet.flatten(screen.getByTestId('calendar.animated-content').props.style).opacity)
+      .toBeDefined();
   });
 
   it('月表示では独自グリッドと選択日の予定一覧を表示する', async () => {

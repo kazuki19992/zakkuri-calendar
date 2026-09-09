@@ -62,24 +62,15 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
     </>
   );
 
-  const animatedContent = (
-    <Animated.View testID="calendar.animated-content" {...transition.panHandlers}
-      onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}
-      style={[
-        state.mode === 'twoDay' ? styles.fill : null,
-        { transform: [{ translateX: transition.translateX }] },
-      ]}>
-      {state.mode === 'twoDay' ? (
-        <TwoDayView days={state.twoDayDays} onAddEvent={onAddEvent} />
-      ) : (
-        <>
-          <MonthGrid days={state.monthDays} onSelectDate={(date) => void state.selectDate(date)} />
-          <SelectedDayAgenda selectedDate={state.selectedDate}
-            holidayName={state.selectedHolidayName} holidaySupport={state.holidaySupport}
-            items={state.selectedAgendaItems} onAddEvent={() => onAddEvent(state.selectedDate)} />
-        </>
-      )}
-    </Animated.View>
+  const swipeContent = state.mode === 'twoDay' ? (
+    <TwoDayView days={state.twoDayDays} onAddEvent={onAddEvent} />
+  ) : (
+    <>
+      <MonthGrid days={state.monthDays} onSelectDate={(date) => void state.selectDate(date)} />
+      <SelectedDayAgenda selectedDate={state.selectedDate}
+        holidayName={state.selectedHolidayName} holidaySupport={state.holidaySupport}
+        items={state.selectedAgendaItems} onAddEvent={() => onAddEvent(state.selectedDate)} />
+    </>
   );
 
   return (
@@ -96,13 +87,34 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
           // 2日表示は画面の残り高さいっぱいにタイムラインを収め、ページ全体のスクロールを行わない。
           <>
             {headerControls}
-            <View style={styles.fill}>{animatedContent}</View>
+            <View style={styles.fill}>
+              <Animated.View testID="calendar.animated-content" {...transition.panHandlers}
+                onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}
+                style={[styles.fill, {
+                  transform: [{ translateX: transition.translateX }],
+                  opacity: transition.contentOpacity,
+                }]}>
+                {swipeContent}
+              </Animated.View>
+            </View>
           </>
         ) : (
-          <ScrollView testID="calendar.scroll" style={styles.scroll} contentContainerStyle={styles.content}>
-            {headerControls}
-            {animatedContent}
-          </ScrollView>
+          // 月表示は縦スクロールも行うため、横スワイプの受付(panHandlers)をScrollViewの
+          // 祖先に置く。ScrollViewの内側に置くと、内容が縦スクロール可能になった際に
+          // ScrollView自身のジェスチャーへ奪われ、横スワイプを受け付けなくなる。
+          <View testID="calendar.swipe-area" style={styles.fill} {...transition.panHandlers}
+            onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}>
+            <ScrollView testID="calendar.scroll" style={styles.scroll} contentContainerStyle={styles.content}>
+              {headerControls}
+              <Animated.View testID="calendar.animated-content"
+                style={{
+                  transform: [{ translateX: transition.translateX }],
+                  opacity: transition.contentOpacity,
+                }}>
+                {swipeContent}
+              </Animated.View>
+            </ScrollView>
+          </View>
         )}
       </View>
     </CalendarLoadState>

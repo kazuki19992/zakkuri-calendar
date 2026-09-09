@@ -226,6 +226,20 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
   });
 
+  it('罫線を予定ブロックより手前に描画し、予定と重なる時間帯でも罫線が見えるようにする', async () => {
+    const view = await renderTwoDayView();
+
+    const hourLineZIndex = StyleSheet.flatten(
+      view.getAllByTestId('two-day-calendar.hour-line')[0].props.style,
+    ).zIndex;
+    const eventZIndex = StyleSheet.flatten(
+      view.getByTestId('timeline-event.event-1').props.style,
+    ).zIndex;
+    expect(hourLineZIndex).toBeGreaterThan(eventZIndex);
+    // 罫線は表示のみが目的で、下にある予定へのタップ操作を妨げてはならない。
+    expect(view.getAllByTestId('two-day-calendar.hour-line')[0].props.pointerEvents).toBe('none');
+  });
+
   it('表示中の2日に今日を含む列にだけ現在時刻の赤線を引き、時間軸に現在時刻を表示する', async () => {
     const view = await renderTwoDayView({ now: () => new Date(2026, 8, 8, 14, 30) });
 

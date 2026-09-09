@@ -20,14 +20,21 @@ export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1, 
         testID="two-day-calendar.timeline-column"
         style={[styles.timelineColumn, { height: TIMELINE_HEIGHT * scale, borderColor: theme.calendarBorder }]}
       >
+        {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} />)}
         {hourLines.map((hour) => (
           <View
             key={hour}
             testID="two-day-calendar.hour-line"
-            style={[styles.hourLine, { top: hour * HOUR_HEIGHT * scale, borderColor: theme.calendarBorder }]}
+            // 予定ブロック(zIndex 1)より手前に描画し、予定の背景に隠れて
+            // 罫線が見えなくなったり間隔が不揃いに見えたりしないようにする。
+            // 表示のみが目的のため、下にある予定へのタップは妨げない。
+            pointerEvents="none"
+            style={[
+              styles.hourLine,
+              { top: hour * HOUR_HEIGHT * scale, borderColor: theme.calendarBorder, zIndex: 2 },
+            ]}
           />
         ))}
-        {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} />)}
         {nowTop !== null ? (
           <View
             testID="two-day-calendar.now-line"
@@ -103,6 +110,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    zIndex: 1,
+    zIndex: 3,
   },
 });

@@ -5,6 +5,7 @@ import type { HolidayProvider } from '@/domain/calendar/holiday';
 import type {
   CalendarRepository,
   EventRepository,
+  SettingsRepository,
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
 import { useCalendarView } from '../use-calendar-view';
@@ -73,7 +74,12 @@ function createDependencies() {
       holidays: [{ date: '2026-09-09', name: 'テスト祝日' }],
     }),
   };
-  return { calendars, events, temporalDefinitions, holidayProvider };
+  const settings: jest.Mocked<SettingsRepository> = {
+    getDefaultExactDuration: jest.fn(),
+    setDefaultExactDuration: jest.fn(),
+    getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(90),
+  };
+  return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }
 
 describe('カレンダー表示の状態調整', () => {
@@ -101,13 +107,15 @@ describe('カレンダー表示の状態調整', () => {
     ]);
     expect(result.current.twoDayDays[1]).toMatchObject({
       holidayName: 'テスト祝日',
-      items: [{ title: '散歩', temporalLabel: '午後' }],
+      timelineItems: [{ title: '散歩', temporalLabel: '午後' }],
     });
     expect(dependencies.events.listByAnchorRange).toHaveBeenCalledWith(
       calendar.id,
-      '2026-09-08',
+      '2026-09-07',
       '2026-09-09',
     );
+    expect(dependencies.settings.getUndeterminedFadeMinutes).toHaveBeenCalledTimes(1);
+    expect(dependencies.temporalDefinitions.getById).toHaveBeenCalledWith(event.temporalDefinitionId);
   });
 
   it('2日表示は前後へ1日単位で移動する', async () => {
@@ -208,13 +216,13 @@ describe('カレンダー表示の状態調整', () => {
 
     await rerender({ revision: 1 });
     await waitFor(() => expect(result.current.status).toBe('ready'));
-    expect(result.current.twoDayDays[1].items[0]?.title).toBe('更新後の予定');
+    expect(result.current.twoDayDays[1].timelineItems[0]?.title).toBe('更新後の予定');
 
     await act(async () => {
       oldRequest.resolve([event]);
       await Promise.resolve();
     });
-    expect(result.current.twoDayDays[1].items[0]?.title).toBe('更新後の予定');
+    expect(result.current.twoDayDays[1].timelineItems[0]?.title).toBe('更新後の予定');
   });
 
   it('期間移動中の再取得が完了すると読み込み中を解除する', async () => {

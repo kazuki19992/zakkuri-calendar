@@ -1,9 +1,34 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
+import { HOUR_HEIGHT, TIMELINE_HEIGHT } from '../timeline-layout';
 import type { TwoDayViewModel } from '../two-day-view-model';
+import { TimelineEventBlock } from './timeline-event-block';
 
-export function TwoDayColumn({ day, onAddEvent }: Readonly<{ day: TwoDayViewModel; onAddEvent(date: string): void }>) {
+const hourLines = Array.from({ length: 25 }, (_, hour) => hour);
+
+export function TwoDayColumn({ day, onAddEvent, variant = 'summary' }: Readonly<{
+  day: TwoDayViewModel;
+  onAddEvent(date: string): void;
+  variant?: 'summary' | 'timeline';
+}>) {
   const theme = useTheme();
+  if (variant === 'timeline') {
+    return (
+      <View
+        testID="two-day-calendar.timeline-column"
+        style={[styles.timelineColumn, { height: TIMELINE_HEIGHT, borderColor: theme.calendarBorder }]}
+      >
+        {hourLines.map((hour) => (
+          <View
+            key={hour}
+            testID="two-day-calendar.hour-line"
+            style={[styles.hourLine, { top: hour * HOUR_HEIGHT, borderColor: theme.calendarBorder }]}
+          />
+        ))}
+        {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} />)}
+      </View>
+    );
+  }
   return (
     <View testID="two-day-calendar.column" style={[styles.column, { borderColor: theme.calendarBorder }] }>
       <View accessible accessibilityLabel={day.accessibilityLabel} style={[styles.header, { borderBottomColor: theme.calendarBorder }] }>
@@ -19,13 +44,16 @@ export function TwoDayColumn({ day, onAddEvent }: Readonly<{ day: TwoDayViewMode
         onPress={() => onAddEvent(day.date)} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
         <Text style={[styles.addLabel, { color: theme.calendarAccent }]}>＋ 予定</Text>
       </Pressable>
-      {day.items.length === 0 ? <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text> : day.items.map((item) => (
+      {day.allDayItems.map((item) => (
         <View key={item.id} accessible accessibilityLabel={item.accessibilityLabel}
           style={[styles.item, { borderTopColor: theme.calendarBorder }] }>
           <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
           <Text style={[styles.itemTime, { color: theme.textSecondary }]}>{item.temporalLabel}</Text>
         </View>
       ))}
+      {day.allDayItems.length === 0 && day.timelineItems.length === 0
+        ? <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text>
+        : null}
     </View>
   );
 }
@@ -46,4 +74,17 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 15, fontWeight: '600' },
   itemTime: { fontSize: 13, marginTop: 3 },
   pressed: { opacity: 0.6 },
+  timelineColumn: {
+    flex: 1,
+    minWidth: 0,
+    position: 'relative',
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  hourLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
 });

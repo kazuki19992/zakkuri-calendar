@@ -14,8 +14,10 @@ import {
 import type {
   CalendarRepository,
   EventRepository,
+  SettingsRepository,
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
+import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   createAgendaItems,
   type AgendaItemViewModel,
@@ -31,6 +33,7 @@ export type CalendarViewStatus = 'loading' | 'ready' | 'error';
 export type UseCalendarViewInput = Readonly<{
   calendars: CalendarRepository;
   events: EventRepository;
+  settings: SettingsRepository;
   temporalDefinitions: TemporalDefinitionRepository;
   holidayProvider: HolidayProvider;
   weekStartsOn: WeekStartsOn;
@@ -63,7 +66,8 @@ export type CalendarViewState = Readonly<{
 type CalendarSnapshot = Readonly<{
   events: readonly CalendarEvent[];
   holidayCoverage: readonly HolidayRangeCoverage[];
-  definitionLabels: ReadonlyMap<string, string>;
+  definitions: ReadonlyMap<string, TemporalDefinition>;
+  undeterminedFadeMinutes: number;
 }>;
 
 type ViewTarget = Readonly<{
@@ -85,7 +89,8 @@ type InternalState = ViewTarget &
 const emptySnapshot: CalendarSnapshot = {
   events: [],
   holidayCoverage: [],
-  definitionLabels: new Map(),
+  definitions: new Map(),
+  undeterminedFadeMinutes: 120,
 };
 
 function getSystemTime(): Date {
@@ -93,9 +98,11 @@ function getSystemTime(): Date {
 }
 
 function getTargetRange(target: ViewTarget): Readonly<{ from: string; through: string }> {
-  return target.mode === 'twoDay'
-    ? getTwoDayRange(target.anchorDate)
-    : getMonthRange(target.visibleMonth);
+  if (target.mode === 'twoDay') {
+    const range = getTwoDayRange(target.anchorDate);
+    return { from: moveTwoDayWindow(range.from, -1), through: range.through };
+  }
+  return getMonthRange(target.visibleMonth);
 }
 
 function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): readonly string[] {
@@ -124,18 +131,20 @@ async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Pr
         .map((event) => event.temporalDefinitionId),
     ),
   ];
-  const definitions = await Promise.all(
-    fuzzyDefinitionIds.map((id) => input.temporalDefinitions.getById(id)),
-  );
+  const [definitions, undeterminedFadeMinutes] = await Promise.all([
+    Promise.all(fuzzyDefinitionIds.map((id) => input.temporalDefinitions.getById(id))),
+    input.settings.getUndeterminedFadeMinutes(),
+  ]);
 
   return {
     events,
     holidayCoverage,
-    definitionLabels: new Map(
+    definitions: new Map(
       definitions.flatMap((definition) =>
-        definition === null ? [] : [[definition.id, definition.label] as const],
+        definition === null ? [] : [[definition.id, definition] as const],
       ),
     ),
+    undeterminedFadeMinutes,
   };
 }
 
@@ -207,6 +216,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     input.events,
     input.holidayProvider,
     input.refreshRevision,
+    input.settings,
     input.temporalDefinitions,
     input.weekStartsOn,
   ]);
@@ -318,7 +328,8 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         range: getTwoDayRange(state.anchorDate),
         today: state.today,
         events: state.snapshot.events,
-        definitionLabels: state.snapshot.definitionLabels,
+        definitions: state.snapshot.definitions,
+        undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes,
         holidayCoverage: state.snapshot.holidayCoverage,
       }),
     [state.anchorDate, state.snapshot, state.today],
@@ -338,7 +349,10 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     () =>
       createAgendaItems(
         state.snapshot.events.filter((event) => event.anchorDate === state.selectedDate),
-        state.snapshot.definitionLabels,
+        new Map(
+          [...state.snapshot.definitions.values()]
+            .map((definition) => [definition.id, definition.label] as const),
+        ),
       ),
     [state.selectedDate, state.snapshot],
   );

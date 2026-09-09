@@ -9,13 +9,14 @@ const holidayProvider = new JapaneseHolidayProvider();
 
 export default function IndexRoute() {
   const router = useRouter();
-  const { calendars, events, temporalDefinitions } = useRepositories();
+  const { calendars, events, settings, temporalDefinitions } = useRepositories();
   const { revision } = useCalendarRefresh();
   // TODO(v1, #9): 祝日カレンダーと、ざっくり期間・業務日計算への反映を設定可能にする。
   // TODO(v1, #10): 永続化したカレンダー設定から週の開始曜日を取得する。
   const state = useCalendarView({
     calendars,
     events,
+    settings,
     temporalDefinitions,
     holidayProvider,
     refreshRevision: revision,

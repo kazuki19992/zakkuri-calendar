@@ -35,10 +35,10 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
     visibleMonth: '2026-09-01', selectedDate: '2026-09-08',
     twoDayDays: [
       { date: '2026-09-08', dateLabel: '9月8日', weekdayLabel: '火', isToday: true,
-        holidayName: null, holidaySupport: 'available', items: [],
+        holidayName: null, holidaySupport: 'available', allDayItems: [], timelineItems: [],
         accessibilityLabel: '2026年9月8日、火曜日、今日、予定なし' },
       { date: '2026-09-09', dateLabel: '9月9日', weekdayLabel: '水', isToday: false,
-        holidayName: null, holidaySupport: 'available', items: [],
+        holidayName: null, holidaySupport: 'available', allDayItems: [], timelineItems: [],
         accessibilityLabel: '2026年9月9日、水曜日、予定なし' },
     ],
     monthDays: [], selectedAgendaItems: [], selectedHolidayName: null,

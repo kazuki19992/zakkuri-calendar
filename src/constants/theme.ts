@@ -18,6 +18,8 @@ export const Colors = {
     calendarHoliday: '#A55B4B',
     calendarAccent: '#8B6F5A',
     calendarBorder: '#D8D5CF',
+    calendarEvent: '#DDD3C7',
+    calendarEventBorder: '#A88F78',
   },
   dark: {
     text: '#EDECE9',
@@ -29,6 +31,8 @@ export const Colors = {
     calendarHoliday: '#D08A78',
     calendarAccent: '#C6A58A',
     calendarBorder: '#3F3E3B',
+    calendarEvent: '#5A4B40',
+    calendarEventBorder: '#B99A80',
   },
 } as const;
 

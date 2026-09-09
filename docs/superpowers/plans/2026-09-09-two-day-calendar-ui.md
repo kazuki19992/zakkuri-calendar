@@ -70,21 +70,21 @@ Commit: `feat: 2日表示の日付範囲を追加`
 - Produces: `TwoDayViewModel = { date; dateLabel; weekdayLabel; isToday; holidayName; holidaySupport; items; accessibilityLabel }`
 - Produces: `createTwoDayViewModels(input): readonly [TwoDayViewModel, TwoDayViewModel]`
 
-- [ ] **Step 1: 2日表示モデルの失敗テストを書く**
+- [x] **Step 1: 2日表示モデルの失敗テストを書く**
 
 基準日と翌日の順序、月・年境界、今日表示、祝日名、祝日未対応、fuzzyラベル、日別予定、空配列、読み上げラベルを日本語テストで固定する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/__tests__/two-day-view-model.test.ts`
 
 Expected: 新しいmodelとfactoryが存在しないためFAIL。
 
-- [ ] **Step 3: 共通処理を移動し2日モデルを最小実装する**
+- [x] **Step 3: 共通処理を移動し2日モデルを最小実装する**
 
 月モデルと2日モデルが同じ`createAgendaItems`と`getHolidayInfo`を使う。曜日ラベルは`日`〜`土`の配列から生成し、予定は`anchorDate`で日別に分ける。
 
-- [ ] **Step 4: 月モデルを含めGREENにしてコミットする**
+- [x] **Step 4: 月モデルを含めGREENにしてコミットする**
 
 Run: `npm test -- --runInBand src/features/calendar/__tests__/two-day-view-model.test.ts src/features/calendar/__tests__/month-view-model.test.ts`
 

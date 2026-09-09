@@ -6,14 +6,19 @@ jest.mock('@/global.css', () => ({}));
 
 jest.mock('expo-router', () => {
   const React = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  const { Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
+  const Stack = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(View, { testID: 'router-stack' }, children);
+  function StackScreen({ name, options }: { name: string; options: { presentation?: string } }) {
+    return React.createElement(Text, { testID: `stack-screen.${name}` }, options.presentation);
+  }
+  Stack.Screen = StackScreen;
   return {
     DarkTheme: {},
     DefaultTheme: {},
     ThemeProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement(View, { testID: 'theme-provider' }, children),
-    Stack: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(View, { testID: 'router-stack' }, children),
+    Stack,
   };
 });
 
@@ -38,15 +43,27 @@ jest.mock('@/data/sqlite/app-database-provider', () => {
   };
 });
 
+jest.mock('@/features/calendar/calendar-refresh-context', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    CalendarRefreshProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(View, { testID: 'calendar-refresh-provider' }, children),
+  };
+});
+
 describe('ルートレイアウト', () => {
-  it('データベースproviderの外にスプラッシュを維持し通常のStackを内側に置く', async () => {
+  it('データベースと再読み込みproviderの内側に通常のStackを置く', async () => {
     await render(<RootLayout />);
 
     const splashOverlay = screen.getByTestId('animated-splash-overlay');
     const databaseProvider = screen.getByTestId('database-provider');
+    const calendarRefreshProvider = screen.getByTestId('calendar-refresh-provider');
     const stack = screen.getByTestId('router-stack');
 
     expect(splashOverlay.parent).toBe(databaseProvider.parent);
-    expect(stack.parent).toBe(databaseProvider);
+    expect(calendarRefreshProvider.parent).toBe(databaseProvider);
+    expect(stack.parent).toBe(calendarRefreshProvider);
+    expect(screen.getByTestId('stack-screen.events/new')).toHaveTextContent('modal');
   });
 });

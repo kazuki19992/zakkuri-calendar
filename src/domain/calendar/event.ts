@@ -96,3 +96,14 @@ export function parseCalendarEvent(input: unknown): Result<CalendarEvent, EventV
   if (!isNonBlank(input.updatedAt)) return fail('updatedAt', 'updatedAt must not be blank');
   return { ok: true, value: { ...draft.value, id: input.id, createdAt: input.createdAt, updatedAt: input.updatedAt } };
 }
+
+export function createCalendarEvent(
+  input: Readonly<{ id: string; draft: EventDraft; now: string }>,
+): Result<CalendarEvent, EventValidationError> {
+  return parseCalendarEvent({
+    ...input.draft,
+    id: input.id,
+    createdAt: input.now,
+    updatedAt: input.now,
+  });
+}

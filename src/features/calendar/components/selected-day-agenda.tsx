@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AgendaItemViewModel } from '../month-view-model';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -7,6 +7,7 @@ export type SelectedDayAgendaProps = Readonly<{
   holidayName: string | null;
   holidaySupport: 'available' | 'unsupported';
   items: readonly AgendaItemViewModel[];
+  onAddEvent(): void;
 }>;
 
 function formatSelectedDate(date: string): string {
@@ -19,6 +20,7 @@ export function SelectedDayAgenda({
   holidayName,
   holidaySupport,
   items,
+  onAddEvent,
 }: SelectedDayAgendaProps) {
   const theme = useTheme();
 
@@ -27,6 +29,14 @@ export function SelectedDayAgenda({
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
         {formatSelectedDate(selectedDate)}の予定
       </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="予定を追加"
+        onPress={onAddEvent}
+        style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
+      >
+        <Text style={[styles.addButtonText, { color: theme.calendarAccent }]}>＋ 予定を追加</Text>
+      </Pressable>
       {holidayName !== null ? (
         <Text style={[styles.holiday, { color: theme.calendarHoliday }]}>{holidayName}</Text>
       ) : holidaySupport === 'unsupported' ? (
@@ -49,6 +59,9 @@ export function SelectedDayAgenda({
 const styles = StyleSheet.create({
   container: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingVertical: 12 },
   title: { fontSize: 17, fontWeight: '700' },
+  addButton: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 44 },
+  addButtonText: { fontSize: 15, fontWeight: '700' },
+  pressed: { opacity: 0.6 },
   holiday: { fontSize: 14, fontWeight: '600', marginTop: 4 },
   support: { fontSize: 14, marginTop: 4 },
   empty: { fontSize: 15, marginTop: 12 },

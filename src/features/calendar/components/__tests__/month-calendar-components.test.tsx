@@ -306,17 +306,22 @@ describe('月カレンダー表示コンポーネント', () => {
   });
 
   it('祝日情報が未対応でも選択日の予定と空状態を表示する', async () => {
+    const onAddEvent = jest.fn();
+    const user = userEvent.setup();
     const view = await render(
       <SelectedDayAgenda
         selectedDate="2026-09-21"
         holidayName={null}
         holidaySupport="unsupported"
         items={agendaItems}
+        onAddEvent={onAddEvent}
       />,
     );
 
     expect(view.getByText('祝日情報未対応')).toBeOnTheScreen();
     expect(view.getByLabelText('敬老会、終日')).toBeOnTheScreen();
+    await user.press(view.getByRole('button', { name: '予定を追加' }));
+    expect(onAddEvent).toHaveBeenCalledTimes(1);
 
     await view.rerender(
       <SelectedDayAgenda
@@ -324,6 +329,7 @@ describe('月カレンダー表示コンポーネント', () => {
         holidayName={null}
         holidaySupport="available"
         items={[]}
+        onAddEvent={onAddEvent}
       />,
     );
 

@@ -1,4 +1,4 @@
-import { parseCalendarEvent, parseEventDraft } from '../event';
+import { createCalendarEvent, parseCalendarEvent, parseEventDraft } from '../event';
 
 const base = {
   calendarId: 'personal-default',
@@ -50,5 +50,38 @@ describe('parseCalendarEvent', () => {
   it('adds stable persistence metadata to a valid draft', () => {
     const event = { ...validAllDay, id: 'event-1', createdAt: '2026-09-08T00:00:00.000Z', updatedAt: '2026-09-08T00:00:00.000Z' };
     expect(parseCalendarEvent(event)).toEqual({ ok: true, value: event });
+  });
+});
+
+describe('予定の新規作成', () => {
+  it('ざっくり予定へIDと同一の作成更新日時を付与する', () => {
+    expect(
+      createCalendarEvent({
+        id: 'event-new',
+        draft: validFuzzy,
+        now: '2026-09-09T01:02:03.000Z',
+      }),
+    ).toEqual({
+      ok: true,
+      value: {
+        ...validFuzzy,
+        id: 'event-new',
+        createdAt: '2026-09-09T01:02:03.000Z',
+        updatedAt: '2026-09-09T01:02:03.000Z',
+      },
+    });
+  });
+
+  it('空のIDでは予定を作成しない', () => {
+    const result = createCalendarEvent({
+      id: '',
+      draft: validFuzzy,
+      now: '2026-09-09T01:02:03.000Z',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { field: 'id', message: 'id must not be blank' },
+    });
   });
 });

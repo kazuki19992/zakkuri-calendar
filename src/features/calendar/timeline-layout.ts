@@ -1,4 +1,5 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { PixelRatio } from 'react-native';
 import type { CalendarEvent } from '@/domain/calendar/event';
 import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
@@ -13,9 +14,18 @@ const PIXELS_PER_MINUTE = HOUR_HEIGHT / 60;
 /**
  * 画面の実測高さを24時間分の基準高さ(TIMELINE_HEIGHT)に対する倍率へ変換する。
  * 未計測(0以下)の間は初期描画のちらつきを避けるため等倍(1)を返す。
+ *
+ * 1時間の高さは実機ピクセルへ丸めてから倍率を求める。丸めずに
+ * `availableHeight / TIMELINE_HEIGHT`をそのまま使うと、1時間ごとの罫線の
+ * 位置(`hour * HOUR_HEIGHT * scale`)がピクセル境界で独立に丸められ、
+ * 間隔が1pxずつ不揃いに見えることがある。先に1時間の高さをピクセルへ
+ * 丸めておけば、その整数倍である各罫線の位置も必ずピクセルに揃い、
+ * 間隔が均一になる。
  */
 export function computeTimelineScale(availableHeight: number): number {
-  return availableHeight > 0 ? availableHeight / TIMELINE_HEIGHT : 1;
+  if (availableHeight <= 0) return 1;
+  const hourHeight = PixelRatio.roundToNearestPixel(availableHeight / 24);
+  return hourHeight / HOUR_HEIGHT;
 }
 
 /**

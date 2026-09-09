@@ -85,6 +85,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getByTestId('two-day-calendar.timeline')).toBeOnTheScreen();
     expect(view.getByText('0:00')).toBeOnTheScreen();
     expect(view.getByText('21:00')).toBeOnTheScreen();
+    expect(view.getByText('24:00')).toBeOnTheScreen();
     expect(view.getByLabelText('歯医者、14:30・30分')).toBeOnTheScreen();
     // 予備列(前日・翌々日)もday2と同じく予定なしのため、3列分表示される。
     expect(view.getAllByText('予定はありません')).toHaveLength(3);
@@ -195,6 +196,29 @@ describe('2日カレンダー表示コンポーネント', () => {
     // 812 * 0.5 = 406(縮小後の開始位置)。高さは36の半分(18)が最小表示高(36)を下回るため36のまま。
     expect(StyleSheet.flatten(view.getByTestId('timeline-event.event-1').props.style))
       .toMatchObject({ top: 406, height: 36 });
+  });
+
+  it('24:00のラベルは軸の下端からはみ出さないよう、行の高さ分だけ上げて配置する', async () => {
+    const view = await renderTwoDayView();
+
+    // 行の高さ(13)分だけ上げて下端(TIMELINE_HEIGHT)に揃え、はみ出さないようにする。
+    expect(StyleSheet.flatten(view.getByText('24:00').props.style)).toMatchObject({
+      top: TIMELINE_HEIGHT - 13,
+    });
+  });
+
+  it('3時間ごとの罫線を太くし、時間軸のラベルとの対応を分かりやすくする', async () => {
+    const view = await renderTwoDayView();
+
+    const hourLinesOfFirstColumn = view.getAllByTestId('two-day-calendar.hour-line').slice(0, 25);
+    hourLinesOfFirstColumn.forEach((line, hour) => {
+      const { borderTopWidth } = StyleSheet.flatten(line.props.style);
+      if (hour % 3 === 0) {
+        expect(borderTopWidth).toBeGreaterThan(StyleSheet.hairlineWidth);
+      } else {
+        expect(borderTopWidth).toBe(StyleSheet.hairlineWidth);
+      }
+    });
   });
 
   it('表示中の2日に今日を含む列にだけ現在時刻の赤線を引き、時間軸に現在時刻を表示する', async () => {

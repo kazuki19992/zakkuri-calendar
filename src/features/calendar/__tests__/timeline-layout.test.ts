@@ -1,3 +1,4 @@
+import { PixelRatio } from 'react-native';
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
@@ -200,6 +201,18 @@ describe('タイムライン表示の縮尺計算', () => {
   it('未計測(0以下)の高さは基準高さのまま等倍で表示する', () => {
     expect(computeTimelineScale(0)).toBe(1);
     expect(computeTimelineScale(-10)).toBe(1);
+  });
+
+  it('24で割り切れない高さでも、1時間の高さを実機ピクセルへ丸めてから倍率を求め、罫線の間隔が均一になるようにする', () => {
+    const scale = computeTimelineScale(569);
+    const hourHeight = HOUR_HEIGHT * scale;
+
+    expect(hourHeight).toBe(PixelRatio.roundToNearestPixel(569 / 24));
+    // 丸め済みの1時間の高さの整数倍なら、罫線はすべて実機ピクセルに揃い、間隔も均一になる。
+    for (let hour = 1; hour <= 24; hour += 1) {
+      expect(hour * hourHeight - (hour - 1) * hourHeight).toBeCloseTo(hourHeight, 10);
+      expect(PixelRatio.roundToNearestPixel(hour * hourHeight)).toBeCloseTo(hour * hourHeight, 10);
+    }
   });
 });
 

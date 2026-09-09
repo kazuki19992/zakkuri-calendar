@@ -1,4 +1,5 @@
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { CalendarLoadState } from '../components/calendar-load-state';
@@ -32,6 +33,7 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
   onAddEvent(date: string): void;
 }>) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
   const transition = useHorizontalSwipeTransition({
     onPrevious: state.showPreviousPeriod,
@@ -79,19 +81,27 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
 
   return (
     <CalendarLoadState status={state.status} onRetry={() => void state.retry()}>
-      {state.mode === 'twoDay' ? (
-        // 2日表示は画面の残り高さいっぱいにタイムラインを収め、ページ全体のスクロールを行わない。
-        <View style={[styles.root, { backgroundColor: theme.background }]}>
-          {headerControls}
-          <View style={styles.fill}>{animatedContent}</View>
-        </View>
-      ) : (
-        <ScrollView testID="calendar.scroll" style={[styles.scroll, { backgroundColor: theme.background }]}
-          contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
-          {headerControls}
-          {animatedContent}
-        </ScrollView>
-      )}
+      {/* ノッチ・ホームインジケーターなどセーフエリアは画面全体でここ1箇所にまとめて確保する。 */}
+      <View testID="calendar.screen" style={[styles.root, {
+        backgroundColor: theme.background,
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+      }]}>
+        {state.mode === 'twoDay' ? (
+          // 2日表示は画面の残り高さいっぱいにタイムラインを収め、ページ全体のスクロールを行わない。
+          <>
+            {headerControls}
+            <View style={styles.fill}>{animatedContent}</View>
+          </>
+        ) : (
+          <ScrollView testID="calendar.scroll" style={styles.scroll} contentContainerStyle={styles.content}>
+            {headerControls}
+            {animatedContent}
+          </ScrollView>
+        )}
+      </View>
     </CalendarLoadState>
   );
 }

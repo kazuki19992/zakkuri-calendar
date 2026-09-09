@@ -82,6 +82,27 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
   });
 
+  it('予定テキストを不透明度が最も濃い部分へ寄せて配置する', async () => {
+    const anchorPatterns = [
+      { opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 0 }], expected: 'flex-start' },
+      { opacityStops: [{ offset: 0, opacity: 0 }, { offset: 1, opacity: 1 }], expected: 'flex-end' },
+      { opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }], expected: 'center' },
+    ] as const;
+    const items = anchorPatterns.map(({ opacityStops }, index) => ({
+      ...timelineItem,
+      id: `anchor-${index}`,
+      opacityStops,
+    }));
+    const view = await render(
+      <TwoDayView days={[{ ...days[0], timelineItems: items }, days[1]]} onAddEvent={jest.fn()} />,
+    );
+
+    anchorPatterns.forEach(({ expected }, index) => {
+      const textContainer = view.getByTestId(`timeline-event.anchor-${index}.text`);
+      expect(StyleSheet.flatten(textContainer.props.style)).toMatchObject({ justifyContent: expected });
+    });
+  });
+
   it('計測した画面高さに合わせて24時間軸・時間線・予定の位置と高さを縮小する', async () => {
     const view = await render(<TwoDayView days={days} onAddEvent={jest.fn()} />);
 
@@ -99,6 +120,30 @@ describe('2日カレンダー表示コンポーネント', () => {
     // 812 * 0.5 = 406(縮小後の開始位置)。高さは36の半分(18)が最小表示高(36)を下回るため36のまま。
     expect(StyleSheet.flatten(view.getByTestId('timeline-event.event-1').props.style))
       .toMatchObject({ top: 406, height: 36 });
+  });
+
+  it('今日を含む列にだけ現在時刻の赤線を引き、時間軸に現在時刻を表示する', async () => {
+    const view = await render(
+      <TwoDayView days={days} onAddEvent={jest.fn()} now={() => new Date(2026, 8, 8, 14, 30)} />,
+    );
+
+    expect(view.getByText('14:30')).toBeOnTheScreen();
+    const nowLines = view.getAllByTestId('two-day-calendar.now-line');
+    expect(nowLines).toHaveLength(1);
+    expect(StyleSheet.flatten(nowLines[0].props.style)).toMatchObject({ top: 870 * (HOUR_HEIGHT / 60) });
+  });
+
+  it('表示中の2日がどちらも今日でなければ現在時刻を表示しない', async () => {
+    const notToday: readonly [TwoDayViewModel, TwoDayViewModel] = [
+      { ...days[0], isToday: false },
+      days[1],
+    ];
+    const view = await render(
+      <TwoDayView days={notToday} onAddEvent={jest.fn()} now={() => new Date(2026, 8, 8, 14, 30)} />,
+    );
+
+    expect(view.queryByText('14:30')).toBeNull();
+    expect(view.queryByTestId('two-day-calendar.now-line')).toBeNull();
   });
 
   it('予定ブロックに枠線を描画しない', async () => {

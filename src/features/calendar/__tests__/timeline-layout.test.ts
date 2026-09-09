@@ -4,8 +4,11 @@ import {
   HOUR_HEIGHT,
   MIN_EVENT_HEIGHT,
   TIMELINE_HEIGHT,
+  computeNowLineTop,
+  computePeakOpacityOffset,
   computeTimelineScale,
   createDayTimelineItems,
+  resolveTextAnchor,
 } from '../timeline-layout';
 
 const base = {
@@ -197,5 +200,36 @@ describe('タイムライン表示の縮尺計算', () => {
   it('未計測(0以下)の高さは基準高さのまま等倍で表示する', () => {
     expect(computeTimelineScale(0)).toBe(1);
     expect(computeTimelineScale(-10)).toBe(1);
+  });
+});
+
+describe('現在時刻の位置計算', () => {
+  it('0時からの分数と縮尺から現在時刻線のtop位置を求める', () => {
+    expect(computeNowLineTop(0, 1)).toBe(0);
+    expect(computeNowLineTop(90, 1)).toBe(84); // 1時間30分 * 56pt/時
+    expect(computeNowLineTop(90, 0.5)).toBe(42);
+  });
+});
+
+describe('予定テキストの配置(不透明度が最も濃い位置へ寄せる)', () => {
+  it.each([
+    [[{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }] as const, 0.5],
+    [[{ offset: 0, opacity: 0 }, { offset: 0.25, opacity: 1 }, { offset: 1, opacity: 1 }] as const, 0.625],
+    [[{ offset: 0, opacity: 1 }, { offset: 0.75, opacity: 1 }, { offset: 1, opacity: 0 }] as const, 0.375],
+    [[{ offset: 0, opacity: 0 }, { offset: 0.5, opacity: 1 }, { offset: 1, opacity: 0 }] as const, 0.5],
+  ])('opacityStops %o の最も濃い区間の中心offsetは%p', (stops, expected) => {
+    expect(computePeakOpacityOffset(stops)).toBe(expected);
+  });
+
+  it.each([
+    [0, 'flex-start'],
+    [0.3, 'flex-start'],
+    [1 / 3, 'flex-start'],
+    [0.5, 'center'],
+    [2 / 3, 'flex-end'],
+    [0.9, 'flex-end'],
+    [1, 'flex-end'],
+  ] as const)('中心offset%pを3段階のFlexbox配置%pへ変換する', (offset, expected) => {
+    expect(resolveTextAnchor(offset)).toBe(expected);
   });
 });

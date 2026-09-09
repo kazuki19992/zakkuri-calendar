@@ -1,9 +1,23 @@
 import { render, screen, userEvent } from '@testing-library/react-native';
+import type { ReactElement } from 'react';
 import { StyleSheet } from 'react-native';
+import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import type { CalendarViewState } from '../../hooks/use-calendar-view';
 import { useHorizontalSwipeTransition } from '../../hooks/use-horizontal-swipe-transition';
 import { CalendarScreen } from '../calendar-screen';
+
+// iPhoneのノッチ・ホームインジケーター相当の値を固定し、セーフエリア適用を検証できるようにする。
+const safeAreaMetrics: Metrics = {
+  insets: { top: 47, left: 0, right: 0, bottom: 34 },
+  frame: { x: 0, y: 0, width: 390, height: 844 },
+};
+
+function renderWithSafeArea(element: ReactElement) {
+  return render(
+    <SafeAreaProvider initialMetrics={safeAreaMetrics}>{element}</SafeAreaProvider>,
+  );
+}
 
 jest.mock('@/global.css', () => ({}));
 jest.mock('@/hooks/use-reduce-motion', () => ({ useReduceMotion: () => false }));
@@ -55,7 +69,7 @@ describe('カレンダー画面', () => {
     const onAddEvent = jest.fn();
     const user = userEvent.setup();
     const state = createState();
-    await render(<CalendarScreen state={state} onAddEvent={onAddEvent} />);
+    await renderWithSafeArea(<CalendarScreen state={state} onAddEvent={onAddEvent} />);
 
     expect(screen.getByRole('tab', { name: '2日表示' }).props.accessibilityState).toEqual({ selected: true });
     expect(screen.getByText('2026年9月8日〜9日')).toBeOnTheScreen();
@@ -72,7 +86,7 @@ describe('カレンダー画面', () => {
   it('表示切替と期間ツールバーの操作を状態へ渡す', async () => {
     const state = createState();
     const user = userEvent.setup();
-    await render(<CalendarScreen state={state} onAddEvent={jest.fn()} />);
+    await renderWithSafeArea(<CalendarScreen state={state} onAddEvent={jest.fn()} />);
 
     await user.press(screen.getByRole('tab', { name: '月表示' }));
     await user.press(screen.getByRole('button', { name: '前の1日へ' }));
@@ -85,8 +99,30 @@ describe('カレンダー画面', () => {
     expect(swipe.moveNext).toHaveBeenCalledTimes(1);
   });
 
+  it('2日表示で画面全体にセーフエリア分の余白を確保する', async () => {
+    await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
+
+    expect(StyleSheet.flatten(screen.getByTestId('calendar.screen').props.style)).toMatchObject({
+      paddingTop: safeAreaMetrics.insets.top,
+      paddingBottom: safeAreaMetrics.insets.bottom,
+      paddingLeft: safeAreaMetrics.insets.left,
+      paddingRight: safeAreaMetrics.insets.right,
+    });
+  });
+
+  it('月表示でも画面全体にセーフエリア分の余白を確保する', async () => {
+    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
+
+    expect(StyleSheet.flatten(screen.getByTestId('calendar.screen').props.style)).toMatchObject({
+      paddingTop: safeAreaMetrics.insets.top,
+      paddingBottom: safeAreaMetrics.insets.bottom,
+      paddingLeft: safeAreaMetrics.insets.left,
+      paddingRight: safeAreaMetrics.insets.right,
+    });
+  });
+
   it('2日表示ではスクロール領域を持たず残り高さいっぱいにタイムラインを表示する', async () => {
-    await render(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
+    await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
 
     expect(screen.queryByTestId('calendar.scroll')).toBeNull();
     expect(StyleSheet.flatten(screen.getByTestId('calendar.animated-content').props.style))
@@ -94,7 +130,7 @@ describe('カレンダー画面', () => {
   });
 
   it('月表示では従来通りページ全体をスクロール領域にする', async () => {
-    await render(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
+    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
 
     expect(screen.getByTestId('calendar.scroll')).toBeOnTheScreen();
     expect(StyleSheet.flatten(screen.getByTestId('calendar.animated-content').props.style).flex)
@@ -113,7 +149,7 @@ describe('カレンダー画面', () => {
       dayNumber: index + 1,
       accessibilityLabel: index === 21 ? monthDay.accessibilityLabel : `グリッド日付${index + 1}`,
     }));
-    await render(<CalendarScreen state={createState({ mode: 'month', selectedDate: '2026-09-21', monthDays,
+    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month', selectedDate: '2026-09-21', monthDays,
       selectedHolidayName: '敬老の日' })} onAddEvent={onAddEvent} />);
 
     expect(screen.getByText('2026年9月')).toBeOnTheScreen();

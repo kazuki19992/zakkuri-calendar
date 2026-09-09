@@ -18,7 +18,37 @@ export function computeTimelineScale(availableHeight: number): number {
   return availableHeight > 0 ? availableHeight / TIMELINE_HEIGHT : 1;
 }
 
+/**
+ * 0時からの経過分数と縮尺から、現在時刻線のtop位置(px)を求める。
+ */
+export function computeNowLineTop(minutesSinceMidnight: number, scale: number): number {
+  return minutesSinceMidnight * PIXELS_PER_MINUTE * scale;
+}
+
 export type TimelineOpacityStop = Readonly<{ offset: number; opacity: number }>;
+
+export type TimelineTextAnchor = 'flex-start' | 'center' | 'flex-end';
+
+/**
+ * opacity stopのうち最も濃い値を持つ区間の中心offset(0〜1)を求める。
+ * フェードで両端が薄くなる予定でも、最も濃い部分にテキストを配置できるようにする。
+ */
+export function computePeakOpacityOffset(stops: readonly TimelineOpacityStop[]): number {
+  const maxOpacity = Math.max(...stops.map((stop) => stop.opacity));
+  const peakOffsets = stops
+    .filter((stop) => stop.opacity === maxOpacity)
+    .map((stop) => stop.offset);
+  return (Math.min(...peakOffsets) + Math.max(...peakOffsets)) / 2;
+}
+
+/**
+ * 最も濃い位置(0〜1)を3段階のFlexbox配置へ変換し、予定テキストを常に濃い背景の上へ描画する。
+ */
+export function resolveTextAnchor(peakOffset: number): TimelineTextAnchor {
+  if (peakOffset <= 1 / 3) return 'flex-start';
+  if (peakOffset >= 2 / 3) return 'flex-end';
+  return 'center';
+}
 
 export type TimelineItemViewModel = Readonly<{
   id: string;

@@ -1,7 +1,12 @@
 import { LinearGradient, type LinearGradientProps } from 'expo-linear-gradient';
 import { StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
-import { MIN_EVENT_HEIGHT, type TimelineItemViewModel } from '../timeline-layout';
+import {
+  MIN_EVENT_HEIGHT,
+  computePeakOpacityOffset,
+  resolveTextAnchor,
+  type TimelineItemViewModel,
+} from '../timeline-layout';
 
 function withOpacity(hex: string, opacity: number): string {
   const red = Number.parseInt(hex.slice(1, 3), 16);
@@ -28,6 +33,8 @@ export function TimelineEventBlock({ item, scale = 1 }: Readonly<{
     number,
     ...number[],
   ];
+  // フェードで両端が薄くなる予定でも、不透明度が最も濃い部分にテキストを寄せて可読性を保つ。
+  const textAnchor = resolveTextAnchor(computePeakOpacityOffset(item.opacityStops));
 
   return (
     <View
@@ -48,8 +55,10 @@ export function TimelineEventBlock({ item, scale = 1 }: Readonly<{
           style={StyleSheet.absoluteFill}
         />
         {item.isInstant ? <View style={[styles.instantLine, { backgroundColor: theme.calendarEventBorder }]} /> : null}
-        <Text numberOfLines={2} style={[styles.title, { color: theme.text }]}>{item.title}</Text>
-        <Text numberOfLines={1} style={[styles.time, { color: theme.text }]}>{item.temporalLabel}</Text>
+        <View testID={`timeline-event.${item.id}.text`} style={[styles.text, { justifyContent: textAnchor }]}>
+          <Text numberOfLines={2} style={[styles.title, { color: theme.text }]}>{item.title}</Text>
+          <Text numberOfLines={1} style={[styles.time, { color: theme.text }]}>{item.temporalLabel}</Text>
+        </View>
       </View>
     </View>
   );
@@ -65,6 +74,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   instantLine: { position: 'absolute', left: 0, right: 0, top: 0, height: 2 },
+  text: { flex: 1 },
   title: { fontSize: 12, fontWeight: '600', lineHeight: 15 },
   time: { fontSize: 10, lineHeight: 13 },
 });

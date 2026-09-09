@@ -20,6 +20,7 @@ export const Colors = {
     calendarBorder: '#D8D5CF',
     calendarEvent: '#DDD3C7',
     calendarEventBorder: '#A88F78',
+    calendarNowIndicator: '#E03131',
   },
   dark: {
     text: '#EDECE9',
@@ -33,6 +34,7 @@ export const Colors = {
     calendarBorder: '#3F3E3B',
     calendarEvent: '#5A4B40',
     calendarEventBorder: '#B99A80',
+    calendarNowIndicator: '#FF6B6B',
   },
 } as const;
 

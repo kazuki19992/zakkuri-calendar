@@ -6,11 +6,12 @@ import { TimelineEventBlock } from './timeline-event-block';
 
 const hourLines = Array.from({ length: 25 }, (_, hour) => hour);
 
-export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1 }: Readonly<{
+export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1, nowTop = null }: Readonly<{
   day: TwoDayViewModel;
   onAddEvent(date: string): void;
   variant?: 'summary' | 'timeline';
   scale?: number;
+  nowTop?: number | null;
 }>) {
   const theme = useTheme();
   if (variant === 'timeline') {
@@ -27,6 +28,15 @@ export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1 }
           />
         ))}
         {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} />)}
+        {nowTop !== null ? (
+          <View
+            testID="two-day-calendar.now-line"
+            accessible
+            accessibilityLabel="現在時刻"
+            pointerEvents="none"
+            style={[styles.nowLine, { top: nowTop, backgroundColor: theme.calendarNowIndicator }]}
+          />
+        ) : null}
       </View>
     );
   }
@@ -87,5 +97,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  nowLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    zIndex: 1,
   },
 });

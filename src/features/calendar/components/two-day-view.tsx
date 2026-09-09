@@ -1,13 +1,15 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import { computeTimelineScale } from '../timeline-layout';
+import { useNowIndicator } from '../hooks/use-now-indicator';
+import { computeNowLineTop, computeTimelineScale } from '../timeline-layout';
 import type { TwoDayViewModel } from '../two-day-view-model';
 import { TimelineAxis } from './timeline-axis';
 import { TwoDayColumn } from './two-day-column';
 
-export function TwoDayView({ days, onAddEvent }: Readonly<{
+export function TwoDayView({ days, onAddEvent, now }: Readonly<{
   days: readonly [TwoDayViewModel, TwoDayViewModel];
   onAddEvent(date: string): void;
+  now?: () => Date;
 }>) {
   // timelineRowの実測高さ(親から配分された画面の残り高さ)に24時間軸を合わせ、
   // ヘッダーなどを除いた画面内へ縦スクロールなしで収める。
@@ -16,6 +18,11 @@ export function TwoDayView({ days, onAddEvent }: Readonly<{
     setScale(computeTimelineScale(event.nativeEvent.layout.height));
   }, []);
 
+  // 表示中の2日のどちらかが今日のときだけ、現在時刻線とラベルを表示する。
+  const indicator = useNowIndicator(now);
+  const showsToday = days.some((day) => day.isToday);
+  const nowTop = showsToday ? computeNowLineTop(indicator.minutesOfDay, scale) : null;
+
   return (
     <View testID="two-day-calendar" style={styles.container}>
       <View testID="two-day-calendar.summary" style={styles.summaryRow}>
@@ -23,10 +30,11 @@ export function TwoDayView({ days, onAddEvent }: Readonly<{
         {days.map((day) => <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} />)}
       </View>
       <View testID="two-day-calendar.timeline" style={styles.timelineRow} onLayout={handleTimelineLayout}>
-        <TimelineAxis scale={scale} />
+        <TimelineAxis scale={scale} now={nowTop !== null ? { top: nowTop, label: indicator.label } : null} />
         <View style={styles.dayLanes}>
           {days.map((day) => (
-            <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} variant="timeline" scale={scale} />
+            <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} variant="timeline" scale={scale}
+              nowTop={day.isToday ? nowTop : null} />
           ))}
         </View>
       </View>

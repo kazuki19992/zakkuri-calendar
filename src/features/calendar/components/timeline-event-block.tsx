@@ -43,7 +43,7 @@ export function TimelineEventBlock({ item }: Readonly<{ item: TimelineItemViewMo
         />
         {item.isInstant ? <View style={[styles.instantLine, { backgroundColor: theme.calendarEventBorder }]} /> : null}
         <Text numberOfLines={2} style={[styles.title, { color: theme.text }]}>{item.title}</Text>
-        <Text numberOfLines={1} style={[styles.time, { color: theme.textSecondary }]}>{item.temporalLabel}</Text>
+        <Text numberOfLines={1} style={[styles.time, { color: theme.text }]}>{item.temporalLabel}</Text>
       </View>
     </View>
   );

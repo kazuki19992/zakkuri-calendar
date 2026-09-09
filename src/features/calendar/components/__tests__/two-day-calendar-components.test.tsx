@@ -1,5 +1,6 @@
 import { render, userEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
+import { Colors } from '@/constants/theme';
 import type { TwoDayViewModel } from '../../two-day-view-model';
 import { CalendarPeriodToolbar } from '../calendar-period-toolbar';
 import { CalendarViewSwitcher } from '../calendar-view-switcher';
@@ -77,6 +78,14 @@ describe('2日カレンダー表示コンポーネント', () => {
       const gradient = view.getByTestId(`timeline-event.${item.id}.gradient`, { includeHiddenElements: true });
       expect(gradient.props.locations).toEqual(item.opacityStops.map((stop) => stop.offset));
       expect(gradient.props.colors).toHaveLength(item.opacityStops.length);
+    });
+  });
+
+  it('小さい時間ラベルを予定背景上で読める本文色にする', async () => {
+    const view = await render(<TwoDayView days={days} onAddEvent={jest.fn()} />);
+
+    expect(StyleSheet.flatten(view.getByText('14:30・30分').props.style)).toMatchObject({
+      color: Colors.light.text,
     });
   });
 

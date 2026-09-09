@@ -12,6 +12,7 @@ import {
 
 export type WeekStartsOn = 0 | 1;
 export type MonthRange = Readonly<{ from: string; through: string }>;
+export type TwoDayRange = Readonly<{ from: string; through: string }>;
 export type MonthGridDate = Readonly<{
   date: string;
   dayNumber: number;
@@ -43,6 +44,17 @@ export function getMonthRange(month: string): MonthRange {
 
 export function moveMonth(month: string, offset: -1 | 1): string {
   return toCalendarDate(addMonths(startOfMonth(parseCalendarDate(month)), offset));
+}
+
+export function getTwoDayRange(anchorDate: string): TwoDayRange {
+  return {
+    from: anchorDate,
+    through: toCalendarDate(addDays(parseCalendarDate(anchorDate), 1)),
+  };
+}
+
+export function moveTwoDayWindow(anchorDate: string, offset: -1 | 1): string {
+  return toCalendarDate(addDays(parseCalendarDate(anchorDate), offset));
 }
 
 export function getMonthGrid(month: string, weekStartsOn: WeekStartsOn): readonly MonthGridDate[] {

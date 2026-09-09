@@ -141,10 +141,8 @@ async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Pr
 
 export function useCalendarView(input: UseCalendarViewInput): CalendarViewState {
   const inputRef = useRef(input);
-  inputRef.current = input;
-  const initialTodayRef = useRef(toCalendarDate((input.now ?? getSystemTime)()));
   const [state, setState] = useState<InternalState>(() => {
-    const today = initialTodayRef.current;
+    const today = toCalendarDate((input.now ?? getSystemTime)());
     return {
       status: 'loading',
       // TODO(v1, #16): 最後に開いた表示モードを設定として永続化する。
@@ -159,9 +157,16 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     };
   });
   const stateRef = useRef(state);
-  stateRef.current = state;
   const requestIdRef = useRef(0);
   const mountedRef = useRef(true);
+
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   useEffect(() => {
     mountedRef.current = true;

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -51,28 +51,23 @@ function runAnimation(value: Animated.Value, toValue: number): Promise<void> {
 export function useHorizontalSwipeTransition(
   input: UseHorizontalSwipeTransitionInput,
 ): HorizontalSwipeTransition {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const widthRef = useRef(1);
-  const animatingRef = useRef(false);
-  const inputRef = useRef(input);
-  inputRef.current = input;
+  const [translateX] = useState(() => new Animated.Value(0));
+  const [width, setWidth] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
 
   const move = useCallback(
     async (direction: SwipeDirection): Promise<boolean> => {
-      if (animatingRef.current) return false;
-      animatingRef.current = true;
+      if (isAnimating) return false;
       setIsAnimating(true);
-      const callback =
-        direction === 'previous' ? inputRef.current.onPrevious : inputRef.current.onNext;
-      const exitPosition = direction === 'previous' ? widthRef.current : -widthRef.current;
+      const callback = direction === 'previous' ? input.onPrevious : input.onNext;
+      const exitPosition = direction === 'previous' ? width : -width;
       try {
-        if (!inputRef.current.reduceMotion) await runAnimation(translateX, exitPosition);
+        if (!input.reduceMotion) await runAnimation(translateX, exitPosition);
         const succeeded = await callback();
-        if (succeeded && !inputRef.current.reduceMotion) {
+        if (succeeded && !input.reduceMotion) {
           translateX.setValue(-exitPosition);
           await runAnimation(translateX, 0);
-        } else if (!inputRef.current.reduceMotion) {
+        } else if (!input.reduceMotion) {
           await runAnimation(translateX, 0);
         } else {
           translateX.setValue(0);
@@ -82,11 +77,10 @@ export function useHorizontalSwipeTransition(
         translateX.setValue(0);
         return false;
       } finally {
-        animatingRef.current = false;
         setIsAnimating(false);
       }
     },
-    [translateX],
+    [input.onNext, input.onPrevious, input.reduceMotion, isAnimating, translateX, width],
   );
 
   const movePrevious = useCallback(() => move('previous'), [move]);
@@ -95,11 +89,11 @@ export function useHorizontalSwipeTransition(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponderCapture: (_, gesture) =>
-          !animatingRef.current &&
+          !isAnimating &&
           Math.abs(gesture.dx) > 8 &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy) * horizontalDominance,
         onPanResponderMove: (_, gesture) => {
-          if (!animatingRef.current) translateX.setValue(gesture.dx);
+          if (!isAnimating) translateX.setValue(gesture.dx);
         },
         onPanResponderRelease: (_, gesture) => {
           const direction = getSwipeDirection(gesture);
@@ -113,7 +107,7 @@ export function useHorizontalSwipeTransition(
           void runAnimation(translateX, 0);
         },
       }),
-    [move, translateX],
+    [isAnimating, move, translateX],
   );
 
   return {
@@ -123,7 +117,7 @@ export function useHorizontalSwipeTransition(
     moveNext,
     isAnimating,
     onLayout: (width) => {
-      widthRef.current = Math.max(width, 1);
+      setWidth(Math.max(width, 1));
     },
   };
 }

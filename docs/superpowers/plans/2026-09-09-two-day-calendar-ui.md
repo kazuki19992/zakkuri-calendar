@@ -230,25 +230,25 @@ Commit: `feat: 2日と月のカレンダーを独自描画`
 - `IndexRoute` composes repositories、holiday provider、refresh revision、router without UI logic。
 - Existing `useTheme` consumers receive the new Notion-like semantic color values without direct hex literals。
 
-- [ ] **Step 1: screen、route、themeの失敗テストを書く**
+- [x] **Step 1: screen、route、themeの失敗テストを書く**
 
 日本語テストで初期2日表示、mode切替、period toolbar、gesture handlers、日別追加callback、月選択一覧、route dependency composition、light/darkの具体tokenを固定する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/screens/__tests__/calendar-screen.test.tsx src/app/__tests__/index.test.tsx`
 
 Expected: `CalendarScreen`と`useCalendarView`接続が存在しないためFAIL。
 
-- [ ] **Step 3: screenとrouteを最小実装する**
+- [x] **Step 3: screenとrouteを最小実装する**
 
 screenは`useReduceMotion`と`useHorizontalSwipeTransition`を呼び、両modeを同じAnimated containerへ描画する。`TODO(v1, #16)`はmode初期値付近へ置く。2日ビューの追加は各列の日付、月ビューは選択日をrouteへ渡す。
 
-- [ ] **Step 4: theme tokenとREADMEを更新する**
+- [x] **Step 4: theme tokenとREADMEを更新する**
 
 設計書のlight/dark 8 tokenへ置き換え、READMEの初期表示、切替、1日移動、独自描画、Issue #16/#17の対象外を記録する。
 
-- [ ] **Step 5: GREENを確認してコミットする**
+- [x] **Step 5: GREENを確認してコミットする**
 
 Run: `npm test -- --runInBand src/features/calendar/screens/__tests__/calendar-screen.test.tsx src/app/__tests__/index.test.tsx`
 

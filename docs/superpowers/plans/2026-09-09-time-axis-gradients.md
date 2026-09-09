@@ -60,21 +60,21 @@ Run: `npm test -- --runInBand src/domain/temporal/__tests__/resolve-event-time.t
 - Produces: `TimelineItemViewModel` with `startMinute`、`endMinute`、`top`、`height`、`overlapIndex`、`overlapCount`、`opacityStops`、label fields。
 - Produces: `createDayTimelineItems(input)` and exported timeline size constants。
 
-- [ ] **Step 1: 失敗テストを書く**
+- [x] **Step 1: 失敗テストを書く**
 
 日本語テストで、分数から位置・高さ、瞬間の最小高、日跨ぎの前半・後半、表示先頭日の前日からの継続、4種類のstop、`.5/.5`の一点ピーク、重複レーンの決定順を固定する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/__tests__/timeline-layout.test.ts`
 
 Expected: moduleが存在しないためFAIL。
 
-- [ ] **Step 3: 最小実装する**
+- [x] **Step 3: 最小実装する**
 
 date-fnsの`differenceInCalendarDays`で表示日との差を求め、全範囲を表示日の0〜1440分へクリップする。opacityは全範囲上の区分線を切り出し、同一offsetをまとめ、最低2stopにする。重複は開始・終了・ID順の貪欲レーン割り当てとする。
 
-- [ ] **Step 4: GREENを確認する**
+- [x] **Step 4: GREENを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/__tests__/timeline-layout.test.ts`
 

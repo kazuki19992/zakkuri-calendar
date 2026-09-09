@@ -179,6 +179,6 @@ npx expo export --platform android --output-dir /tmp/zakkuri-calendar-time-axis-
 
 `format:check`が未定義の場合は既存のformat検証手段を確認し、存在しないことをPRへ明記する。自動検証で代替できないiOS/Android実機、小画面、文字拡大、VoiceOver/TalkBack、light/darkの見え方は未確認として記載する。
 
-- [ ] **Step 4: develop向けPRを作成する**
+- [x] **Step 4: develop向けPRを作成する**
 
 `codex/mvp-time-axis-gradients`をpushし、`Closes #17`、設計判断、依存追加、検証結果、実機未確認事項を日本語で記載して`develop`向けPRを作成する。作成後にhead/base/state/checksを再取得する。

@@ -1,7 +1,7 @@
 import { fireEvent, render, userEvent } from '@testing-library/react-native';
 import { Animated, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/theme';
-import { HOUR_HEIGHT, TIMELINE_HEIGHT } from '../../timeline-layout';
+import { HOUR_HEIGHT, TIMELINE_HEIGHT, computeTimelineScale } from '../../timeline-layout';
 import type { TwoDayViewModel } from '../../two-day-view-model';
 import { CalendarPeriodToolbar } from '../calendar-period-toolbar';
 import { CalendarViewSwitcher } from '../calendar-view-switcher';
@@ -104,7 +104,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(stripStyle.transform[0].translateX).toBeDefined();
   });
 
-  it('計測した画面幅をカルーセルへ通知する', async () => {
+  it('時間軸(48pt)を除いた、実際に日付列が占める幅をカルーセルへ通知する', async () => {
     const onCarouselLayout = jest.fn();
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH}
@@ -112,11 +112,14 @@ describe('2日カレンダー表示コンポーネント', () => {
         onAddEvent={jest.fn()} />,
     );
 
-    await fireEvent(view.getByTestId('two-day-calendar'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 390, height: 800 } },
+    // ルート(two-day-calendar)全体の幅ではなく、時間軸の48pt分の余白を
+    // 除いた日付列の表示領域(viewport)の幅を通知する必要がある。
+    // ルートの幅をそのまま使うと、右側の列が画面からはみ出してしまう。
+    await fireEvent(view.getByTestId('two-day-calendar.day-columns-viewport'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 342, height: 800 } },
     });
 
-    expect(onCarouselLayout).toHaveBeenCalledWith(390);
+    expect(onCarouselLayout).toHaveBeenCalledWith(342);
   });
 
   it('画面のどこからでも横スワイプを受け付けられるよう、受付領域全体へpanHandlersを適用する', async () => {
@@ -207,17 +210,19 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
   });
 
-  it('3時間ごとの罫線を太くし、時間軸のラベルとの対応を分かりやすくする', async () => {
+  it('罫線はすべて同じ太さにし、1時間ごとに均等な間隔で配置する', async () => {
     const view = await renderTwoDayView();
+
+    await fireEvent(view.getByTestId('two-day-calendar.timeline'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 620 } },
+    });
+    const scale = computeTimelineScale(620);
 
     const hourLinesOfFirstColumn = view.getAllByTestId('two-day-calendar.hour-line').slice(0, 25);
     hourLinesOfFirstColumn.forEach((line, hour) => {
-      const { borderTopWidth } = StyleSheet.flatten(line.props.style);
-      if (hour % 3 === 0) {
-        expect(borderTopWidth).toBeGreaterThan(StyleSheet.hairlineWidth);
-      } else {
-        expect(borderTopWidth).toBe(StyleSheet.hairlineWidth);
-      }
+      const style = StyleSheet.flatten(line.props.style);
+      expect(style.borderTopWidth).toBe(StyleSheet.hairlineWidth);
+      expect(style.top).toBe(hour * HOUR_HEIGHT * scale);
     });
   });
 

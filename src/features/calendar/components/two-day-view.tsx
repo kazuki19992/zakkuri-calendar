@@ -46,15 +46,16 @@ export function TwoDayView({
   const stripWidth = strip.length * columnWidth;
 
   return (
-    <View
-      testID="two-day-calendar"
-      style={styles.container}
-      onLayout={(event) => onCarouselLayout(event.nativeEvent.layout.width)}
-      {...panHandlers}
-    >
+    <View testID="two-day-calendar" style={styles.container} {...panHandlers}>
       <View testID="two-day-calendar.summary" style={styles.summaryRow}>
         <View style={styles.axisSpacer} />
-        <View style={styles.viewport}>
+        <View
+          testID="two-day-calendar.day-columns-viewport"
+          style={styles.viewport}
+          // 時間軸(48pt)を除いた、実際に日付列が占める幅を計測する。ルート全体の
+          // 幅を使うと、その分だけ列の幅が広く計算され、右側の列がはみ出してしまう。
+          onLayout={(event) => onCarouselLayout(event.nativeEvent.layout.width)}
+        >
           <Animated.View testID="two-day-calendar.summary-strip"
             style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
             {strip.map((day) => <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} />)}

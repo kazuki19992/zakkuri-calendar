@@ -24,12 +24,7 @@ export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1, 
           <View
             key={hour}
             testID="two-day-calendar.hour-line"
-            // 時間軸のラベルと対応する3時間ごとの罫線を太くし、どの罫線がどのラベルの
-            // 時刻かを目で追いやすくする。
-            style={[
-              hour % 3 === 0 ? styles.hourLineMajor : styles.hourLine,
-              { top: hour * HOUR_HEIGHT * scale, borderColor: theme.calendarBorder },
-            ]}
+            style={[styles.hourLine, { top: hour * HOUR_HEIGHT * scale, borderColor: theme.calendarBorder }]}
           />
         ))}
         {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} />)}
@@ -102,12 +97,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  hourLineMajor: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    borderTopWidth: 1,
   },
   nowLine: {
     position: 'absolute',

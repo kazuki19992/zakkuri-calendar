@@ -146,21 +146,21 @@ Commit: `feat: 2日と月のカレンダー状態を統合`
 - Produces: `getSwipeDirection(gesture): SwipeDirection | null`
 - Produces: `useHorizontalSwipeTransition({ onPrevious; onNext; reduceMotion })` returning `translateX`、`panHandlers`、`movePrevious()`、`moveNext()`、`isAnimating`、`onLayout(width)`。
 
-- [ ] **Step 1: Reduce Motionとgesture判定の失敗テストを書く**
+- [x] **Step 1: Reduce Motionとgesture判定の失敗テストを書く**
 
 `AccessibilityInfo.isReduceMotionEnabled()`の初期値と`reduceMotionChanged`購読、水平距離・速度・縦移動の判定、previous/next方向を日本語テストで固定する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/hooks/__tests__/use-reduce-motion.test.tsx src/features/calendar/hooks/__tests__/use-horizontal-swipe-transition.test.tsx`
 
 Expected: hooksと純粋判定関数が存在しないためFAIL。
 
-- [ ] **Step 3: AnimatedとPanResponderで最小実装する**
+- [x] **Step 3: AnimatedとPanResponderで最小実装する**
 
 移動確定時は現在表示を画面外へanimateし、`await onPrevious/onNext`が`true`なら反対側から0へanimateする。`false`なら元位置へ戻す。`reduceMotion`時はanimationを呼ばずcallback結果だけを返す。進行中は追加操作を無視する。
 
-- [ ] **Step 4: GREENを確認してコミットする**
+- [x] **Step 4: GREENを確認してコミットする**
 
 Run: `npm test -- --runInBand src/hooks/__tests__/use-reduce-motion.test.tsx src/features/calendar/hooks/__tests__/use-horizontal-swipe-transition.test.tsx`
 

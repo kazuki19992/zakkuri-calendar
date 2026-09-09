@@ -1,0 +1,65 @@
+import { LinearGradient, type LinearGradientProps } from 'expo-linear-gradient';
+import { StyleSheet, Text, View, type ColorValue } from 'react-native';
+import { useTheme } from '@/hooks/use-theme';
+import type { TimelineItemViewModel } from '../timeline-layout';
+
+function withOpacity(hex: string, opacity: number): string {
+  const red = Number.parseInt(hex.slice(1, 3), 16);
+  const green = Number.parseInt(hex.slice(3, 5), 16);
+  const blue = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+}
+
+export function TimelineEventBlock({ item }: Readonly<{ item: TimelineItemViewModel }>) {
+  const theme = useTheme();
+  const width = `${100 / item.overlapCount}%` as const;
+  const left = `${item.overlapIndex * (100 / item.overlapCount)}%` as const;
+  const colors = item.opacityStops.map((stop) =>
+    withOpacity(theme.calendarEvent, stop.opacity),
+  ) as unknown as LinearGradientProps['colors'];
+  const locations = item.opacityStops.map((stop) => stop.offset) as unknown as readonly [
+    number,
+    number,
+    ...number[],
+  ];
+
+  return (
+    <View
+      testID={`timeline-event.${item.id}`}
+      accessible
+      accessibilityLabel={item.accessibilityLabel}
+      style={[styles.position, { top: item.top, height: item.height, width, left }]}
+    >
+      <View style={[styles.card, { borderColor: theme.calendarEventBorder }] }>
+        <LinearGradient
+          testID={`timeline-event.${item.id}.gradient`}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          colors={colors as readonly [ColorValue, ColorValue, ...ColorValue[]]}
+          locations={locations}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {item.isInstant ? <View style={[styles.instantLine, { backgroundColor: theme.calendarEventBorder }]} /> : null}
+        <Text numberOfLines={2} style={[styles.title, { color: theme.text }]}>{item.title}</Text>
+        <Text numberOfLines={1} style={[styles.time, { color: theme.textSecondary }]}>{item.temporalLabel}</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  position: { position: 'absolute', paddingHorizontal: 2, zIndex: 1 },
+  card: {
+    flex: 1,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 3,
+  },
+  instantLine: { position: 'absolute', left: 0, right: 0, top: 0, height: 2 },
+  title: { fontSize: 12, fontWeight: '600', lineHeight: 15 },
+  time: { fontSize: 10, lineHeight: 13 },
+});

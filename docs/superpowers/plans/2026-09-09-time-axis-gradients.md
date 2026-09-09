@@ -128,25 +128,25 @@ Run: `npm test -- --runInBand src/features/calendar/__tests__/two-day-view-model
 - `TimelineEventBlock` consumes one `TimelineItemViewModel` only。
 - `TwoDayColumn` consumes header/all-day data and a `timelineOnly` rendering mode instead of resolving time。
 
-- [ ] **Step 1: Expo SDK 57互換依存を追加する**
+- [x] **Step 1: Expo SDK 57互換依存を追加する**
 
 Run: `npx expo install expo-linear-gradient`
 
 Versioned docsの推奨版`~57.0.1`が解決されることを確認する。
 
-- [ ] **Step 2: componentの失敗テストを書く**
+- [x] **Step 2: componentの失敗テストを書く**
 
 共通24時間軸、横2列、絶対位置、重複幅、4種類の`LinearGradient` colors/locations、タイトルと時間表現、終日・空状態、読み上げ、日別追加を日本語テストで固定する。
 
-- [ ] **Step 3: REDを確認する**
+- [x] **Step 3: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/components/__tests__/two-day-calendar-components.test.tsx src/features/calendar/screens/__tests__/calendar-screen.test.tsx`
 
-- [ ] **Step 4: themeに予定用semantic tokenを追加して最小描画する**
+- [x] **Step 4: themeに予定用semantic tokenを追加して最小描画する**
 
 `calendarEvent`と`calendarEventBorder`をlight/darkへ追加する。opacity stopをテーマ色のrgbaへ変換し、`LinearGradient`の`colors`と`locations`へ渡す。1時間罫線、3時間ラベル、予定の位置・高さ・重複幅はview modelだけを使う。
 
-- [ ] **Step 5: GREENを確認する**
+- [x] **Step 5: GREENを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/components/__tests__/two-day-calendar-components.test.tsx src/features/calendar/screens/__tests__/calendar-screen.test.tsx`
 

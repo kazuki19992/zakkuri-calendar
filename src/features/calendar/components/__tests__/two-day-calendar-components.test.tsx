@@ -6,31 +6,78 @@ import { CalendarViewSwitcher } from '../calendar-view-switcher';
 import { TwoDayView } from '../two-day-view';
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('expo-linear-gradient', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return { LinearGradient: (props: React.ComponentProps<typeof View>) => React.createElement(View, props) };
+});
+
+const timelineItem = {
+  id: 'event-1', title: '歯医者', temporalLabel: '14:30・30分',
+  accessibilityLabel: '歯医者、14:30・30分', startMinute: 870, endMinute: 900,
+  top: 812, height: 36, overlapIndex: 0, overlapCount: 1,
+  opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
+  isInstant: false, continuesFromPreviousDay: false, continuesToNextDay: false,
+} as const;
 
 const days: readonly [TwoDayViewModel, TwoDayViewModel] = [
   {
     date: '2026-09-08', dateLabel: '9月8日', weekdayLabel: '火', isToday: true,
     holidayName: null, holidaySupport: 'available',
-    items: [{ id: 'event-1', title: '歯医者', temporalLabel: '14:30', accessibilityLabel: '歯医者、14:30' }],
+    allDayItems: [], timelineItems: [timelineItem],
     accessibilityLabel: '2026年9月8日、火曜日、今日、予定1件',
   },
   {
     date: '2026-09-09', dateLabel: '9月9日', weekdayLabel: '水', isToday: false,
-    holidayName: null, holidaySupport: 'unsupported', items: [],
+    holidayName: null, holidaySupport: 'unsupported', allDayItems: [], timelineItems: [],
     accessibilityLabel: '2026年9月9日、水曜日、祝日情報未対応、予定なし',
   },
 ];
 
 describe('2日カレンダー表示コンポーネント', () => {
-  it('2日を横2列で表示し、予定・空状態・祝日未対応を示す', async () => {
+  it('2日を横2列と共通24時間軸で表示し、予定・空状態・祝日未対応を示す', async () => {
     const view = await render(<TwoDayView days={days} onAddEvent={jest.fn()} />);
-    expect(StyleSheet.flatten(view.getByTestId('two-day-calendar').props.style)).toMatchObject({
+    expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.summary').props.style)).toMatchObject({
       flexDirection: 'row',
     });
     expect(view.getAllByTestId('two-day-calendar.column')).toHaveLength(2);
-    expect(view.getByLabelText('歯医者、14:30')).toBeOnTheScreen();
+    expect(view.getByTestId('two-day-calendar.timeline')).toBeOnTheScreen();
+    expect(view.getByText('0:00')).toBeOnTheScreen();
+    expect(view.getByText('21:00')).toBeOnTheScreen();
+    expect(view.getByLabelText('歯医者、14:30・30分')).toBeOnTheScreen();
     expect(view.getByText('予定はありません')).toBeOnTheScreen();
     expect(view.getByText('祝日情報未対応')).toBeOnTheScreen();
+  });
+
+  it('位置・重複幅と4種類のグラデーションstopを描画へ渡す', async () => {
+    const opacityPatterns = [
+      [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
+      [{ offset: 0, opacity: 0 }, { offset: 0.25, opacity: 1 }, { offset: 1, opacity: 1 }],
+      [{ offset: 0, opacity: 1 }, { offset: 0.75, opacity: 1 }, { offset: 1, opacity: 0 }],
+      [{ offset: 0, opacity: 0 }, { offset: 0.5, opacity: 1 }, { offset: 1, opacity: 0 }],
+    ] as const;
+    const gradientItems = opacityPatterns.map((opacityStops, index) => ({
+      ...timelineItem,
+      id: `gradient-${index}`,
+      title: `予定${index + 1}`,
+      accessibilityLabel: `予定${index + 1}、午後`,
+      top: 100 + index * 50,
+      overlapIndex: index % 2,
+      overlapCount: 2,
+      opacityStops,
+    }));
+    const view = await render(<TwoDayView
+      days={[{ ...days[0], timelineItems: gradientItems }, days[1]]}
+      onAddEvent={jest.fn()}
+    />);
+
+    gradientItems.forEach((item) => {
+      const blockStyle = StyleSheet.flatten(view.getByTestId(`timeline-event.${item.id}`).props.style);
+      expect(blockStyle).toMatchObject({ top: item.top, height: item.height, width: '50%' });
+      const gradient = view.getByTestId(`timeline-event.${item.id}.gradient`, { includeHiddenElements: true });
+      expect(gradient.props.locations).toEqual(item.opacityStops.map((stop) => stop.offset));
+      expect(gradient.props.colors).toHaveLength(item.opacityStops.length);
+    });
   });
 
   it('選んだ日付を予定追加へ渡す', async () => {

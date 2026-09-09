@@ -277,6 +277,6 @@ npx expo export --platform android --output-dir /tmp/zakkuri-calendar-two-day-an
 
 Expected: すべてexit 0。実機で確認していないanimation、small screen、文字拡大、VoiceOver/TalkBack、light/darkは未確認としてPRへ明記する。
 
-- [ ] **Step 3: develop向けPRを作成する**
+- [x] **Step 3: develop向けPRを作成する**
 
 `codex/mvp-two-day-calendar-ui`をpushし、`Closes #15`、Issue #16/#17への後続、依存削除、検証結果、実機未確認項目を日本語で記載して`develop`向けPRを作成する。GitHubのhead/base/checksを再取得して報告する。

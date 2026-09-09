@@ -32,17 +32,17 @@
 - Consumes: 既存の`EventDraft`、`CalendarEvent`、`parseCalendarEvent`
 - Produces: `createCalendarEvent(input: { id: string; draft: EventDraft; now: string }): Result<CalendarEvent, EventValidationError>`
 
-- [ ] **Step 1: `createCalendarEvent`の失敗テストを書く**
+- [x] **Step 1: `createCalendarEvent`の失敗テストを書く**
 
 `src/domain/calendar/__tests__/event.test.ts`へ、空IDを拒否し、有効なfuzzy draftでは`createdAt`と`updatedAt`へ同じ`now`を保持する日本語テストを追加する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/domain/calendar/__tests__/event.test.ts`
 
 Expected: `createCalendarEvent`が未定義のためFAIL。
 
-- [ ] **Step 3: 最小実装とExpo Cryptoを追加する**
+- [x] **Step 3: 最小実装とExpo Cryptoを追加する**
 
 `createCalendarEvent`は次の形で既存parserへ委譲する。
 
@@ -63,7 +63,7 @@ export function createCalendarEvent(input: Readonly<{
 
 Run: `npx expo install expo-crypto`
 
-- [ ] **Step 4: GREENを確認する**
+- [x] **Step 4: GREENを確認する**
 
 Run: `npm test -- --runInBand src/domain/calendar/__tests__/event.test.ts`
 
@@ -85,21 +85,21 @@ Expected: PASS。
 - Produces: `CalendarRefreshProvider`、`useCalendarRefresh(): { revision: number; notifyChanged(): void }`
 - Extends: `UseMonthCalendarInput`へ`refreshRevision?: number`
 
-- [ ] **Step 1: Contextと月再取得の失敗テストを書く**
+- [x] **Step 1: Contextと月再取得の失敗テストを書く**
 
 Provider内で`notifyChanged()`後に`revision`が増えること、`refreshRevision`変更時に現在月を再取得すること、RootLayoutがProvider内へStackを置くことを日本語テストで固定する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/__tests__/calendar-refresh-context.test.tsx src/features/calendar/hooks/__tests__/use-month-calendar.test.tsx src/app/__tests__/_layout.test.tsx src/app/__tests__/index.test.tsx`
 
 Expected: Contextと`refreshRevision`が未定義のためFAIL。
 
-- [ ] **Step 3: 最小実装を追加する**
+- [x] **Step 3: 最小実装を追加する**
 
 Contextは整数revisionだけを保持する。`IndexRoute`はrevisionを`useMonthCalendar`へ渡し、`useMonthCalendar`の読み込みeffect依存へ追加する。Providerは`AppDatabaseProvider`の内側、`Stack`の外側に置く。
 
-- [ ] **Step 4: GREENを確認する**
+- [x] **Step 4: GREENを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/__tests__/calendar-refresh-context.test.tsx src/features/calendar/hooks/__tests__/use-month-calendar.test.tsx src/app/__tests__/_layout.test.tsx src/app/__tests__/index.test.tsx`
 
@@ -116,7 +116,7 @@ Expected: PASS。
 - Produces: `QuickCreateEventState`（`status`、`title`、`anchorDate`、`definitions`、`selectedDefinitionId`、field error、save error、setter、`retry()`、`save()`）
 - `save(): Promise<boolean>`は永続化成功時だけ`true`を返す。
 
-- [ ] **Step 1: 読み込みと保存の失敗テストを書く**
+- [x] **Step 1: 読み込みと保存の失敗テストを書く**
 
 次の日本語テストを追加する。
 
@@ -127,17 +127,17 @@ Expected: PASS。
 - 保存中の2回目の`save()`はRepositoryを再度呼ばない。
 - Repository失敗時は`false`を返して入力を保持し、再試行可能なエラーを公開する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/events/hooks/__tests__/use-quick-create-event.test.tsx`
 
 Expected: hookが存在しないためFAIL。
 
-- [ ] **Step 3: hookを最小実装する**
+- [x] **Step 3: hookを最小実装する**
 
 `now`、`createId`、`getTimeZoneId`は任意注入とし、production defaultは`new Date().toISOString()`、`Crypto.randomUUID()`、`Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'`を使う。二重送信はstateだけでなくrefでも防ぐ。例外内容やタイトルはログへ出さない。
 
-- [ ] **Step 4: GREENを確認する**
+- [x] **Step 4: GREENを確認する**
 
 Run: `npm test -- --runInBand src/features/events/hooks/__tests__/use-quick-create-event.test.tsx`
 
@@ -165,7 +165,7 @@ Expected: PASS。
 - `QuickCreateEventScreen`は表示用stateと`onSave()`、`onCancel()`だけを受け取る。
 - `/events/new?date=YYYY-MM-DD` routeだけがRepository、router、refresh Context、ID生成を組み立てる。
 
-- [ ] **Step 1: UIとnavigationの失敗テストを書く**
+- [x] **Step 1: UIとnavigationの失敗テストを書く**
 
 次を日本語テストで固定する。
 
@@ -177,17 +177,17 @@ Expected: PASS。
 - 選択状態を色だけに頼らず`accessibilityState.selected`とラベルで伝える。
 - routeは保存成功時だけ`notifyChanged()`して`router.back()`する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/events/screens/__tests__/quick-create-event-screen.test.tsx src/app/events/__tests__/new.test.tsx src/features/calendar/screens/__tests__/month-calendar-screen.test.tsx src/features/calendar/components/__tests__/month-calendar-components.test.tsx src/app/__tests__/index.test.tsx src/app/__tests__/_layout.test.tsx`
 
 Expected: route、screen、追加callbackが未定義のためFAIL。
 
-- [ ] **Step 3: 最小UIとrouteを実装する**
+- [x] **Step 3: 最小UIとrouteを実装する**
 
 画面は`KeyboardAvoidingView`と`ScrollView`を使い、タイトル`TextInput`、基準日の`YYYY-MM-DD`入力、日内定義のPressable一覧を表示する。選択肢にはチェック記号と`accessibilityState.selected`を付ける。保存中は入力と保存ボタンを無効化し、成功したときだけrouteがrefresh通知後に戻る。
 
-- [ ] **Step 4: GREENを確認する**
+- [x] **Step 4: GREENを確認する**
 
 Run: `npm test -- --runInBand src/features/events/screens/__tests__/quick-create-event-screen.test.tsx src/app/events/__tests__/new.test.tsx src/features/calendar/screens/__tests__/month-calendar-screen.test.tsx src/features/calendar/components/__tests__/month-calendar-components.test.tsx src/app/__tests__/index.test.tsx src/app/__tests__/_layout.test.tsx`
 
@@ -202,11 +202,11 @@ Expected: PASS。
 **Interfaces:**
 - Produces: Issue #13を閉じる`develop`向けPR
 
-- [ ] **Step 1: READMEへ現在の登録導線と対象外を記録する**
+- [x] **Step 1: READMEへ現在の登録導線と対象外を記録する**
 
 月ビューで日付選択→予定を追加→タイトル・日付・日内表現→保存、という操作と、exact/allDay/編集削除が後続であることを追記する。
 
-- [ ] **Step 2: 全検証を実行する**
+- [x] **Step 2: 全検証を実行する**
 
 Run:
 

@@ -15,7 +15,9 @@ export default function RootLayout() {
       <AnimatedSplashOverlay />
       <AppDatabaseProvider>
         <CalendarRefreshProvider>
-          <Stack screenOptions={{ headerShown: false }} />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="events/new" options={{ presentation: 'modal' }} />
+          </Stack>
         </CalendarRefreshProvider>
       </AppDatabaseProvider>
     </ThemeProvider>

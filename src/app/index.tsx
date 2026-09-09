@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { JapaneseHolidayProvider } from '@/data/holidays/japanese-holiday-provider';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
@@ -7,6 +8,7 @@ import { MonthCalendarScreen } from '@/features/calendar/screens/month-calendar-
 const holidayProvider = new JapaneseHolidayProvider();
 
 export default function IndexRoute() {
+  const router = useRouter();
   const { calendars, events, temporalDefinitions } = useRepositories();
   const { revision } = useCalendarRefresh();
   // TODO(v1, #9): 祝日カレンダーと、ざっくり期間・業務日計算への反映を設定可能にする。
@@ -19,5 +21,10 @@ export default function IndexRoute() {
     refreshRevision: revision,
     weekStartsOn: 1,
   });
-  return <MonthCalendarScreen state={state} />;
+  return (
+    <MonthCalendarScreen
+      state={state}
+      onAddEvent={(date) => router.push({ pathname: '/events/new', params: { date } })}
+    />
+  );
 }

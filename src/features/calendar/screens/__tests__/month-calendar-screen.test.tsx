@@ -58,15 +58,21 @@ jest.mock('../../components/selected-day-agenda', () => ({
     holidayName: string | null;
     holidaySupport: 'available' | 'unsupported';
     items: readonly { id: string; title: string }[];
+    onAddEvent(): void;
   }) => {
     const React = jest.requireActual<typeof import('react')>('react');
-    const { Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
+    const { Pressable, Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
     return React.createElement(
       View,
       null,
       React.createElement(Text, null, `予定日:${props.selectedDate}`),
       React.createElement(Text, null, `祝日:${props.holidayName ?? 'なし'}:${props.holidaySupport}`),
       ...props.items.map((item) => React.createElement(Text, { key: item.id }, item.title)),
+      React.createElement(
+        Pressable,
+        { accessibilityRole: 'button', accessibilityLabel: '予定を追加', onPress: props.onAddEvent },
+        React.createElement(Text, null, '予定を追加'),
+      ),
     );
   },
 }));
@@ -95,19 +101,21 @@ function createState(overrides: Partial<MonthCalendarState> = {}): MonthCalendar
 }
 
 describe('月カレンダー画面', () => {
+  const onAddEvent = jest.fn();
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('読み込み中はカレンダー操作を表示しない', async () => {
-    await render(<MonthCalendarScreen state={createState({ status: 'loading' })} />);
+    await render(<MonthCalendarScreen state={createState({ status: 'loading' })} onAddEvent={onAddEvent} />);
 
     expect(screen.getByLabelText('カレンダーを読み込んでいます')).toBeTruthy();
     expect(screen.queryByText('月グリッド:2026-09-01')).toBeNull();
   });
 
   it('読み込みエラー時は再試行操作を表示する', async () => {
-    await render(<MonthCalendarScreen state={createState({ status: 'error' })} />);
+    await render(<MonthCalendarScreen state={createState({ status: 'error' })} onAddEvent={onAddEvent} />);
 
     expect(screen.getByText('データを読み込めませんでした')).toBeTruthy();
     expect(screen.getByRole('button', { name: '再試行' })).toBeTruthy();
@@ -115,7 +123,7 @@ describe('月カレンダー画面', () => {
 
   it('予定がない準備完了時は選択日の空の予定一覧を表示する', async () => {
     await render(
-      <MonthCalendarScreen state={createState({ selectedHolidayName: null, agendaItems: [] })} />,
+      <MonthCalendarScreen state={createState({ selectedHolidayName: null, agendaItems: [] })} onAddEvent={onAddEvent} />,
     );
 
     expect(screen.getByText('月グリッド:2026-09-01')).toBeTruthy();
@@ -145,7 +153,7 @@ describe('月カレンダー画面', () => {
         agendaItems,
       });
 
-    await render(<MonthCalendarScreen state={state} />);
+    await render(<MonthCalendarScreen state={state} onAddEvent={onAddEvent} />);
 
     expect(screen.getByText('月グリッド:2026-09-01')).toBeTruthy();
     expect(screen.getByText('日付モデル:2026-09-21')).toBeTruthy();
@@ -157,11 +165,13 @@ describe('月カレンダー画面', () => {
     await user.press(screen.getByRole('button', { name: '前月' }));
     await user.press(screen.getByRole('button', { name: '今日' }));
     await user.press(screen.getByRole('button', { name: '次月' }));
+    await user.press(screen.getByRole('button', { name: '予定を追加' }));
     expect(stateCallbacks.selectDate).toHaveBeenCalledWith('2026-09-22');
     expect(stateCallbacks.selectDate).toHaveBeenCalledTimes(1);
     expect(stateCallbacks.showPreviousMonth).toHaveBeenCalledTimes(1);
     expect(stateCallbacks.showToday).toHaveBeenCalledTimes(1);
     expect(stateCallbacks.showNextMonth).toHaveBeenCalledTimes(1);
+    expect(onAddEvent).toHaveBeenCalledWith('2026-09-21');
   });
 
   it('小さい画面や文字拡大と多数の予定でも末尾へ到達できる構造にする', async () => {
@@ -171,7 +181,7 @@ describe('月カレンダー画面', () => {
       temporalLabel: '終日',
       accessibilityLabel: `予定${index}、終日`,
     }));
-    await render(<MonthCalendarScreen state={createState({ agendaItems })} />);
+    await render(<MonthCalendarScreen state={createState({ agendaItems })} onAddEvent={onAddEvent} />);
 
     expect(screen.getByTestId('month-calendar.scroll')).toBeTruthy();
     expect(screen.getByText('予定29')).toBeTruthy();

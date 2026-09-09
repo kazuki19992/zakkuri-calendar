@@ -6,14 +6,19 @@ jest.mock('@/global.css', () => ({}));
 
 jest.mock('expo-router', () => {
   const React = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  const { Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
+  const Stack = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(View, { testID: 'router-stack' }, children);
+  function StackScreen({ name, options }: { name: string; options: { presentation?: string } }) {
+    return React.createElement(Text, { testID: `stack-screen.${name}` }, options.presentation);
+  }
+  Stack.Screen = StackScreen;
   return {
     DarkTheme: {},
     DefaultTheme: {},
     ThemeProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement(View, { testID: 'theme-provider' }, children),
-    Stack: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(View, { testID: 'router-stack' }, children),
+    Stack,
   };
 });
 
@@ -59,5 +64,6 @@ describe('ルートレイアウト', () => {
     expect(splashOverlay.parent).toBe(databaseProvider.parent);
     expect(calendarRefreshProvider.parent).toBe(databaseProvider);
     expect(stack.parent).toBe(calendarRefreshProvider);
+    expect(screen.getByTestId('stack-screen.events/new')).toHaveTextContent('modal');
   });
 });

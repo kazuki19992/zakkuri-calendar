@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, userEvent } from '@testing-library/react-native';
+import { useRouter } from 'expo-router';
 
 import IndexRoute from '../index';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
@@ -6,6 +7,7 @@ import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context
 import { useMonthCalendar, type MonthCalendarState } from '@/features/calendar/hooks/use-month-calendar';
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('expo-router', () => ({ useRouter: jest.fn() }));
 
 jest.mock('expo-device', () => ({ isDevice: false }));
 
@@ -26,8 +28,14 @@ jest.mock('@/features/calendar/screens/month-calendar-screen', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    MonthCalendarScreen: ({ state }: { state: MonthCalendarState }) =>
-      React.createElement(Text, null, `月画面:${state.visibleMonth}`),
+    MonthCalendarScreen: ({ state, onAddEvent }: { state: MonthCalendarState; onAddEvent(date: string): void }) => {
+      const { Pressable } = jest.requireActual<typeof import('react-native')>('react-native');
+      return React.createElement(
+        Pressable,
+        { accessibilityRole: 'button', accessibilityLabel: '予定を追加', onPress: () => onAddEvent('2026-09-21') },
+        React.createElement(Text, null, `月画面:${state.visibleMonth}`),
+      );
+    },
   };
 });
 
@@ -41,6 +49,9 @@ jest.mock('@/components/web-badge', () => ({ WebBadge: () => null }));
 
 describe('ホームルート', () => {
   it('Repositoryと祝日providerを組み立てて画面へ状態だけを渡す', async () => {
+    const user = userEvent.setup();
+    const push = jest.fn();
+    jest.mocked(useRouter).mockReturnValue({ push } as unknown as ReturnType<typeof useRouter>);
     const repositories = {
       calendars: { getDefault: jest.fn() },
       events: {
@@ -77,5 +88,7 @@ describe('ホームルート', () => {
       weekStartsOn: 1,
     });
     expect(screen.getByText('月画面:2026-09-01')).toBeTruthy();
+    await user.press(screen.getByRole('button', { name: '予定を追加' }));
+    expect(push).toHaveBeenCalledWith({ pathname: '/events/new', params: { date: '2026-09-21' } });
   });
 });

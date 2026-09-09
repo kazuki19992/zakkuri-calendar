@@ -65,7 +65,6 @@ export function useQuickCreateEvent({
 
   useEffect(() => {
     let isActive = true;
-    setStatus('loading');
 
     const load = async (): Promise<void> => {
       try {
@@ -109,6 +108,7 @@ export function useQuickCreateEvent({
   }, []);
 
   const retry = useCallback((): void => {
+    setStatus('loading');
     setLoadRevision((current) => current + 1);
   }, []);
 

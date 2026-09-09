@@ -6,9 +6,10 @@ import type { MonthCalendarState } from '../hooks/use-month-calendar';
 
 export type MonthCalendarScreenProps = Readonly<{
   state: MonthCalendarState;
+  onAddEvent(date: string): void;
 }>;
 
-export function MonthCalendarScreen({ state }: MonthCalendarScreenProps) {
+export function MonthCalendarScreen({ state, onAddEvent }: MonthCalendarScreenProps) {
   return (
     <CalendarLoadState status={state.status} onRetry={state.retry}>
       <ScrollView
@@ -30,6 +31,7 @@ export function MonthCalendarScreen({ state }: MonthCalendarScreenProps) {
           holidayName={state.selectedHolidayName}
           holidaySupport={state.holidaySupport}
           items={state.agendaItems}
+          onAddEvent={() => onAddEvent(state.selectedDate)}
         />
       </ScrollView>
     </CalendarLoadState>

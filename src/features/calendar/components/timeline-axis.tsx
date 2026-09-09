@@ -4,19 +4,19 @@ import { HOUR_HEIGHT, TIMELINE_HEIGHT } from '../timeline-layout';
 
 const labelHours = Array.from({ length: 8 }, (_, index) => index * 3);
 
-export function TimelineAxis() {
+export function TimelineAxis({ scale = 1 }: Readonly<{ scale?: number }>) {
   const theme = useTheme();
   return (
     <View
       testID="two-day-calendar.timeline-axis"
       accessible
       accessibilityLabel="0時から24時までの時間軸"
-      style={[styles.axis, { height: TIMELINE_HEIGHT }]}
+      style={[styles.axis, { height: TIMELINE_HEIGHT * scale }]}
     >
       {labelHours.map((hour) => (
         <Text
           key={hour}
-          style={[styles.label, { top: hour * HOUR_HEIGHT, color: theme.textSecondary }]}
+          style={[styles.label, { top: hour * HOUR_HEIGHT * scale, color: theme.textSecondary }]}
         >
           {hour}:00
         </Text>

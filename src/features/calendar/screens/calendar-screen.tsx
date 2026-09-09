@@ -1,4 +1,4 @@
-import { Animated, ScrollView, StyleSheet, Text } from 'react-native';
+import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { CalendarLoadState } from '../components/calendar-load-state';
@@ -44,38 +44,61 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
   const previousLabel = state.mode === 'twoDay' ? '前の1日へ' : '前月へ';
   const nextLabel = state.mode === 'twoDay' ? '次の1日へ' : '次月へ';
 
+  const headerControls = (
+    <>
+      <CalendarViewSwitcher mode={state.mode} onSelectMode={(mode) => void state.selectMode(mode)} />
+      <CalendarPeriodToolbar periodLabel={periodLabel} previousAccessibilityLabel={previousLabel}
+        nextAccessibilityLabel={nextLabel} isLoading={state.isPeriodLoading || transition.isAnimating}
+        onPrevious={() => void transition.movePrevious()} onToday={() => void state.showToday()}
+        onNext={() => void transition.moveNext()} />
+      {state.periodError !== null ? (
+        <Text accessibilityRole="alert" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
+      ) : null}
+    </>
+  );
+
+  const animatedContent = (
+    <Animated.View testID="calendar.animated-content" {...transition.panHandlers}
+      onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}
+      style={[
+        state.mode === 'twoDay' ? styles.fill : null,
+        { transform: [{ translateX: transition.translateX }] },
+      ]}>
+      {state.mode === 'twoDay' ? (
+        <TwoDayView days={state.twoDayDays} onAddEvent={onAddEvent} />
+      ) : (
+        <>
+          <MonthGrid days={state.monthDays} onSelectDate={(date) => void state.selectDate(date)} />
+          <SelectedDayAgenda selectedDate={state.selectedDate}
+            holidayName={state.selectedHolidayName} holidaySupport={state.holidaySupport}
+            items={state.selectedAgendaItems} onAddEvent={() => onAddEvent(state.selectedDate)} />
+        </>
+      )}
+    </Animated.View>
+  );
+
   return (
     <CalendarLoadState status={state.status} onRetry={() => void state.retry()}>
-      <ScrollView testID="calendar.scroll" style={[styles.scroll, { backgroundColor: theme.background }]}
-        contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
-        <CalendarViewSwitcher mode={state.mode} onSelectMode={(mode) => void state.selectMode(mode)} />
-        <CalendarPeriodToolbar periodLabel={periodLabel} previousAccessibilityLabel={previousLabel}
-          nextAccessibilityLabel={nextLabel} isLoading={state.isPeriodLoading || transition.isAnimating}
-          onPrevious={() => void transition.movePrevious()} onToday={() => void state.showToday()}
-          onNext={() => void transition.moveNext()} />
-        {state.periodError !== null ? (
-          <Text accessibilityRole="alert" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
-        ) : null}
-        <Animated.View testID="calendar.animated-content" {...transition.panHandlers}
-          onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}
-          style={{ transform: [{ translateX: transition.translateX }] }}>
-          {state.mode === 'twoDay' ? (
-            <TwoDayView days={state.twoDayDays} onAddEvent={onAddEvent} />
-          ) : (
-            <>
-              <MonthGrid days={state.monthDays} onSelectDate={(date) => void state.selectDate(date)} />
-              <SelectedDayAgenda selectedDate={state.selectedDate}
-                holidayName={state.selectedHolidayName} holidaySupport={state.holidaySupport}
-                items={state.selectedAgendaItems} onAddEvent={() => onAddEvent(state.selectedDate)} />
-            </>
-          )}
-        </Animated.View>
-      </ScrollView>
+      {state.mode === 'twoDay' ? (
+        // 2日表示は画面の残り高さいっぱいにタイムラインを収め、ページ全体のスクロールを行わない。
+        <View style={[styles.root, { backgroundColor: theme.background }]}>
+          {headerControls}
+          <View style={styles.fill}>{animatedContent}</View>
+        </View>
+      ) : (
+        <ScrollView testID="calendar.scroll" style={[styles.scroll, { backgroundColor: theme.background }]}
+          contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+          {headerControls}
+          {animatedContent}
+        </ScrollView>
+      )}
     </CalendarLoadState>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
+  fill: { flex: 1 },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingTop: 8 },
   error: { fontSize: 13, paddingHorizontal: 16, paddingBottom: 8 },

@@ -1,6 +1,7 @@
-import { render, userEvent } from '@testing-library/react-native';
+import { fireEvent, render, userEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { Colors } from '@/constants/theme';
+import { HOUR_HEIGHT, TIMELINE_HEIGHT } from '../../timeline-layout';
 import type { TwoDayViewModel } from '../../two-day-view-model';
 import { CalendarPeriodToolbar } from '../calendar-period-toolbar';
 import { CalendarViewSwitcher } from '../calendar-view-switcher';
@@ -79,6 +80,32 @@ describe('2日カレンダー表示コンポーネント', () => {
       expect(gradient.props.locations).toEqual(item.opacityStops.map((stop) => stop.offset));
       expect(gradient.props.colors).toHaveLength(item.opacityStops.length);
     });
+  });
+
+  it('計測した画面高さに合わせて24時間軸・時間線・予定の位置と高さを縮小する', async () => {
+    const view = await render(<TwoDayView days={days} onAddEvent={jest.fn()} />);
+
+    await fireEvent(view.getByTestId('two-day-calendar.timeline'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: TIMELINE_HEIGHT / 2 } },
+    });
+
+    expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-axis').props.style))
+      .toMatchObject({ height: TIMELINE_HEIGHT / 2 });
+    for (const column of view.getAllByTestId('two-day-calendar.timeline-column')) {
+      expect(StyleSheet.flatten(column.props.style)).toMatchObject({ height: TIMELINE_HEIGHT / 2 });
+    }
+    const hourLineAt3 = view.getAllByTestId('two-day-calendar.hour-line')[3];
+    expect(StyleSheet.flatten(hourLineAt3.props.style)).toMatchObject({ top: 3 * HOUR_HEIGHT * 0.5 });
+    // 812 * 0.5 = 406(縮小後の開始位置)。高さは36の半分(18)が最小表示高(36)を下回るため36のまま。
+    expect(StyleSheet.flatten(view.getByTestId('timeline-event.event-1').props.style))
+      .toMatchObject({ top: 406, height: 36 });
+  });
+
+  it('予定ブロックに枠線を描画しない', async () => {
+    const view = await render(<TwoDayView days={days} onAddEvent={jest.fn()} />);
+
+    const card = view.getByTestId('timeline-event.event-1.card');
+    expect(StyleSheet.flatten(card.props.style).borderWidth).toBeFalsy();
   });
 
   it('小さい時間ラベルを予定背景上で読める本文色にする', async () => {

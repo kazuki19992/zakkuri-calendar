@@ -6,26 +6,27 @@ import { TimelineEventBlock } from './timeline-event-block';
 
 const hourLines = Array.from({ length: 25 }, (_, hour) => hour);
 
-export function TwoDayColumn({ day, onAddEvent, variant = 'summary' }: Readonly<{
+export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1 }: Readonly<{
   day: TwoDayViewModel;
   onAddEvent(date: string): void;
   variant?: 'summary' | 'timeline';
+  scale?: number;
 }>) {
   const theme = useTheme();
   if (variant === 'timeline') {
     return (
       <View
         testID="two-day-calendar.timeline-column"
-        style={[styles.timelineColumn, { height: TIMELINE_HEIGHT, borderColor: theme.calendarBorder }]}
+        style={[styles.timelineColumn, { height: TIMELINE_HEIGHT * scale, borderColor: theme.calendarBorder }]}
       >
         {hourLines.map((hour) => (
           <View
             key={hour}
             testID="two-day-calendar.hour-line"
-            style={[styles.hourLine, { top: hour * HOUR_HEIGHT, borderColor: theme.calendarBorder }]}
+            style={[styles.hourLine, { top: hour * HOUR_HEIGHT * scale, borderColor: theme.calendarBorder }]}
           />
         ))}
-        {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} />)}
+        {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} />)}
       </View>
     );
   }

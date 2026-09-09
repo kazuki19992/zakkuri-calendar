@@ -10,6 +10,14 @@ export const MIN_EVENT_HEIGHT = 36;
 
 const PIXELS_PER_MINUTE = HOUR_HEIGHT / 60;
 
+/**
+ * 画面の実測高さを24時間分の基準高さ(TIMELINE_HEIGHT)に対する倍率へ変換する。
+ * 未計測(0以下)の間は初期描画のちらつきを避けるため等倍(1)を返す。
+ */
+export function computeTimelineScale(availableHeight: number): number {
+  return availableHeight > 0 ? availableHeight / TIMELINE_HEIGHT : 1;
+}
+
 export type TimelineOpacityStop = Readonly<{ offset: number; opacity: number }>;
 
 export type TimelineItemViewModel = Readonly<{

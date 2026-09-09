@@ -4,6 +4,7 @@ import {
   HOUR_HEIGHT,
   MIN_EVENT_HEIGHT,
   TIMELINE_HEIGHT,
+  computeTimelineScale,
   createDayTimelineItems,
 } from '../timeline-layout';
 
@@ -184,5 +185,17 @@ describe('日別タイムライン配置', () => {
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
     })).toEqual([]);
+  });
+});
+
+describe('タイムライン表示の縮尺計算', () => {
+  it('計測した高さを24時間分の基準高さに対する倍率へ変換する', () => {
+    expect(computeTimelineScale(TIMELINE_HEIGHT)).toBe(1);
+    expect(computeTimelineScale(TIMELINE_HEIGHT / 2)).toBe(0.5);
+  });
+
+  it('未計測(0以下)の高さは基準高さのまま等倍で表示する', () => {
+    expect(computeTimelineScale(0)).toBe(1);
+    expect(computeTimelineScale(-10)).toBe(1);
   });
 });

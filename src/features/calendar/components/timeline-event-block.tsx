@@ -1,7 +1,7 @@
 import { LinearGradient, type LinearGradientProps } from 'expo-linear-gradient';
 import { StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
-import type { TimelineItemViewModel } from '../timeline-layout';
+import { MIN_EVENT_HEIGHT, type TimelineItemViewModel } from '../timeline-layout';
 
 function withOpacity(hex: string, opacity: number): string {
   const red = Number.parseInt(hex.slice(1, 3), 16);
@@ -10,10 +10,16 @@ function withOpacity(hex: string, opacity: number): string {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
-export function TimelineEventBlock({ item }: Readonly<{ item: TimelineItemViewModel }>) {
+export function TimelineEventBlock({ item, scale = 1 }: Readonly<{
+  item: TimelineItemViewModel;
+  scale?: number;
+}>) {
   const theme = useTheme();
   const width = `${100 / item.overlapCount}%` as const;
   const left = `${item.overlapIndex * (100 / item.overlapCount)}%` as const;
+  // 縮小後も最小表示高(MIN_EVENT_HEIGHT)を下回らせず、極端な縮尺でも予定を視認・タップできるようにする。
+  const top = item.top * scale;
+  const height = Math.max(item.height * scale, MIN_EVENT_HEIGHT);
   const colors = item.opacityStops.map((stop) =>
     withOpacity(theme.calendarEvent, stop.opacity),
   ) as unknown as LinearGradientProps['colors'];
@@ -28,9 +34,9 @@ export function TimelineEventBlock({ item }: Readonly<{ item: TimelineItemViewMo
       testID={`timeline-event.${item.id}`}
       accessible
       accessibilityLabel={item.accessibilityLabel}
-      style={[styles.position, { top: item.top, height: item.height, width, left }]}
+      style={[styles.position, { top, height, width, left }]}
     >
-      <View style={[styles.card, { borderColor: theme.calendarEventBorder }] }>
+      <View testID={`timeline-event.${item.id}.card`} style={styles.card}>
         <LinearGradient
           testID={`timeline-event.${item.id}.gradient`}
           accessibilityElementsHidden
@@ -54,7 +60,6 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 5,
     paddingHorizontal: 5,
     paddingVertical: 3,

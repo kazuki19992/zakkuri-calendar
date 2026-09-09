@@ -1,4 +1,5 @@
 import { render, screen, userEvent } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { Colors } from '@/constants/theme';
 import type { CalendarViewState } from '../../hooks/use-calendar-view';
 import { useHorizontalSwipeTransition } from '../../hooks/use-horizontal-swipe-transition';
@@ -82,6 +83,22 @@ describe('カレンダー画面', () => {
     expect(swipe.movePrevious).toHaveBeenCalledTimes(1);
     expect(callbacks.showToday).toHaveBeenCalledTimes(1);
     expect(swipe.moveNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('2日表示ではスクロール領域を持たず残り高さいっぱいにタイムラインを表示する', async () => {
+    await render(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
+
+    expect(screen.queryByTestId('calendar.scroll')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('calendar.animated-content').props.style))
+      .toMatchObject({ flex: 1 });
+  });
+
+  it('月表示では従来通りページ全体をスクロール領域にする', async () => {
+    await render(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
+
+    expect(screen.getByTestId('calendar.scroll')).toBeOnTheScreen();
+    expect(StyleSheet.flatten(screen.getByTestId('calendar.animated-content').props.style).flex)
+      .toBeUndefined();
   });
 
   it('月表示では独自グリッドと選択日の予定一覧を表示する', async () => {

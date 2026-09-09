@@ -35,6 +35,20 @@ export function computeNowLineTop(minutesSinceMidnight: number, scale: number): 
   return minutesSinceMidnight * PIXELS_PER_MINUTE * scale;
 }
 
+/**
+ * 指定した時刻の罫線のtop位置を、物理ピクセル境界へ吸着させて返す。
+ *
+ * 1時間の高さが物理ピクセルの整数倍にならない縮尺(例: 2xで21.5pt = 43px)では、
+ * ptのまま`hour * 1時間の高さ`で配置すると、罫線が1本おきに半ピクセル境界へ落ちる。
+ * hairlineの罫線は半ピクセル位置だとアンチエイリアスで薄くなり、背景との
+ * コントラストによっては消えたように見えるため、罫線が1時間分飛んでいるように
+ * 感じられる。各罫線を個別にピクセルへ吸着させることで、すべての罫線が同じ
+ * 濃さで描画される。間隔は最大でも物理ピクセル1つ分しかばらつかない。
+ */
+export function computeHourLineTop(hour: number, scale: number): number {
+  return PixelRatio.roundToNearestPixel(hour * HOUR_HEIGHT * scale);
+}
+
 export type TimelineOpacityStop = Readonly<{ offset: number; opacity: number }>;
 
 export type TimelineTextAnchor = 'flex-start' | 'center' | 'flex-end';

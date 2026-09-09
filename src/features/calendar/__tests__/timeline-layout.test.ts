@@ -5,6 +5,7 @@ import {
   HOUR_HEIGHT,
   MIN_EVENT_HEIGHT,
   TIMELINE_HEIGHT,
+  computeHourLineTop,
   computeNowLineTop,
   computePeakOpacityOffset,
   computeTimelineScale,
@@ -203,16 +204,38 @@ describe('タイムライン表示の縮尺計算', () => {
     expect(computeTimelineScale(-10)).toBe(1);
   });
 
-  it('24で割り切れない高さでも、1時間の高さを実機ピクセルへ丸めてから倍率を求め、罫線の間隔が均一になるようにする', () => {
+  it('24で割り切れない高さでも、1時間の高さを実機ピクセルへ丸めてから倍率を求める', () => {
     const scale = computeTimelineScale(569);
-    const hourHeight = HOUR_HEIGHT * scale;
 
-    expect(hourHeight).toBe(PixelRatio.roundToNearestPixel(569 / 24));
-    // 丸め済みの1時間の高さの整数倍なら、罫線はすべて実機ピクセルに揃い、間隔も均一になる。
-    for (let hour = 1; hour <= 24; hour += 1) {
-      expect(hour * hourHeight - (hour - 1) * hourHeight).toBeCloseTo(hourHeight, 10);
-      expect(PixelRatio.roundToNearestPixel(hour * hourHeight)).toBeCloseTo(hour * hourHeight, 10);
+    expect(HOUR_HEIGHT * scale).toBe(PixelRatio.roundToNearestPixel(569 / 24));
+  });
+});
+
+describe('罫線位置の物理ピクセルへの吸着', () => {
+  // 1時間の高さが物理ピクセルの整数倍にならない縮尺(例: 2xで21.5pt = 43px)では、
+  // ptのまま配置すると罫線が1本おきに半ピクセル境界へ落ち、アンチエイリアスで
+  // 薄くなって消えたように見える(間隔が1時間分飛んで見える原因)。
+  it('各罫線のtopを物理ピクセル境界へ吸着させる', () => {
+    const scale = computeTimelineScale(516); // 1時間 = 21.5pt → 2xで43px
+
+    for (let hour = 0; hour <= 24; hour += 1) {
+      const top = computeHourLineTop(hour, scale);
+      expect(PixelRatio.roundToNearestPixel(top)).toBe(top);
+      expect(top * PixelRatio.get()).toBeCloseTo(Math.round(top * PixelRatio.get()), 10);
     }
+  });
+
+  it('吸着後も隣接する罫線の間隔のばらつきを物理ピクセル1つ以内に収める', () => {
+    const scale = computeTimelineScale(516);
+    const tops = Array.from({ length: 25 }, (_, hour) => computeHourLineTop(hour, scale));
+    const gaps = tops.slice(1).map((top, index) => top - tops[index]);
+
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1 / PixelRatio.get() + 1e-9);
+  });
+
+  it('0時は常に先頭、24時は24時間分の位置に対応する', () => {
+    expect(computeHourLineTop(0, 0.5)).toBe(0);
+    expect(computeHourLineTop(24, 1)).toBe(TIMELINE_HEIGHT);
   });
 });
 

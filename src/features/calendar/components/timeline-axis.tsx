@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
-import { HOUR_HEIGHT, TIMELINE_HEIGHT } from '../timeline-layout';
+import { TIMELINE_HEIGHT, computeHourLineTop } from '../timeline-layout';
 
 const labelHours = Array.from({ length: 9 }, (_, index) => index * 3);
 
@@ -22,9 +22,10 @@ export function TimelineAxis({ scale = 1, now = null }: Readonly<{
           style={[styles.label, {
             // 24:00は軸の下端と同じ位置になり、そのまま上端基準で置くとラベルが
             // はみ出して見切れるため、行の高さ分だけ上げて下端に揃える。
+            // それ以外は罫線と同じ吸着済みの位置を使い、ラベルと罫線を必ず揃える。
             top: hour === 24
-              ? TIMELINE_HEIGHT * scale - styles.label.lineHeight
-              : hour * HOUR_HEIGHT * scale,
+              ? computeHourLineTop(24, scale) - styles.label.lineHeight
+              : computeHourLineTop(hour, scale),
             color: theme.textSecondary,
           }]}
         >

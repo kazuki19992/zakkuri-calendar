@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
-import { HOUR_HEIGHT, TIMELINE_HEIGHT } from '../timeline-layout';
+import { TIMELINE_HEIGHT, computeHourLineTop } from '../timeline-layout';
 import type { TwoDayViewModel } from '../two-day-view-model';
 import { TimelineEventBlock } from './timeline-event-block';
 
@@ -31,7 +31,7 @@ export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1, 
             pointerEvents="none"
             style={[
               styles.hourLine,
-              { top: hour * HOUR_HEIGHT * scale, borderColor: theme.calendarBorder, zIndex: 2 },
+              { top: computeHourLineTop(hour, scale), backgroundColor: theme.calendarBorder },
             ]}
           />
         ))}
@@ -103,7 +103,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    // 高さ0 + borderTopWidthではなく、実体のある背景色付きの線として描画する。
+    // 前者は端末によって描画が不安定になりやすい。
+    height: StyleSheet.hairlineWidth,
+    zIndex: 2,
   },
   nowLine: {
     position: 'absolute',

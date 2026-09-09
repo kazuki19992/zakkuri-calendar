@@ -1,7 +1,12 @@
 import { fireEvent, render, userEvent } from '@testing-library/react-native';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, PixelRatio, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/theme';
-import { HOUR_HEIGHT, TIMELINE_HEIGHT, computeTimelineScale } from '../../timeline-layout';
+import {
+  HOUR_HEIGHT,
+  TIMELINE_HEIGHT,
+  computeHourLineTop,
+  computeTimelineScale,
+} from '../../timeline-layout';
 import type { TwoDayViewModel } from '../../two-day-view-model';
 import { CalendarPeriodToolbar } from '../calendar-period-toolbar';
 import { CalendarViewSwitcher } from '../calendar-view-switcher';
@@ -210,19 +215,21 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
   });
 
-  it('罫線はすべて同じ太さにし、1時間ごとに均等な間隔で配置する', async () => {
+  it('罫線はすべて同じ太さにし、1時間ごとに物理ピクセルへ吸着した位置へ配置する', async () => {
     const view = await renderTwoDayView();
 
+    // 1時間 = 21.5pt となり、ptのままでは1本おきに半ピクセル境界へ落ちる高さ。
     await fireEvent(view.getByTestId('two-day-calendar.timeline'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 620 } },
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 516 } },
     });
-    const scale = computeTimelineScale(620);
+    const scale = computeTimelineScale(516);
 
     const hourLinesOfFirstColumn = view.getAllByTestId('two-day-calendar.hour-line').slice(0, 25);
     hourLinesOfFirstColumn.forEach((line, hour) => {
       const style = StyleSheet.flatten(line.props.style);
-      expect(style.borderTopWidth).toBe(StyleSheet.hairlineWidth);
-      expect(style.top).toBe(hour * HOUR_HEIGHT * scale);
+      expect(style.height).toBe(StyleSheet.hairlineWidth);
+      expect(style.top).toBe(computeHourLineTop(hour, scale));
+      expect(PixelRatio.roundToNearestPixel(style.top)).toBe(style.top);
     });
   });
 

@@ -1,24 +1,18 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect } from 'react';
+import { BackHandler } from 'react-native';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
+import { toCalendarDate } from '@/domain/calendar/month';
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
 import { useQuickCreateEvent } from '@/features/events/hooks/use-quick-create-event';
 import { QuickCreateEventScreen } from '@/features/events/screens/quick-create-event-screen';
-
-function today(): string {
-  const current = new Date();
-  const year = current.getFullYear();
-  const month = String(current.getMonth() + 1).padStart(2, '0');
-  const day = String(current.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 export default function NewEventRoute() {
   const router = useRouter();
   const params = useLocalSearchParams<{ date?: string | string[] }>();
   const repositories = useRepositories();
   const { notifyChanged } = useCalendarRefresh();
-  const initialDate = typeof params.date === 'string' ? params.date : today();
+  const initialDate = typeof params.date === 'string' ? params.date : toCalendarDate(new Date());
   const state = useQuickCreateEvent({
     calendars: repositories.calendars,
     events: repositories.events,
@@ -32,5 +26,19 @@ export default function NewEventRoute() {
     router.back();
   }, [notifyChanged, router, state]);
 
-  return <QuickCreateEventScreen state={state} onSave={save} onCancel={router.back} />;
+  useEffect(() => {
+    if (!state.isSaving) return;
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => true,
+    );
+    return () => subscription.remove();
+  }, [state.isSaving]);
+
+  return (
+    <>
+      <Stack.Screen options={{ gestureEnabled: state.isSaving !== true }} />
+      <QuickCreateEventScreen state={state} onSave={save} onCancel={router.back} />
+    </>
+  );
 }

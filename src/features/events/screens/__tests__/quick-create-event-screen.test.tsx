@@ -103,11 +103,13 @@ describe('ざっくり予定作成画面', () => {
   });
 
   it('保存中は保存操作を無効にする', async () => {
+    const onCancel = jest.fn();
+    const user = userEvent.setup();
     await render(
       <QuickCreateEventScreen
         state={createState({ isSaving: true })}
         onSave={jest.fn()}
-        onCancel={jest.fn()}
+        onCancel={onCancel}
       />,
     );
 
@@ -120,6 +122,11 @@ describe('ざっくり予定作成画面', () => {
       disabled: true,
       selected: true,
     });
+    expect(screen.getByRole('button', { name: 'キャンセル' }).props.accessibilityState).toEqual({
+      disabled: true,
+    });
+    await user.press(screen.getByRole('button', { name: 'キャンセル' }));
+    expect(onCancel).not.toHaveBeenCalled();
   });
 
   it('時間帯がない場合は保存せず案内を表示する', async () => {

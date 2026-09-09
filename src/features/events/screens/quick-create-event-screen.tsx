@@ -35,10 +35,19 @@ export function QuickCreateEventScreen({ state, onSave, onCancel }: QuickCreateE
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="キャンセル"
+          accessibilityState={{ disabled: state.isSaving }}
+          disabled={state.isSaving}
           onPress={onCancel}
           style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}
         >
-          <Text style={[styles.headerButtonText, { color: theme.calendarAccent }]}>キャンセル</Text>
+          <Text
+            style={[
+              styles.headerButtonText,
+              { color: state.isSaving ? theme.textSecondary : theme.calendarAccent },
+            ]}
+          >
+            キャンセル
+          </Text>
         </Pressable>
         <Text accessibilityRole="header" style={[styles.headerTitle, { color: theme.text }]}>
           予定を追加

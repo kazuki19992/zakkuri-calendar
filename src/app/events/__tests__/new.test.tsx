@@ -1,5 +1,6 @@
 import { render, screen, userEvent } from '@testing-library/react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { BackHandler } from 'react-native';
 import NewEventRoute from '../new';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
@@ -9,7 +10,11 @@ import {
 } from '@/features/events/hooks/use-quick-create-event';
 
 jest.mock('@/global.css', () => ({}));
-jest.mock('expo-router', () => ({ useLocalSearchParams: jest.fn(), useRouter: jest.fn() }));
+jest.mock('expo-router', () => ({
+  Stack: { Screen: jest.fn(() => null) },
+  useLocalSearchParams: jest.fn(),
+  useRouter: jest.fn(),
+}));
 jest.mock('@/data/sqlite/app-database-provider', () => ({ useRepositories: jest.fn() }));
 jest.mock('@/features/calendar/calendar-refresh-context', () => ({ useCalendarRefresh: jest.fn() }));
 jest.mock('@/features/events/hooks/use-quick-create-event', () => ({ useQuickCreateEvent: jest.fn() }));
@@ -36,6 +41,11 @@ jest.mock('@/features/events/screens/quick-create-event-screen', () => {
 });
 
 describe('予定作成ルート', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
   it('選択日とRepositoryをフックへ渡し保存成功後に月表示へ戻る', async () => {
     const user = userEvent.setup();
     const repositories = {
@@ -88,5 +98,63 @@ describe('予定作成ルート', () => {
 
     expect(notifyChanged).not.toHaveBeenCalled();
     expect(back).not.toHaveBeenCalled();
+  });
+
+  it('日付指定がない場合も4桁年の今日を初期値にする', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(999, 8, 9, 12));
+    jest.mocked(useLocalSearchParams).mockReturnValue({});
+    jest.mocked(useRouter).mockReturnValue({ back: jest.fn() } as unknown as ReturnType<
+      typeof useRouter
+    >);
+    jest.mocked(useRepositories).mockReturnValue({
+      calendars: {},
+      events: {},
+      temporalDefinitions: {},
+    } as ReturnType<typeof useRepositories>);
+    jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged: jest.fn() });
+    jest.mocked(useQuickCreateEvent).mockReturnValue({
+      isSaving: false,
+      save: jest.fn(),
+    } as unknown as QuickCreateEventState);
+
+    await render(<NewEventRoute />);
+
+    expect(useQuickCreateEvent).toHaveBeenCalledWith(expect.objectContaining({
+      initialDate: '0999-09-09',
+    }));
+  });
+
+  it('保存中はモーダルのスワイプとAndroidの戻る操作を無効にする', async () => {
+    const remove = jest.fn();
+    const addBackHandler = jest
+      .spyOn(BackHandler, 'addEventListener')
+      .mockReturnValue({ remove });
+    jest.mocked(useLocalSearchParams).mockReturnValue({ date: '2026-09-21' });
+    jest.mocked(useRouter).mockReturnValue({ back: jest.fn() } as unknown as ReturnType<
+      typeof useRouter
+    >);
+    jest.mocked(useRepositories).mockReturnValue({
+      calendars: {},
+      events: {},
+      temporalDefinitions: {},
+    } as ReturnType<typeof useRepositories>);
+    jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged: jest.fn() });
+    jest.mocked(useQuickCreateEvent).mockReturnValue({
+      isSaving: true,
+      save: jest.fn(),
+    } as unknown as QuickCreateEventState);
+
+    const view = await render(<NewEventRoute />);
+
+    expect(jest.mocked(Stack.Screen)).toHaveBeenCalledWith(
+      expect.objectContaining({ options: { gestureEnabled: false } }),
+      undefined,
+    );
+    const backHandler = addBackHandler.mock.calls[0]?.[1];
+    expect(backHandler?.({ type: 'hardwareBackPress', timeStamp: 0 })).toBe(true);
+
+    await view.unmount();
+    expect(remove).toHaveBeenCalledTimes(1);
   });
 });

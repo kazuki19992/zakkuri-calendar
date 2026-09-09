@@ -36,21 +36,21 @@
 - Produces: `getTwoDayRange(anchorDate: string): TwoDayRange`
 - Produces: `moveTwoDayWindow(anchorDate: string, offset: -1 | 1): string`
 
-- [ ] **Step 1: 失敗テストを書く**
+- [x] **Step 1: 失敗テストを書く**
 
 日本語テストで、`2026-09-30`の範囲が`2026-09-30`〜`2026-10-01`になること、次移動が`2026-10-01`、前移動が`2026-09-29`になることを固定する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/domain/calendar/__tests__/month.test.ts`
 
 Expected: `getTwoDayRange`と`moveTwoDayWindow`が未定義のためFAIL。
 
-- [ ] **Step 3: date-fnsを使って最小実装する**
+- [x] **Step 3: date-fnsを使って最小実装する**
 
 `parse(date, 'yyyy-MM-dd', new Date())`と`addDays`を使い、固定ミリ秒加算を行わない。`moveTwoDayWindow`内だけに現在の1日移動を保持する。
 
-- [ ] **Step 4: GREENを確認してコミットする**
+- [x] **Step 4: GREENを確認してコミットする**
 
 Run: `npm test -- --runInBand src/domain/calendar/__tests__/month.test.ts`
 

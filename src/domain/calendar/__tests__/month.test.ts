@@ -1,4 +1,12 @@
-import { getMonthGrid, getMonthRange, getMonthStart, moveMonth, toCalendarDate } from '../month';
+import {
+  getMonthGrid,
+  getMonthRange,
+  getMonthStart,
+  getTwoDayRange,
+  moveMonth,
+  moveTwoDayWindow,
+  toCalendarDate,
+} from '../month';
 
 describe('月カレンダーの日付計算', () => {
   it('閏年2月の月初と月末を返す', () => {
@@ -11,6 +19,18 @@ describe('月カレンダーの日付計算', () => {
   it('年境界を越えて前月と次月へ移動する', () => {
     expect(moveMonth('2026-01-01', -1)).toBe('2025-12-01');
     expect(moveMonth('2026-12-01', 1)).toBe('2027-01-01');
+  });
+
+  it('2日表示の範囲を月境界を越えて返す', () => {
+    expect(getTwoDayRange('2026-09-30')).toEqual({
+      from: '2026-09-30',
+      through: '2026-10-01',
+    });
+  });
+
+  it('2日表示の基準日を1日単位で前後へ移動する', () => {
+    expect(moveTwoDayWindow('2026-09-30', 1)).toBe('2026-10-01');
+    expect(moveTwoDayWindow('2026-09-30', -1)).toBe('2026-09-29');
   });
 
   it('月曜始まりの42日を壁時計日付で返す', () => {

@@ -156,15 +156,15 @@ Run: `npm test -- --runInBand src/features/calendar/components/__tests__/two-day
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-09-09-time-axis-gradients.md`
 
-- [ ] **Step 1: READMEとplanを更新する**
+- [x] **Step 1: READMEとplanを更新する**
 
 READMEへ24時間軸、DB定義グラデーション、日跨ぎ、未定時間設定を記載し、plan checkboxを実績へ合わせる。
 
-- [ ] **Step 2: 差分を確認する**
+- [x] **Step 2: 差分を確認する**
 
 Run: `git diff --check && git status --short && git diff --stat origin/develop...HEAD`
 
-- [ ] **Step 3: repository全体を検証する**
+- [x] **Step 3: repository全体を検証する**
 
 Run:
 

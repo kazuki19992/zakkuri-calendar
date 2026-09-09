@@ -93,19 +93,19 @@ Run: `npm test -- --runInBand src/features/calendar/__tests__/timeline-layout.te
 - Changes: `UseCalendarViewInput` receives `settings: SettingsRepository`。
 - Snapshot stores `definitions: ReadonlyMap<string, TemporalDefinition>` and `undeterminedFadeMinutes`。
 
-- [ ] **Step 1: 表示モデルとhookの失敗テストを書く**
+- [x] **Step 1: 表示モデルとhookの失敗テストを書く**
 
 2日モデルが終日・未解決と時間軸項目を分けること、翌日へ続く予定を両日に出すこと、hookが定義本体と未定分数を取得すること、2日表示だけ前日から予定を取得することを日本語テストで固定する。
 
-- [ ] **Step 2: REDを確認する**
+- [x] **Step 2: REDを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/__tests__/two-day-view-model.test.ts src/features/calendar/hooks/__tests__/use-calendar-view.test.tsx src/app/__tests__/index.test.tsx`
 
-- [ ] **Step 3: 最小実装する**
+- [x] **Step 3: 最小実装する**
 
 hookで定義と設定を取得し、Mapと設定値を2日表示モデルへ渡す。月表示のagendaには定義MapからラベルMapを生成して既存関数を使う。routeから`settings`を注入する。
 
-- [ ] **Step 4: GREENを確認する**
+- [x] **Step 4: GREENを確認する**
 
 Run: `npm test -- --runInBand src/features/calendar/__tests__/two-day-view-model.test.ts src/features/calendar/hooks/__tests__/use-calendar-view.test.tsx src/app/__tests__/index.test.tsx`
 

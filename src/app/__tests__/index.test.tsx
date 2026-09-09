@@ -82,6 +82,7 @@ describe('ホームルート', () => {
     expect(useCalendarView).toHaveBeenCalledWith({
       calendars: repositories.calendars,
       events: repositories.events,
+      settings: repositories.settings,
       temporalDefinitions: repositories.temporalDefinitions,
       holidayProvider: expect.objectContaining({ constructor: expect.any(Function) }),
       refreshRevision: 4,

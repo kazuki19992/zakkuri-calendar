@@ -1,5 +1,7 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { TwoDayRange } from '@/domain/calendar/month';
+import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
+import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import { getDay, parse } from 'date-fns';
 import {
   createAgendaItems,
@@ -8,6 +10,7 @@ import {
   type HolidayRangeCoverage,
   type HolidaySupport,
 } from './calendar-view-model';
+import { createDayTimelineItems, type TimelineItemViewModel } from './timeline-layout';
 
 const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
@@ -18,7 +21,8 @@ export type TwoDayViewModel = Readonly<{
   isToday: boolean;
   holidayName: string | null;
   holidaySupport: HolidaySupport;
-  items: readonly AgendaItemViewModel[];
+  allDayItems: readonly AgendaItemViewModel[];
+  timelineItems: readonly TimelineItemViewModel[];
   accessibilityLabel: string;
 }>;
 
@@ -32,7 +36,8 @@ function createDayViewModel(
   input: Readonly<{
     today: string;
     events: readonly CalendarEvent[];
-    definitionLabels: ReadonlyMap<string, string>;
+    definitions: ReadonlyMap<string, TemporalDefinition>;
+    undeterminedFadeMinutes: number;
     holidayCoverage: readonly HolidayRangeCoverage[];
   }>,
 ): TwoDayViewModel {
@@ -40,15 +45,35 @@ function createDayViewModel(
   const weekdayLabel = weekdayLabels[getDay(parse(date, 'yyyy-MM-dd', new Date()))];
   const holiday = getHolidayInfo(date, input.holidayCoverage);
   const isToday = date === input.today;
-  const items = createAgendaItems(
-    input.events.filter((event) => event.anchorDate === date),
-    input.definitionLabels,
+  const definitionLabels = new Map(
+    [...input.definitions.values()].map((definition) => [definition.id, definition.label] as const),
   );
+  const eventsForDate = input.events.filter((event) => event.anchorDate === date);
+  const allDayItems = createAgendaItems(
+    eventsForDate.filter((event) => {
+      const definition = event.temporalType === 'fuzzy'
+        ? input.definitions.get(event.temporalDefinitionId) ?? null
+        : null;
+      return resolveEventTime({
+        event,
+        definition,
+        undeterminedFadeMinutes: input.undeterminedFadeMinutes,
+      }).kind !== 'timed';
+    }),
+    definitionLabels,
+  );
+  const timelineItems = createDayTimelineItems({
+    date,
+    events: input.events,
+    definitions: input.definitions,
+    undeterminedFadeMinutes: input.undeterminedFadeMinutes,
+  });
+  const itemCount = new Set([...allDayItems, ...timelineItems].map((item) => item.id)).size;
   const labels = [`${year}年${month}月${day}日`, `${weekdayLabel}曜日`];
   if (holiday.name !== null) labels.push(holiday.name);
   if (holiday.support === 'unsupported') labels.push('祝日情報未対応');
   if (isToday) labels.push('今日');
-  labels.push(items.length === 0 ? '予定なし' : `予定${items.length}件`);
+  labels.push(itemCount === 0 ? '予定なし' : `予定${itemCount}件`);
 
   return {
     date,
@@ -57,7 +82,8 @@ function createDayViewModel(
     isToday,
     holidayName: holiday.name,
     holidaySupport: holiday.support,
-    items,
+    allDayItems,
+    timelineItems,
     accessibilityLabel: labels.join('、'),
   };
 }
@@ -66,7 +92,8 @@ export function createTwoDayViewModels(input: Readonly<{
   range: TwoDayRange;
   today: string;
   events: readonly CalendarEvent[];
-  definitionLabels: ReadonlyMap<string, string>;
+  definitions: ReadonlyMap<string, TemporalDefinition>;
+  undeterminedFadeMinutes: number;
   holidayCoverage: readonly HolidayRangeCoverage[];
 }>): readonly [TwoDayViewModel, TwoDayViewModel] {
   return [createDayViewModel(input.range.from, input), createDayViewModel(input.range.through, input)];

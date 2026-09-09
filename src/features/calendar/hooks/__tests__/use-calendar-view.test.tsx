@@ -216,4 +216,36 @@ describe('カレンダー表示の状態調整', () => {
     });
     expect(result.current.twoDayDays[1].items[0]?.title).toBe('更新後の予定');
   });
+
+  it('期間移動中の再取得が完了すると読み込み中を解除する', async () => {
+    const dependencies = createDependencies();
+    const transitionRequest = createDeferred<CalendarEvent[]>();
+    const { result, rerender } = await renderHook(
+      ({ revision }: { revision: number }) =>
+        useCalendarView({
+          ...dependencies,
+          weekStartsOn: 1,
+          refreshRevision: revision,
+          now: () => new Date(2026, 8, 8, 12),
+        }),
+      { initialProps: { revision: 0 } },
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    dependencies.events.listByAnchorRange
+      .mockReturnValueOnce(transitionRequest.promise)
+      .mockResolvedValueOnce([event]);
+    let transitionResult!: Promise<boolean>;
+
+    await act(async () => {
+      transitionResult = result.current.showNextPeriod();
+      await Promise.resolve();
+    });
+    expect(result.current.isPeriodLoading).toBe(true);
+    await rerender({ revision: 1 });
+
+    await waitFor(() => expect(result.current.isPeriodLoading).toBe(false));
+    expect(result.current.anchorDate).toBe('2026-09-08');
+    await act(async () => transitionRequest.resolve([event]));
+    await expect(transitionResult).resolves.toBe(false);
+  });
 });

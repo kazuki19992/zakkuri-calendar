@@ -15,6 +15,20 @@ const minimumDistance = 48;
 const minimumVelocity = 0.5;
 const horizontalDominance = 1.2;
 
+function createTransitionGate() {
+  let isEntered = false;
+  return {
+    tryEnter(): boolean {
+      if (isEntered) return false;
+      isEntered = true;
+      return true;
+    },
+    leave(): void {
+      isEntered = false;
+    },
+  };
+}
+
 export function getSwipeDirection(gesture: SwipeGesture): SwipeDirection | null {
   if (Math.abs(gesture.dx) <= Math.abs(gesture.dy) * horizontalDominance) return null;
   const direction = Math.abs(gesture.dx) >= minimumDistance ? gesture.dx : gesture.vx;
@@ -54,10 +68,11 @@ export function useHorizontalSwipeTransition(
   const [translateX] = useState(() => new Animated.Value(0));
   const [width, setWidth] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [transitionGate] = useState(() => createTransitionGate());
 
   const move = useCallback(
     async (direction: SwipeDirection): Promise<boolean> => {
-      if (isAnimating) return false;
+      if (!transitionGate.tryEnter()) return false;
       setIsAnimating(true);
       const callback = direction === 'previous' ? input.onPrevious : input.onNext;
       const exitPosition = direction === 'previous' ? width : -width;
@@ -77,10 +92,11 @@ export function useHorizontalSwipeTransition(
         translateX.setValue(0);
         return false;
       } finally {
+        transitionGate.leave();
         setIsAnimating(false);
       }
     },
-    [input.onNext, input.onPrevious, input.reduceMotion, isAnimating, translateX, width],
+    [input.onNext, input.onPrevious, input.reduceMotion, transitionGate, translateX, width],
   );
 
   const movePrevious = useCallback(() => move('previous'), [move]);

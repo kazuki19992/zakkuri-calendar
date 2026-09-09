@@ -56,7 +56,7 @@ describe('カレンダー画面', () => {
     const state = createState();
     await render(<CalendarScreen state={state} onAddEvent={onAddEvent} />);
 
-    expect(screen.getByRole('button', { name: '2日表示' }).props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByRole('tab', { name: '2日表示' }).props.accessibilityState).toEqual({ selected: true });
     expect(screen.getByText('2026年9月8日〜9日')).toBeOnTheScreen();
     expect(screen.getByTestId('calendar.animated-content').props.onStartShouldSetResponder).toBeDefined();
     expect(useHorizontalSwipeTransition).toHaveBeenCalledWith({
@@ -73,7 +73,7 @@ describe('カレンダー画面', () => {
     const user = userEvent.setup();
     await render(<CalendarScreen state={state} onAddEvent={jest.fn()} />);
 
-    await user.press(screen.getByRole('button', { name: '月表示' }));
+    await user.press(screen.getByRole('tab', { name: '月表示' }));
     await user.press(screen.getByRole('button', { name: '前の1日へ' }));
     await user.press(screen.getByRole('button', { name: '今日' }));
     await user.press(screen.getByRole('button', { name: '次の1日へ' }));

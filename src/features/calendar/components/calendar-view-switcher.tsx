@@ -20,7 +20,7 @@ export function CalendarViewSwitcher({
         return (
           <Pressable
             key={value}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityLabel={`${label}表示`}
             accessibilityState={{ selected }}
             onPress={() => onSelectMode(value)}

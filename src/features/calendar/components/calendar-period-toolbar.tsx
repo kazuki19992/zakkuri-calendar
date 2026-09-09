@@ -31,12 +31,15 @@ export function CalendarPeriodToolbar(props: CalendarPeriodToolbarProps) {
           <Text style={[styles.todayLabel, { color: theme.calendarAccent }]}>今日</Text>
         </Pressable>
       </View>
-      {props.isLoading ? <ActivityIndicator testID="calendar-period.loading" color={theme.calendarAccent} style={styles.button} /> : (
-        <Pressable accessibilityRole="button" accessibilityLabel={props.nextAccessibilityLabel}
-          onPress={props.onNext} style={buttonStyle}>
+      <Pressable accessibilityRole="button" accessibilityLabel={props.nextAccessibilityLabel}
+        accessibilityState={{ disabled: props.isLoading }} disabled={props.isLoading}
+        onPress={props.onNext} style={buttonStyle}>
+        {props.isLoading ? (
+          <ActivityIndicator testID="calendar-period.loading" color={theme.calendarAccent} />
+        ) : (
           <Text style={[styles.arrow, { color: theme.calendarAccent }]}>›</Text>
-        </Pressable>
-      )}
+        )}
+      </Pressable>
     </View>
   );
 }

@@ -189,12 +189,18 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
           ...current,
           status: 'ready',
           snapshot,
+          isPeriodLoading: false,
           periodError: null,
         }));
       })
       .catch(() => {
         if (!mountedRef.current || requestId !== requestIdRef.current) return;
-        setState((current) => ({ ...current, status: 'error', snapshot: emptySnapshot }));
+        setState((current) => ({
+          ...current,
+          status: 'error',
+          snapshot: emptySnapshot,
+          isPeriodLoading: false,
+        }));
       });
   }, [
     input.calendars,

@@ -5,6 +5,14 @@ import {
   useHorizontalSwipeTransition,
 } from '../use-horizontal-swipe-transition';
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('カレンダーの横スワイプ遷移', () => {
   afterEach(() => jest.restoreAllMocks());
 
@@ -63,5 +71,30 @@ describe('カレンダーの横スワイプ遷移', () => {
     expect(onPrevious).toHaveBeenCalledTimes(1);
     expect(timing).not.toHaveBeenCalled();
     expect(result.current.isAnimating).toBe(false);
+  });
+
+  it('移動処理が保留中の同一tick再入力を拒否する', async () => {
+    const pending = createDeferred<boolean>();
+    const onNext = jest.fn().mockReturnValue(pending.promise);
+    const { result } = await renderHook(() =>
+      useHorizontalSwipeTransition({
+        onPrevious: jest.fn().mockResolvedValue(true),
+        onNext,
+        reduceMotion: true,
+      }),
+    );
+    let firstMove!: Promise<boolean>;
+    let secondMove!: Promise<boolean>;
+
+    await act(async () => {
+      firstMove = result.current.moveNext();
+      secondMove = result.current.moveNext();
+      await Promise.resolve();
+    });
+
+    expect(onNext).toHaveBeenCalledTimes(1);
+    await expect(secondMove).resolves.toBe(false);
+    await act(async () => pending.resolve(true));
+    await expect(firstMove).resolves.toBe(true);
   });
 });

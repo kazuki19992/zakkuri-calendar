@@ -45,8 +45,8 @@ describe('2日カレンダー表示コンポーネント', () => {
     const onSelectMode = jest.fn();
     const user = userEvent.setup();
     const view = await render(<CalendarViewSwitcher mode="twoDay" onSelectMode={onSelectMode} />);
-    expect(view.getByRole('button', { name: '2日表示' }).props.accessibilityState).toEqual({ selected: true });
-    await user.press(view.getByRole('button', { name: '月表示' }));
+    expect(view.getByRole('tab', { name: '2日表示' }).props.accessibilityState).toEqual({ selected: true });
+    await user.press(view.getByRole('tab', { name: '月表示' }));
     expect(onSelectMode).toHaveBeenCalledWith('month');
   });
 
@@ -67,5 +67,17 @@ describe('2日カレンダー表示コンポーネント', () => {
     await user.press(view.getByRole('button', { name: '今日' }));
     await user.press(view.getByRole('button', { name: '次の1日へ' }));
     expect([onPrevious.mock.calls.length, onToday.mock.calls.length, onNext.mock.calls.length]).toEqual([1, 1, 1]);
+  });
+
+  it('読み込み中も次期間ボタンを維持して無効化する', async () => {
+    const view = await render(
+      <CalendarPeriodToolbar periodLabel="2026年9月8日〜9日" previousAccessibilityLabel="前の1日へ"
+        nextAccessibilityLabel="次の1日へ" isLoading onPrevious={jest.fn()}
+        onToday={jest.fn()} onNext={jest.fn()} />,
+    );
+
+    const nextButton = view.getByRole('button', { name: '次の1日へ' });
+    expect(nextButton.props.accessibilityState).toEqual({ disabled: true });
+    expect(view.getByTestId('calendar-period.loading')).toBeOnTheScreen();
   });
 });

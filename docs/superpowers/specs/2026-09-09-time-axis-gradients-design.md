@@ -48,7 +48,7 @@ resolveEventTime(event, definition, undeterminedFadeMinutes)
 
 ### 3.3 Hook
 
-`useCalendarView`は予定、使用中の時間表現定義、未定時間の分数を並行取得し、表示モデルへ渡す。2日表示では先頭日の前日を予定取得範囲へ含め、前日から継続する日跨ぎ予定を描画できるようにする。月表示の取得範囲は変更しない。
+`useCalendarView`は予定、使用中の時間表現定義、未定時間の分数を並行取得し、表示モデルへ渡す。2日表示では、表示2日の前後に横スワイプ用の予備列(`TWO_DAY_SWIPE_BUFFER_DAYS`日、`docs/superpowers/specs/2026-09-09-two-day-calendar-ui-design.md`参照)を含めた範囲で予定を取得し、さらに先頭側はその1日前まで含めて日跨ぎ予定の継続描画に対応する。`twoDayStrip`が予備列を含む表示用モデルの並びを提供する。月表示の取得範囲は変更しない。
 
 ### 3.4 UI
 
@@ -85,7 +85,7 @@ resolveEventTime(event, definition, undeterminedFadeMinutes)
 
 - domain: 00:00、23:59、瞬間、固定10/15/30/60分、未定、4種類のフェード元情報、日跨ぎ、定義不在。
 - presentation: 分数から位置、日跨ぎの分割、4種類のopacity stop、中央一点ピーク、重複レーン、表示ラベル、縮尺計算、現在時刻線のtop位置、opacity stopから濃い区間中心・テキスト配置への変換。
-- hook: 定義本体と未定分数の取得、前日を含む2日範囲、月範囲を広げないこと、再取得、現在時刻インジケーターの初期値と一定間隔での更新。
+- hook: 定義本体と未定分数の取得、予備列と前日を含む取得範囲、予備列を含めた`twoDayStrip`、月範囲を広げないこと、再取得、現在時刻インジケーターの初期値と一定間隔での更新。
 - components: 共通時間軸、横2列、絶対位置、4種類のgradient props、終日・空状態、追加操作、読み上げ、縮尺反映、現在時刻線・ラベルの表示条件、予定テキストの配置、枠線なし、セーフエリア余白。
 - 全体: typecheck、lint、format check、全テスト、iOS・Android export。
 

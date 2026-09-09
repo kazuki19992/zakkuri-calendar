@@ -5,6 +5,7 @@ import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import type { CalendarViewState } from '../../hooks/use-calendar-view';
 import { useHorizontalSwipeTransition } from '../../hooks/use-horizontal-swipe-transition';
+import { useTwoDayCarousel } from '../../hooks/use-two-day-carousel';
 import { CalendarScreen } from '../calendar-screen';
 
 // iPhoneのノッチ・ホームインジケーター相当の値を固定し、セーフエリア適用を検証できるようにする。
@@ -39,6 +40,21 @@ jest.mock('../../hooks/use-horizontal-swipe-transition', () => {
     })),
   };
 });
+jest.mock('../../hooks/use-two-day-carousel', () => {
+  const { Animated } = jest.requireActual<typeof import('react-native')>('react-native');
+  const translateX = new Animated.Value(-195);
+  return {
+    useTwoDayCarousel: jest.fn(() => ({
+      translateX,
+      columnWidth: 195,
+      panHandlers: { onStartShouldSetResponder: () => true },
+      movePrevious: jest.fn(),
+      moveNext: jest.fn(),
+      isAnimating: false,
+      onLayout: jest.fn(),
+    })),
+  };
+});
 
 const callbacks = {
   selectMode: jest.fn().mockResolvedValue(true),
@@ -49,18 +65,29 @@ const callbacks = {
   retry: jest.fn().mockResolvedValue(true),
 };
 
+const twoDayDays: CalendarViewState['twoDayDays'] = [
+  { date: '2026-09-08', dateLabel: '9月8日', weekdayLabel: '火', isToday: true,
+    holidayName: null, holidaySupport: 'available', allDayItems: [], timelineItems: [],
+    accessibilityLabel: '2026年9月8日、火曜日、今日、予定なし' },
+  { date: '2026-09-09', dateLabel: '9月9日', weekdayLabel: '水', isToday: false,
+    holidayName: null, holidaySupport: 'available', allDayItems: [], timelineItems: [],
+    accessibilityLabel: '2026年9月9日、水曜日、予定なし' },
+];
+const twoDayStrip: CalendarViewState['twoDayStrip'] = [
+  { date: '2026-09-07', dateLabel: '9月7日', weekdayLabel: '月', isToday: false,
+    holidayName: null, holidaySupport: 'available', allDayItems: [], timelineItems: [],
+    accessibilityLabel: '2026年9月7日、月曜日、予定なし' },
+  ...twoDayDays,
+  { date: '2026-09-10', dateLabel: '9月10日', weekdayLabel: '木', isToday: false,
+    holidayName: null, holidaySupport: 'available', allDayItems: [], timelineItems: [],
+    accessibilityLabel: '2026年9月10日、木曜日、予定なし' },
+];
+
 function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewState {
   return {
     status: 'ready', mode: 'twoDay', today: '2026-09-08', anchorDate: '2026-09-08',
     visibleMonth: '2026-09-01', selectedDate: '2026-09-08',
-    twoDayDays: [
-      { date: '2026-09-08', dateLabel: '9月8日', weekdayLabel: '火', isToday: true,
-        holidayName: null, holidaySupport: 'available', allDayItems: [], timelineItems: [],
-        accessibilityLabel: '2026年9月8日、火曜日、今日、予定なし' },
-      { date: '2026-09-09', dateLabel: '9月9日', weekdayLabel: '水', isToday: false,
-        holidayName: null, holidaySupport: 'available', allDayItems: [], timelineItems: [],
-        accessibilityLabel: '2026年9月9日、水曜日、予定なし' },
-    ],
+    twoDayDays, twoDayStrip,
     monthDays: [], selectedAgendaItems: [], selectedHolidayName: null,
     holidaySupport: 'available', isPeriodLoading: false, periodError: null,
     ...callbacks, ...overrides,
@@ -78,37 +105,50 @@ describe('カレンダー画面', () => {
 
     expect(screen.getByRole('tab', { name: '2日表示' }).props.accessibilityState).toEqual({ selected: true });
     expect(screen.getByText('2026年9月8日〜9日')).toBeOnTheScreen();
-    expect(screen.getByTestId('calendar.animated-content').props.onStartShouldSetResponder).toBeDefined();
-    expect(useHorizontalSwipeTransition).toHaveBeenCalledWith({
+    expect(screen.getByTestId('two-day-calendar').props.onStartShouldSetResponder).toBeDefined();
+    expect(useTwoDayCarousel).toHaveBeenCalledWith({
       onPrevious: state.showPreviousPeriod,
       onNext: state.showNextPeriod,
       reduceMotion: false,
-      stepRatio: 0.5,
+      bufferDays: 1,
+      leadingDate: '2026-09-07',
     });
     await user.press(screen.getByRole('button', { name: '9月9日に予定を追加' }));
     expect(onAddEvent).toHaveBeenCalledWith('2026-09-09');
   });
 
-  it('月表示では画面全体分の距離でスワイプ遷移させる', async () => {
-    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
-
-    expect(useHorizontalSwipeTransition).toHaveBeenCalledWith(expect.objectContaining({ stepRatio: 1 }));
-  });
-
-  it('表示切替と期間ツールバーの操作を状態へ渡す', async () => {
-    const state = createState();
+  it('2日表示の前後・今日ボタンは予備列付きカルーセルの移動関数を呼ぶ', async () => {
     const user = userEvent.setup();
-    await renderWithSafeArea(<CalendarScreen state={state} onAddEvent={jest.fn()} />);
+    await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
 
-    await user.press(screen.getByRole('tab', { name: '月表示' }));
     await user.press(screen.getByRole('button', { name: '前の1日へ' }));
     await user.press(screen.getByRole('button', { name: '今日' }));
     await user.press(screen.getByRole('button', { name: '次の1日へ' }));
-    expect(callbacks.selectMode).toHaveBeenCalledWith('month');
-    const swipe = jest.mocked(useHorizontalSwipeTransition).mock.results[0]?.value;
-    expect(swipe.movePrevious).toHaveBeenCalledTimes(1);
+
+    const carousel = jest.mocked(useTwoDayCarousel).mock.results[0]?.value;
+    expect(carousel.movePrevious).toHaveBeenCalledTimes(1);
     expect(callbacks.showToday).toHaveBeenCalledTimes(1);
-    expect(swipe.moveNext).toHaveBeenCalledTimes(1);
+    expect(carousel.moveNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('月表示の前後ボタンはuseHorizontalSwipeTransitionの移動関数を呼ぶ', async () => {
+    const user = userEvent.setup();
+    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
+
+    await user.press(screen.getByRole('button', { name: '前月へ' }));
+    await user.press(screen.getByRole('button', { name: '次月へ' }));
+
+    const transition = jest.mocked(useHorizontalSwipeTransition).mock.results[0]?.value;
+    expect(transition.movePrevious).toHaveBeenCalledTimes(1);
+    expect(transition.moveNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('表示切替を状態へ渡す', async () => {
+    const user = userEvent.setup();
+    await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
+
+    await user.press(screen.getByRole('tab', { name: '月表示' }));
+    expect(callbacks.selectMode).toHaveBeenCalledWith('month');
   });
 
   it('2日表示で画面全体にセーフエリア分の余白を確保する', async () => {
@@ -133,12 +173,11 @@ describe('カレンダー画面', () => {
     });
   });
 
-  it('2日表示ではスクロール領域を持たず残り高さいっぱいにタイムラインを表示する', async () => {
+  it('2日表示ではスクロール領域を持たず、予備列付きのタイムラインを直接表示する', async () => {
     await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
 
     expect(screen.queryByTestId('calendar.scroll')).toBeNull();
-    expect(StyleSheet.flatten(screen.getByTestId('calendar.animated-content').props.style))
-      .toMatchObject({ flex: 1 });
+    expect(screen.getByTestId('two-day-calendar')).toBeOnTheScreen();
   });
 
   it('月表示では従来通りページ全体をスクロール領域にする', async () => {
@@ -157,8 +196,8 @@ describe('カレンダー画面', () => {
     expect(within(swipeArea).getByTestId('calendar.scroll')).toBeOnTheScreen();
   });
 
-  it.each([['twoDay'], ['month']] as const)('%s表示でも入場時の瞬間移動を隠す不透明度をスワイプ内容へ適用する', async (mode) => {
-    await renderWithSafeArea(<CalendarScreen state={createState({ mode })} onAddEvent={jest.fn()} />);
+  it('月表示では入場時の瞬間移動を隠す不透明度をスワイプ内容へ適用する', async () => {
+    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
 
     expect(StyleSheet.flatten(screen.getByTestId('calendar.animated-content').props.style).opacity)
       .toBeDefined();

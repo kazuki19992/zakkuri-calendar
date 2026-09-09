@@ -1,51 +1,20 @@
 import { useCallback, useMemo, useState } from 'react';
+import { Animated, PanResponder, type PanResponderInstance } from 'react-native';
 import {
-  Animated,
-  Easing,
-  PanResponder,
-  type PanResponderGestureState,
-  type PanResponderInstance,
-} from 'react-native';
+  createTransitionGate,
+  getSwipeDirection,
+  horizontalDominance,
+  runAnimation,
+  type SwipeDirection,
+} from './swipe-gesture';
 
-export type SwipeDirection = 'previous' | 'next';
-
-type SwipeGesture = Readonly<Pick<PanResponderGestureState, 'dx' | 'dy' | 'vx'>>;
-
-const minimumDistance = 48;
-const minimumVelocity = 0.5;
-const horizontalDominance = 1.2;
-
-function createTransitionGate() {
-  let isEntered = false;
-  return {
-    tryEnter(): boolean {
-      if (isEntered) return false;
-      isEntered = true;
-      return true;
-    },
-    leave(): void {
-      isEntered = false;
-    },
-  };
-}
-
-export function getSwipeDirection(gesture: SwipeGesture): SwipeDirection | null {
-  if (Math.abs(gesture.dx) <= Math.abs(gesture.dy) * horizontalDominance) return null;
-  const direction = Math.abs(gesture.dx) >= minimumDistance ? gesture.dx : gesture.vx;
-  if (Math.abs(gesture.dx) < minimumDistance && Math.abs(gesture.vx) < minimumVelocity) return null;
-  return direction > 0 ? 'previous' : 'next';
-}
+export type { SwipeDirection };
+export { getSwipeDirection };
 
 export type UseHorizontalSwipeTransitionInput = Readonly<{
   onPrevious(): Promise<boolean>;
   onNext(): Promise<boolean>;
   reduceMotion: boolean;
-  /**
-   * 1回の遷移で退場・入場させる距離を、計測した画面幅に対する比率で指定する。
-   * 省略時は1(画面全体)。2日ビューのように1回の移動が画面の一部(1日分)しか
-   * 更新しない場合は、その割合(例: 0.5)を指定して、更新範囲と見た目の移動量を一致させる。
-   */
-  stepRatio?: number;
 }>;
 
 export type HorizontalSwipeTransition = Readonly<{
@@ -63,17 +32,6 @@ export type HorizontalSwipeTransition = Readonly<{
   onLayout(width: number): void;
 }>;
 
-function runAnimation(value: Animated.Value, toValue: number): Promise<void> {
-  return new Promise((resolve) => {
-    Animated.timing(value, {
-      toValue,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => resolve());
-  });
-}
-
 export function useHorizontalSwipeTransition(
   input: UseHorizontalSwipeTransitionInput,
 ): HorizontalSwipeTransition {
@@ -82,15 +40,13 @@ export function useHorizontalSwipeTransition(
   const [width, setWidth] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
   const [transitionGate] = useState(() => createTransitionGate());
-  const stepRatio = input.stepRatio ?? 1;
 
   const move = useCallback(
     async (direction: SwipeDirection): Promise<boolean> => {
       if (!transitionGate.tryEnter()) return false;
       setIsAnimating(true);
       const callback = direction === 'previous' ? input.onPrevious : input.onNext;
-      const stepWidth = width * stepRatio;
-      const exitPosition = direction === 'previous' ? stepWidth : -stepWidth;
+      const exitPosition = direction === 'previous' ? width : -width;
       try {
         if (!input.reduceMotion) await runAnimation(translateX, exitPosition);
         const succeeded = await callback();
@@ -117,7 +73,7 @@ export function useHorizontalSwipeTransition(
         setIsAnimating(false);
       }
     },
-    [contentOpacity, input.onNext, input.onPrevious, input.reduceMotion, stepRatio, transitionGate, translateX, width],
+    [contentOpacity, input.onNext, input.onPrevious, input.reduceMotion, transitionGate, translateX, width],
   );
 
   const movePrevious = useCallback(() => move('previous'), [move]);

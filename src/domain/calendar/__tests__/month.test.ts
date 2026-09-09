@@ -5,6 +5,7 @@ import {
   getTwoDayRange,
   moveMonth,
   moveTwoDayWindow,
+  offsetCalendarDate,
   toCalendarDate,
 } from '../month';
 
@@ -31,6 +32,12 @@ describe('月カレンダーの日付計算', () => {
   it('2日表示の基準日を1日単位で前後へ移動する', () => {
     expect(moveTwoDayWindow('2026-09-30', 1)).toBe('2026-10-01');
     expect(moveTwoDayWindow('2026-09-30', -1)).toBe('2026-09-29');
+  });
+
+  it('任意の日数だけ月・年境界を越えて日付をずらす', () => {
+    expect(offsetCalendarDate('2026-09-30', 2)).toBe('2026-10-02');
+    expect(offsetCalendarDate('2026-01-01', -2)).toBe('2025-12-30');
+    expect(offsetCalendarDate('2026-09-08', 0)).toBe('2026-09-08');
   });
 
   it('月曜始まりの42日を壁時計日付で返す', () => {

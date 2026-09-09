@@ -8,6 +8,7 @@ import {
   getTwoDayRange,
   moveMonth,
   moveTwoDayWindow,
+  offsetCalendarDate,
   toCalendarDate,
   type WeekStartsOn,
 } from '@/domain/calendar/month';
@@ -25,7 +26,13 @@ import {
   type HolidaySupport,
 } from '../calendar-view-model';
 import { createMonthDayViewModels, type MonthDayViewModel } from '../month-view-model';
-import { createTwoDayViewModels, type TwoDayViewModel } from '../two-day-view-model';
+import {
+  TWO_DAY_SWIPE_BUFFER_DAYS,
+  createTwoDayStripDates,
+  createTwoDayStripViewModels,
+  createTwoDayViewModels,
+  type TwoDayViewModel,
+} from '../two-day-view-model';
 
 export type CalendarViewMode = 'twoDay' | 'month';
 export type CalendarViewStatus = 'loading' | 'ready' | 'error';
@@ -49,6 +56,11 @@ export type CalendarViewState = Readonly<{
   visibleMonth: string;
   selectedDate: string;
   twoDayDays: readonly [TwoDayViewModel, TwoDayViewModel];
+  /**
+   * 2日ビューの横スワイプ用に、表示2日の前後へ予備列を加えた並び。
+   * ジャンプなく連続スライドできるよう、予備列分もあらかじめ取得済み。
+   */
+  twoDayStrip: readonly TwoDayViewModel[];
   monthDays: readonly MonthDayViewModel[];
   selectedAgendaItems: readonly AgendaItemViewModel[];
   selectedHolidayName: string | null;
@@ -100,7 +112,12 @@ function getSystemTime(): Date {
 function getTargetRange(target: ViewTarget): Readonly<{ from: string; through: string }> {
   if (target.mode === 'twoDay') {
     const range = getTwoDayRange(target.anchorDate);
-    return { from: moveTwoDayWindow(range.from, -1), through: range.through };
+    // スワイプ用予備列(前後TWO_DAY_SWIPE_BUFFER_DAYS日)の分だけ広く取得する。
+    // 前日側はさらに1日分広げ、日跨ぎ予定が予備列の左端でも継続描画できるようにする。
+    return {
+      from: offsetCalendarDate(range.from, -(TWO_DAY_SWIPE_BUFFER_DAYS + 1)),
+      through: offsetCalendarDate(range.through, TWO_DAY_SWIPE_BUFFER_DAYS),
+    };
   }
   return getMonthRange(target.visibleMonth);
 }
@@ -108,7 +125,7 @@ function getTargetRange(target: ViewTarget): Readonly<{ from: string; through: s
 function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): readonly string[] {
   const dates =
     target.mode === 'twoDay'
-      ? Object.values(getTwoDayRange(target.anchorDate))
+      ? createTwoDayStripDates(getTwoDayRange(target.anchorDate), TWO_DAY_SWIPE_BUFFER_DAYS)
       : getMonthGrid(target.visibleMonth, weekStartsOn).map((day) => day.date);
   return [...new Set(dates.map(getMonthStart))];
 }
@@ -334,6 +351,19 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       }),
     [state.anchorDate, state.snapshot, state.today],
   );
+  const twoDayStrip = useMemo(
+    () =>
+      createTwoDayStripViewModels({
+        range: getTwoDayRange(state.anchorDate),
+        bufferDays: TWO_DAY_SWIPE_BUFFER_DAYS,
+        today: state.today,
+        events: state.snapshot.events,
+        definitions: state.snapshot.definitions,
+        undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes,
+        holidayCoverage: state.snapshot.holidayCoverage,
+      }),
+    [state.anchorDate, state.snapshot, state.today],
+  );
   const monthDays = useMemo(
     () =>
       createMonthDayViewModels({
@@ -369,6 +399,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     visibleMonth: state.visibleMonth,
     selectedDate: state.selectedDate,
     twoDayDays,
+    twoDayStrip,
     monthDays,
     selectedAgendaItems,
     selectedHolidayName: selectedDay?.holidayName ?? null,

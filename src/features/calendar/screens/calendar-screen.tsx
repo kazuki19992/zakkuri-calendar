@@ -9,7 +9,9 @@ import { MonthGrid } from '../components/month-grid';
 import { SelectedDayAgenda } from '../components/selected-day-agenda';
 import { TwoDayView } from '../components/two-day-view';
 import { useHorizontalSwipeTransition } from '../hooks/use-horizontal-swipe-transition';
+import { useTwoDayCarousel } from '../hooks/use-two-day-carousel';
 import type { CalendarViewState } from '../hooks/use-calendar-view';
+import { TWO_DAY_SWIPE_BUFFER_DAYS } from '../two-day-view-model';
 
 function formatMonth(month: string): string {
   const [year, monthNumber] = month.split('-').map(Number);
@@ -35,36 +37,45 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
+  // 月ビューの横スワイプ・アニメーションを担う(2日ビューはuseTwoDayCarouselが担う)。
   const transition = useHorizontalSwipeTransition({
     onPrevious: state.showPreviousPeriod,
     onNext: state.showNextPeriod,
     reduceMotion,
-    // 2日ビューの前後移動は基準日を1日分(画面の半分)だけ動かすため、
-    // 見た目のスワイプ距離も画面全体ではなく半分にして更新範囲と一致させる。
-    stepRatio: state.mode === 'twoDay' ? 0.5 : 1,
   });
-  const periodLabel = state.mode === 'twoDay'
+  // 2日ビューは前後に取得済みの予備列を持つため、取得完了を待たずに
+  // 1列分だけジャンプなく連続スライドできる。
+  const carousel = useTwoDayCarousel({
+    onPrevious: state.showPreviousPeriod,
+    onNext: state.showNextPeriod,
+    reduceMotion,
+    bufferDays: TWO_DAY_SWIPE_BUFFER_DAYS,
+    leadingDate: state.twoDayStrip[0]?.date ?? state.anchorDate,
+  });
+  const isTwoDay = state.mode === 'twoDay';
+  const periodLabel = isTwoDay
     ? formatTwoDayPeriod(state.twoDayDays[0].date, state.twoDayDays[1].date)
     : formatMonth(state.visibleMonth);
-  const previousLabel = state.mode === 'twoDay' ? '前の1日へ' : '前月へ';
-  const nextLabel = state.mode === 'twoDay' ? '次の1日へ' : '次月へ';
+  const previousLabel = isTwoDay ? '前の1日へ' : '前月へ';
+  const nextLabel = isTwoDay ? '次の1日へ' : '次月へ';
+  const movePrevious = isTwoDay ? carousel.movePrevious : transition.movePrevious;
+  const moveNext = isTwoDay ? carousel.moveNext : transition.moveNext;
+  const isMoving = isTwoDay ? carousel.isAnimating : transition.isAnimating;
 
   const headerControls = (
     <>
       <CalendarViewSwitcher mode={state.mode} onSelectMode={(mode) => void state.selectMode(mode)} />
       <CalendarPeriodToolbar periodLabel={periodLabel} previousAccessibilityLabel={previousLabel}
-        nextAccessibilityLabel={nextLabel} isLoading={state.isPeriodLoading || transition.isAnimating}
-        onPrevious={() => void transition.movePrevious()} onToday={() => void state.showToday()}
-        onNext={() => void transition.moveNext()} />
+        nextAccessibilityLabel={nextLabel} isLoading={state.isPeriodLoading || isMoving}
+        onPrevious={() => void movePrevious()} onToday={() => void state.showToday()}
+        onNext={() => void moveNext()} />
       {state.periodError !== null ? (
         <Text accessibilityRole="alert" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
       ) : null}
     </>
   );
 
-  const swipeContent = state.mode === 'twoDay' ? (
-    <TwoDayView days={state.twoDayDays} onAddEvent={onAddEvent} />
-  ) : (
+  const swipeContent = (
     <>
       <MonthGrid days={state.monthDays} onSelectDate={(date) => void state.selectDate(date)} />
       <SelectedDayAgenda selectedDate={state.selectedDate}
@@ -83,20 +94,20 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
         paddingLeft: insets.left,
         paddingRight: insets.right,
       }]}>
-        {state.mode === 'twoDay' ? (
+        {isTwoDay ? (
           // 2日表示は画面の残り高さいっぱいにタイムラインを収め、ページ全体のスクロールを行わない。
+          // 横スワイプは予備列を持つTwoDayView自身が担うため、外側の変形・不透明度制御は不要。
           <>
             {headerControls}
-            <View style={styles.fill}>
-              <Animated.View testID="calendar.animated-content" {...transition.panHandlers}
-                onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}
-                style={[styles.fill, {
-                  transform: [{ translateX: transition.translateX }],
-                  opacity: transition.contentOpacity,
-                }]}>
-                {swipeContent}
-              </Animated.View>
-            </View>
+            <TwoDayView
+              strip={state.twoDayStrip}
+              bufferDays={TWO_DAY_SWIPE_BUFFER_DAYS}
+              columnWidth={carousel.columnWidth}
+              translateX={carousel.translateX}
+              panHandlers={carousel.panHandlers}
+              onCarouselLayout={carousel.onLayout}
+              onAddEvent={onAddEvent}
+            />
           </>
         ) : (
           // 月表示は縦スクロールも行うため、横スワイプの受付(panHandlers)をScrollViewの

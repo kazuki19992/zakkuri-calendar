@@ -1,13 +1,29 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import {
+  Animated,
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+  type PanResponderInstance,
+} from 'react-native';
 import { useNowIndicator } from '../hooks/use-now-indicator';
 import { computeNowLineTop, computeTimelineScale } from '../timeline-layout';
 import type { TwoDayViewModel } from '../two-day-view-model';
 import { TimelineAxis } from './timeline-axis';
 import { TwoDayColumn } from './two-day-column';
 
-export function TwoDayView({ days, onAddEvent, now }: Readonly<{
-  days: readonly [TwoDayViewModel, TwoDayViewModel];
+export function TwoDayView({
+  strip, bufferDays, columnWidth, translateX, panHandlers, onCarouselLayout, onAddEvent, now,
+}: Readonly<{
+  /** 予備列→表示2日→予備列の順に並んだ日付の並び。 */
+  strip: readonly TwoDayViewModel[];
+  bufferDays: number;
+  /** 1列(1日分)の幅。カルーセルの計測結果をそのまま各列の幅として使う。 */
+  columnWidth: number;
+  translateX: Animated.Value;
+  panHandlers: PanResponderInstance['panHandlers'];
+  /** カルーセルが基準位置・スライド距離を計算するための画面幅の計測結果を通知する。 */
+  onCarouselLayout(width: number): void;
   onAddEvent(date: string): void;
   now?: () => Date;
 }>) {
@@ -18,24 +34,43 @@ export function TwoDayView({ days, onAddEvent, now }: Readonly<{
     setScale(computeTimelineScale(event.nativeEvent.layout.height));
   }, []);
 
-  // 表示中の2日のどちらかが今日のときだけ、現在時刻線とラベルを表示する。
+  // 現在時刻線の位置自体は列に依存せず常に計算できる。列ごとの表示は
+  // 各列の`isToday`だけで判断し、予備列が今日でもその列には表示する。
+  // 時間軸の現在時刻ラベルだけは、実際に表示している2日(予備列を除く)を
+  // 対象にする。
+  const visibleDays = strip.slice(bufferDays, bufferDays + 2);
   const indicator = useNowIndicator(now);
-  const showsToday = days.some((day) => day.isToday);
-  const nowTop = showsToday ? computeNowLineTop(indicator.minutesOfDay, scale) : null;
+  const showsToday = visibleDays.some((day) => day.isToday);
+  const nowTop = computeNowLineTop(indicator.minutesOfDay, scale);
+
+  const stripWidth = strip.length * columnWidth;
 
   return (
-    <View testID="two-day-calendar" style={styles.container}>
+    <View
+      testID="two-day-calendar"
+      style={styles.container}
+      onLayout={(event) => onCarouselLayout(event.nativeEvent.layout.width)}
+      {...panHandlers}
+    >
       <View testID="two-day-calendar.summary" style={styles.summaryRow}>
         <View style={styles.axisSpacer} />
-        {days.map((day) => <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} />)}
+        <View style={styles.viewport}>
+          <Animated.View testID="two-day-calendar.summary-strip"
+            style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
+            {strip.map((day) => <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} />)}
+          </Animated.View>
+        </View>
       </View>
       <View testID="two-day-calendar.timeline" style={styles.timelineRow} onLayout={handleTimelineLayout}>
-        <TimelineAxis scale={scale} now={nowTop !== null ? { top: nowTop, label: indicator.label } : null} />
-        <View style={styles.dayLanes}>
-          {days.map((day) => (
-            <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} variant="timeline" scale={scale}
-              nowTop={day.isToday ? nowTop : null} />
-          ))}
+        <TimelineAxis scale={scale} now={showsToday ? { top: nowTop, label: indicator.label } : null} />
+        <View style={styles.viewport}>
+          <Animated.View testID="two-day-calendar.timeline-strip"
+            style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
+            {strip.map((day) => (
+              <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} variant="timeline" scale={scale}
+                nowTop={day.isToday ? nowTop : null} />
+            ))}
+          </Animated.View>
         </View>
       </View>
     </View>
@@ -46,6 +81,8 @@ const styles = StyleSheet.create({
   container: { width: '100%', flex: 1 },
   summaryRow: { flexDirection: 'row', width: '100%' },
   axisSpacer: { width: 48 },
+  // 予備列は基準位置から外れた分だけ隠す。表示2日の描画内容自体は変えない。
+  viewport: { flex: 1, minWidth: 0, overflow: 'hidden' },
+  stripRow: { flexDirection: 'row' },
   timelineRow: { flexDirection: 'row', width: '100%', flex: 1, overflow: 'hidden' },
-  dayLanes: { flex: 1, flexDirection: 'row', minWidth: 0 },
 });

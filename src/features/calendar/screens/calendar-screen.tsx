@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { CalendarLoadState } from '../components/calendar-load-state';
+import { CalendarAddEventButton } from '../components/calendar-add-event-button';
 import { CalendarPeriodToolbar } from '../components/calendar-period-toolbar';
 import { CalendarViewSwitcher } from '../components/calendar-view-switcher';
 import { MonthGrid } from '../components/month-grid';
@@ -30,9 +31,11 @@ function formatTwoDayPeriod(from: string, through: string): string {
   return `${fromYear}年${fromMonth}月${fromDay}日〜${throughYear}年${throughMonth}月${throughDay}日`;
 }
 
-export function CalendarScreen({ state, onAddEvent }: Readonly<{
+export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt }: Readonly<{
   state: CalendarViewState;
   onAddEvent(date: string): void;
+  onEditEvent?(id: string): void;
+  onCreateExactAt?(date: string, startTime: string): void;
 }>) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -80,7 +83,7 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
       <MonthGrid days={state.monthDays} onSelectDate={(date) => void state.selectDate(date)} />
       <SelectedDayAgenda selectedDate={state.selectedDate}
         holidayName={state.selectedHolidayName} holidaySupport={state.holidaySupport}
-        items={state.selectedAgendaItems} onAddEvent={() => onAddEvent(state.selectedDate)} />
+        items={state.selectedAgendaItems} onEditEvent={onEditEvent} />
     </>
   );
 
@@ -106,8 +109,10 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
               translateX={carousel.translateX}
               panHandlers={carousel.panHandlers}
               onCarouselLayout={carousel.onLayout}
-              onAddEvent={onAddEvent}
+              onEditEvent={onEditEvent}
+              onCreateExactAt={onCreateExactAt}
             />
+            <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
           </>
         ) : (
           // 月表示は縦スクロールも行うため、横スワイプの受付(panHandlers)をScrollViewの
@@ -122,9 +127,10 @@ export function CalendarScreen({ state, onAddEvent }: Readonly<{
                   transform: [{ translateX: transition.translateX }],
                   opacity: transition.contentOpacity,
                 }}>
-                {swipeContent}
-              </Animated.View>
+              {swipeContent}
+            </Animated.View>
             </ScrollView>
+            <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
           </View>
         )}
       </View>

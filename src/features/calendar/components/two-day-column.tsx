@@ -1,6 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { NOW_LINE_HEIGHT, TIMELINE_HEIGHT, computeHourLineTop } from '../timeline-layout';
+import { resolveNearestTimelineHour } from '../timeline-tap-time';
 import type { TwoDayViewModel } from '../two-day-view-model';
 import { TimelineEventBlock } from './timeline-event-block';
 
@@ -9,21 +11,30 @@ const hourLines = Array.from({ length: 25 }, (_, hour) => hour);
 /** 罫線の太さ。位置を下端内へ収める計算とstyleの両方で参照する。 */
 const HOUR_LINE_THICKNESS = StyleSheet.hairlineWidth;
 
-export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1, nowTop = null }: Readonly<{
+export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = null, onEditEvent, onCreateExactAt }: Readonly<{
   day: TwoDayViewModel;
-  onAddEvent(date: string): void;
   variant?: 'summary' | 'timeline';
   scale?: number;
   nowTop?: number | null;
+  onEditEvent?(id: string): void;
+  onCreateExactAt?(date: string, startTime: string): void;
 }>) {
   const theme = useTheme();
+  const lastTap = useRef<number | null>(null);
   if (variant === 'timeline') {
     return (
       <View
         testID="two-day-calendar.timeline-column"
         style={[styles.timelineColumn, { height: TIMELINE_HEIGHT * scale, borderColor: theme.calendarBorder }]}
+        onTouchEnd={(event) => {
+          const timestamp = Date.now();
+          if (lastTap.current !== null && timestamp - lastTap.current <= 300) {
+            onCreateExactAt?.(day.date, resolveNearestTimelineHour(event.nativeEvent.locationY, scale));
+            lastTap.current = null;
+          } else lastTap.current = timestamp;
+        }}
       >
-        {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} />)}
+        {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} onPress={onEditEvent} />)}
         {hourLines.map((hour) => (
           <View
             key={hour}
@@ -71,10 +82,6 @@ export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1, 
         {day.holidayName !== null ? <Text style={[styles.holiday, { color: theme.calendarHoliday }]}>{day.holidayName}</Text>
           : day.holidaySupport === 'unsupported' ? <Text style={[styles.support, { color: theme.textSecondary }]}>祝日情報未対応</Text> : null}
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${day.dateLabel}に予定を追加`}
-        onPress={() => onAddEvent(day.date)} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
-        <Text style={[styles.addLabel, { color: theme.calendarAccent }]}>＋ 予定</Text>
-      </Pressable>
       {day.allDayItems.map((item) => (
         <View key={item.id} accessible accessibilityLabel={item.accessibilityLabel}
           style={[styles.item, { borderTopColor: theme.calendarBorder }] }>
@@ -98,13 +105,10 @@ const styles = StyleSheet.create({
   today: { fontSize: 12, fontWeight: '700', marginLeft: 6 },
   holiday: { fontSize: 12, fontWeight: '600', marginTop: 4 },
   support: { fontSize: 12, marginTop: 4 },
-  addButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 10 },
-  addLabel: { fontSize: 14, fontWeight: '600' },
   empty: { fontSize: 13, padding: 10 },
   item: { minHeight: 52, padding: 10, borderTopWidth: StyleSheet.hairlineWidth },
   itemTitle: { fontSize: 15, fontWeight: '600' },
   itemTime: { fontSize: 13, marginTop: 3 },
-  pressed: { opacity: 0.6 },
   timelineColumn: {
     flex: 1,
     minWidth: 0,

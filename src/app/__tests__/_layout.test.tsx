@@ -65,5 +65,6 @@ describe('ルートレイアウト', () => {
     expect(calendarRefreshProvider.parent).toBe(databaseProvider);
     expect(stack.parent).toBe(calendarRefreshProvider);
     expect(screen.getByTestId('stack-screen.events/new')).toHaveTextContent('modal');
+    expect(screen.getByTestId('stack-screen.events/[id]')).toHaveTextContent('modal');
   });
 });

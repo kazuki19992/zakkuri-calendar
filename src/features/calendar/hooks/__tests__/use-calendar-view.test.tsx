@@ -157,7 +157,7 @@ describe('カレンダー表示の状態調整', () => {
     expect(result.current.monthDays).toHaveLength(42);
     expect(dependencies.events.listByAnchorRange).toHaveBeenLastCalledWith(
       calendar.id,
-      '2026-09-01',
+      '2026-08-31',
       '2026-09-30',
     );
     await act(async () => expect(await result.current.selectDate('2026-09-09')).toBe(true));

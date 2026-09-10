@@ -1,4 +1,4 @@
-import DateTimePicker from '@expo/ui/community/datetime-picker';
+import NativeDateTimePicker from '@expo/ui/community/datetime-picker';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -18,11 +18,11 @@ export function EventDateTimeFields({ date, startTime, endTime, disabled, showTi
   const theme = useTheme();
   return <View style={styles.fields}>
     <Text style={[styles.label, { color: theme.text }]}>日付</Text>
-    <DateTimePicker testID="event-editor.date-picker" mode="date" value={toDate(date)} disabled={disabled} onValueChange={(_, value) => onDateChange(dateValue(value))} />
+    <NativeDateTimePicker testID="event-editor.date-picker" mode="date" value={toDate(date)} disabled={disabled} onValueChange={(_, value) => onDateChange(dateValue(value))} />
     {showTimes ? <><Text style={[styles.label, { color: theme.text }]}>開始時刻</Text>
-      <DateTimePicker testID="event-editor.start-time-picker" mode="time" value={toDate(date, startTime)} disabled={disabled} is24Hour onValueChange={(_, value) => onStartTimeChange(timeValue(value))} />
+      <NativeDateTimePicker testID="event-editor.start-time-picker" mode="time" value={toDate(date, startTime)} disabled={disabled} is24Hour onValueChange={(_, value) => onStartTimeChange(timeValue(value))} />
       <Text style={[styles.label, { color: theme.text }]}>終了時刻</Text>
-      <DateTimePicker testID="event-editor.end-time-picker" mode="time" value={toDate(date, endTime)} disabled={disabled} is24Hour onValueChange={(_, value) => onEndTimeChange(timeValue(value))} />
+      <NativeDateTimePicker testID="event-editor.end-time-picker" mode="time" value={toDate(date, endTime)} disabled={disabled} is24Hour onValueChange={(_, value) => onEndTimeChange(timeValue(value))} />
     </> : null}
   </View>;
 }

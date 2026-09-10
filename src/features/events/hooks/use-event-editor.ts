@@ -85,6 +85,7 @@ export function useEventEditor({
   const [definitions, setDefinitions] = useState<readonly TemporalDefinition[]>([]);
   const [selectedDefinitionId, setSelectedDefinitionId] = useState<string | null>(null);
   const [existingEvent, setExistingEvent] = useState<CalendarEvent | null>(null);
+  const [calendarId, setCalendarId] = useState<string | null>(null);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [endTimeError, setEndTimeError] = useState<string | null>(null);
@@ -105,6 +106,7 @@ export function useEventEditor({
         ]);
         if (!active) return;
         const dayDefinitions = loadedDefinitions.filter((definition) => definition.granularity === 'day');
+        setCalendarId(calendar.id);
         setDefinitions(dayDefinitions);
         setSelectedDefinitionId(dayDefinitions[0]?.id ?? null);
         if (eventId !== undefined && loadedEvent === null) throw new Error('event not found');
@@ -156,8 +158,11 @@ export function useEventEditor({
     } else {
       setSaveError('時間帯を選択してください。'); return false;
     }
-    const calendarId = existingEvent?.calendarId ?? (await calendars.getDefault()).id;
-    draft = { ...draft, calendarId } as EventDraft;
+    if (calendarId === null) {
+      setSaveError('カレンダーを読み込めませんでした。もう一度お試しください。');
+      return false;
+    }
+    draft = { ...draft, calendarId: existingEvent?.calendarId ?? calendarId } as EventDraft;
     const timestamp = now();
     const event = existingEvent === null
       ? createCalendarEvent({ id: createId(), draft, now: timestamp })
@@ -177,7 +182,7 @@ export function useEventEditor({
     } finally {
       operationRef.current = false; setIsSaving(false);
     }
-  }, [anchorDate, calendars, clearErrors, createId, endTime, events, existingEvent, getTimeZoneId, now, selectedDefinitionId, startTime, status, temporalType, title]);
+  }, [anchorDate, calendarId, clearErrors, createId, endTime, events, existingEvent, getTimeZoneId, now, selectedDefinitionId, startTime, status, temporalType, title]);
 
   const remove = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || existingEvent === null) return false;

@@ -1,5 +1,5 @@
 import { LinearGradient, type LinearGradientProps } from 'expo-linear-gradient';
-import { StyleSheet, Text, View, type ColorValue } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import {
   MIN_EVENT_HEIGHT,
@@ -16,9 +16,10 @@ function withOpacity(hex: string, opacity: number): string {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
-export function TimelineEventBlock({ item, scale = 1 }: Readonly<{
+export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
   item: TimelineItemViewModel;
   scale?: number;
+  onPress?(id: string): void;
 }>) {
   const theme = useTheme();
   const width = `${100 / item.overlapCount}%` as const;
@@ -41,11 +42,13 @@ export function TimelineEventBlock({ item, scale = 1 }: Readonly<{
   const textAnchor = resolveTextAnchor(computePeakOpacityOffset(item.opacityStops));
 
   return (
-    <View
+    <Pressable
       testID={`timeline-event.${item.id}`}
       accessible
       accessibilityLabel={item.accessibilityLabel}
       style={[styles.position, { top, height, width, left }]}
+      onTouchEnd={(event) => event.stopPropagation()}
+      onPress={() => onPress?.(item.id)}
     >
       <View testID={`timeline-event.${item.id}.card`} style={styles.card}>
         <LinearGradient
@@ -64,7 +67,7 @@ export function TimelineEventBlock({ item, scale = 1 }: Readonly<{
           <Text numberOfLines={1} style={[styles.time, { color: theme.text }]}>{item.temporalLabel}</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

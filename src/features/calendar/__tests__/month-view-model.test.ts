@@ -96,6 +96,24 @@ describe('月表示の表示用モデル', () => {
     ]);
   });
 
+  it('翌日へまたぐ正確な予定は翌日の月表示にも予定ありとして示す', () => {
+    const result = createMonthDayViewModels({
+      grid: [{ ...gridDate, date: '2026-09-22', dayNumber: 22 }],
+      selectedDate: '2026-09-22',
+      today: '2026-09-21',
+      events: [{
+        ...baseEvent,
+        anchorDate: '2026-09-21',
+        temporalType: 'exact',
+        startTime: '23:30',
+        duration: { type: 'fixed', minutes: 60 },
+      }],
+      holidayCoverage: [],
+    });
+
+    expect(result[0]).toMatchObject({ hasEvents: true });
+  });
+
   it('終日予定は終日と表示する', () => {
     const event: CalendarEvent = { ...baseEvent, temporalType: 'allDay' };
 

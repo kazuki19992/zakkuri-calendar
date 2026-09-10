@@ -21,6 +21,7 @@ import type {
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   createAgendaItems,
+  occursOnCalendarDate,
   type AgendaItemViewModel,
   type HolidayRangeCoverage,
   type HolidaySupport,
@@ -119,7 +120,8 @@ function getTargetRange(target: ViewTarget): Readonly<{ from: string; through: s
       through: offsetCalendarDate(range.through, TWO_DAY_SWIPE_BUFFER_DAYS),
     };
   }
-  return getMonthRange(target.visibleMonth);
+  const monthRange = getMonthRange(target.visibleMonth);
+  return { from: offsetCalendarDate(monthRange.from, -1), through: monthRange.through };
 }
 
 function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): readonly string[] {
@@ -378,7 +380,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   const selectedAgendaItems = useMemo(
     () =>
       createAgendaItems(
-        state.snapshot.events.filter((event) => event.anchorDate === state.selectedDate),
+        state.snapshot.events.filter((event) => occursOnCalendarDate(event, state.selectedDate)),
         new Map(
           [...state.snapshot.definitions.values()]
             .map((definition) => [definition.id, definition.label] as const),

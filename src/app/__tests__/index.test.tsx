@@ -28,12 +28,36 @@ jest.mock('@/features/calendar/screens/calendar-screen', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    CalendarScreen: ({ state, onAddEvent }: { state: CalendarViewState; onAddEvent(date: string): void }) => {
+    CalendarScreen: ({
+      state,
+      onAddEvent,
+      onEditEvent,
+      onCreateExactAt,
+    }: {
+      state: CalendarViewState;
+      onAddEvent(date: string): void;
+      onEditEvent?(id: string): void;
+      onCreateExactAt?(date: string, startTime: string): void;
+    }) => {
       const { Pressable } = jest.requireActual<typeof import('react-native')>('react-native');
       return React.createElement(
-        Pressable,
-        { accessibilityRole: 'button', accessibilityLabel: '予定を追加', onPress: () => onAddEvent('2026-09-21') },
-        React.createElement(Text, null, `カレンダー画面:${state.mode}`),
+        React.Fragment,
+        null,
+        React.createElement(
+          Pressable,
+          { accessibilityRole: 'button', accessibilityLabel: '予定を追加', onPress: () => onAddEvent('2026-09-21') },
+          React.createElement(Text, null, `カレンダー画面:${state.mode}`),
+        ),
+        React.createElement(
+          Pressable,
+          { accessibilityRole: 'button', accessibilityLabel: '予定を編集', onPress: () => onEditEvent?.('event-1') },
+          React.createElement(Text, null, '予定を編集'),
+        ),
+        React.createElement(
+          Pressable,
+          { accessibilityRole: 'button', accessibilityLabel: '時刻から予定を追加', onPress: () => onCreateExactAt?.('2026-09-22', '14:00') },
+          React.createElement(Text, null, '時刻から予定を追加'),
+        ),
       );
     },
   };
@@ -91,5 +115,12 @@ describe('ホームルート', () => {
     expect(screen.getByText('カレンダー画面:twoDay')).toBeTruthy();
     await user.press(screen.getByRole('button', { name: '予定を追加' }));
     expect(push).toHaveBeenCalledWith({ pathname: '/events/new', params: { date: '2026-09-21' } });
+    await user.press(screen.getByRole('button', { name: '予定を編集' }));
+    expect(push).toHaveBeenCalledWith({ pathname: '/events/[id]', params: { id: 'event-1' } });
+    await user.press(screen.getByRole('button', { name: '時刻から予定を追加' }));
+    expect(push).toHaveBeenCalledWith({
+      pathname: '/events/new',
+      params: { date: '2026-09-22', startTime: '14:00', temporalType: 'exact' },
+    });
   });
 });

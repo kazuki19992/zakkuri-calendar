@@ -2,6 +2,7 @@ import type { CalendarEvent } from '@/domain/calendar/event';
 import type { MonthGridDate } from '@/domain/calendar/month';
 import {
   getHolidayInfo,
+  occursOnCalendarDate,
   type HolidayRangeCoverage,
   type HolidaySupport,
 } from './calendar-view-model';
@@ -57,7 +58,7 @@ export function createMonthDayViewModels(input: Readonly<{
   return input.grid.map((gridDate) => {
     const isToday = gridDate.date === input.today;
     const isSelected = gridDate.date === input.selectedDate;
-    const hasEvents = input.events.some((event) => event.anchorDate === gridDate.date);
+    const hasEvents = input.events.some((event) => occursOnCalendarDate(event, gridDate.date));
     const holiday = getHolidayInfo(gridDate.date, input.holidayCoverage);
 
     return {

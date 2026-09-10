@@ -97,7 +97,7 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
 describe('カレンダー画面', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('初期2日表示を共通のスワイプ領域へ表示し、各日から予定を追加する', async () => {
+  it('初期2日表示を共通のスワイプ領域へ表示し、常設ボタンから選択日の予定を追加する', async () => {
     const onAddEvent = jest.fn();
     const user = userEvent.setup();
     const state = createState();
@@ -113,8 +113,8 @@ describe('カレンダー画面', () => {
       bufferDays: 1,
       leadingDate: '2026-09-07',
     });
-    await user.press(screen.getByRole('button', { name: '9月9日に予定を追加' }));
-    expect(onAddEvent).toHaveBeenCalledWith('2026-09-09');
+    await user.press(screen.getByRole('button', { name: '予定を追加' }));
+    expect(onAddEvent).toHaveBeenCalledWith('2026-09-08');
   });
 
   it('2日表示の前後・今日ボタンは予備列付きカルーセルの移動関数を呼ぶ', async () => {

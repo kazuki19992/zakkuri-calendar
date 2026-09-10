@@ -1,5 +1,7 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { HolidayRangeResult } from '@/domain/calendar/holiday';
+import { offsetCalendarDate } from '@/domain/calendar/month';
+import { toMinutesOfDay } from '@/domain/calendar/time';
 
 export type HolidaySupport = 'available' | 'unsupported';
 
@@ -15,6 +17,15 @@ export type AgendaItemViewModel = Readonly<{
   temporalLabel: string;
   accessibilityLabel: string;
 }>;
+
+/** 正確な予定が日付をまたぐ場合は、翌日の月表示・予定一覧にも含める。 */
+export function occursOnCalendarDate(event: CalendarEvent, date: string): boolean {
+  if (event.anchorDate === date) return true;
+  if (event.temporalType !== 'exact' || event.duration.type !== 'fixed') return false;
+  const startMinutes = toMinutesOfDay(event.startTime);
+  return startMinutes !== null && startMinutes + event.duration.minutes > 24 * 60
+    && offsetCalendarDate(event.anchorDate, 1) === date;
+}
 
 export function getHolidayInfo(
   date: string,

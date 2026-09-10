@@ -249,12 +249,28 @@ describe('2日カレンダー表示コンポーネント', () => {
     const scale = computeTimelineScale(516);
 
     const hourLinesOfFirstColumn = view.getAllByTestId('two-day-calendar.hour-line').slice(0, 25);
-    hourLinesOfFirstColumn.forEach((line, hour) => {
+    hourLinesOfFirstColumn.slice(0, 24).forEach((line, hour) => {
       const style = StyleSheet.flatten(line.props.style);
       expect(style.height).toBe(StyleSheet.hairlineWidth);
       expect(style.top).toBe(computeHourLineTop(hour, scale));
       expect(PixelRatio.roundToNearestPixel(style.top)).toBe(style.top);
     });
+  });
+
+  it('24:00の罫線が下端でクリップされないよう、線の太さ分だけ内側へ収める', async () => {
+    const view = await renderTwoDayView();
+
+    await fireEvent(view.getByTestId('two-day-calendar.timeline'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 516 } },
+    });
+    const columnHeight = TIMELINE_HEIGHT * computeTimelineScale(516);
+
+    // 24:00の線はtopが列の高さと同じになり、overflow:'hidden'で全体が消える。
+    const lastLine = view.getAllByTestId('two-day-calendar.hour-line').slice(0, 25)[24];
+    const style = StyleSheet.flatten(lastLine.props.style);
+    expect(style.top + style.height).toBeLessThanOrEqual(columnHeight);
+    // 内側へ寄せた後も物理ピクセルに揃い、薄れて見えないようにする。
+    expect(PixelRatio.roundToNearestPixel(style.top)).toBe(style.top);
   });
 
   it('罫線を予定ブロックより手前に描画し、予定と重なる時間帯でも罫線が見えるようにする', async () => {

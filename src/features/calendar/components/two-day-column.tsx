@@ -6,6 +6,9 @@ import { TimelineEventBlock } from './timeline-event-block';
 
 const hourLines = Array.from({ length: 25 }, (_, hour) => hour);
 
+/** 罫線の太さ。位置を下端内へ収める計算とstyleの両方で参照する。 */
+const HOUR_LINE_THICKNESS = StyleSheet.hairlineWidth;
+
 export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1, nowTop = null }: Readonly<{
   day: TwoDayViewModel;
   onAddEvent(date: string): void;
@@ -31,7 +34,17 @@ export function TwoDayColumn({ day, onAddEvent, variant = 'summary', scale = 1, 
             pointerEvents="none"
             style={[
               styles.hourLine,
-              { top: computeHourLineTop(hour, scale), backgroundColor: theme.calendarBorder },
+              {
+                // 24:00の罫線はtopが列の高さと一致し、そのままでは
+                // overflow:'hidden'で線全体がクリップされて見えなくなる。
+                // 線の太さ分だけ内側へ寄せ、下端に接する形で描画する。
+                // 差し引くのは物理ピクセル1つ分のため、吸着済みの位置は保たれる。
+                top: Math.min(
+                  computeHourLineTop(hour, scale),
+                  TIMELINE_HEIGHT * scale - HOUR_LINE_THICKNESS,
+                ),
+                backgroundColor: theme.calendarBorder,
+              },
             ]}
           />
         ))}
@@ -105,7 +118,7 @@ const styles = StyleSheet.create({
     right: 0,
     // 高さ0 + borderTopWidthではなく、実体のある背景色付きの線として描画する。
     // 前者は端末によって描画が不安定になりやすい。
-    height: StyleSheet.hairlineWidth,
+    height: HOUR_LINE_THICKNESS,
     zIndex: 2,
   },
   nowLine: {

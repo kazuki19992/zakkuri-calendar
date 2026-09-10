@@ -1,40 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
+import { Animated, PanResponder, type PanResponderInstance } from 'react-native';
 import {
-  Animated,
-  Easing,
-  PanResponder,
-  type PanResponderGestureState,
-  type PanResponderInstance,
-} from 'react-native';
+  createTransitionGate,
+  getSwipeDirection,
+  horizontalDominance,
+  runAnimation,
+  type SwipeDirection,
+} from './swipe-gesture';
 
-export type SwipeDirection = 'previous' | 'next';
-
-type SwipeGesture = Readonly<Pick<PanResponderGestureState, 'dx' | 'dy' | 'vx'>>;
-
-const minimumDistance = 48;
-const minimumVelocity = 0.5;
-const horizontalDominance = 1.2;
-
-function createTransitionGate() {
-  let isEntered = false;
-  return {
-    tryEnter(): boolean {
-      if (isEntered) return false;
-      isEntered = true;
-      return true;
-    },
-    leave(): void {
-      isEntered = false;
-    },
-  };
-}
-
-export function getSwipeDirection(gesture: SwipeGesture): SwipeDirection | null {
-  if (Math.abs(gesture.dx) <= Math.abs(gesture.dy) * horizontalDominance) return null;
-  const direction = Math.abs(gesture.dx) >= minimumDistance ? gesture.dx : gesture.vx;
-  if (Math.abs(gesture.dx) < minimumDistance && Math.abs(gesture.vx) < minimumVelocity) return null;
-  return direction > 0 ? 'previous' : 'next';
-}
+export type { SwipeDirection };
+export { getSwipeDirection };
 
 export type UseHorizontalSwipeTransitionInput = Readonly<{
   onPrevious(): Promise<boolean>;
@@ -44,6 +19,12 @@ export type UseHorizontalSwipeTransitionInput = Readonly<{
 
 export type HorizontalSwipeTransition = Readonly<{
   translateX: Animated.Value;
+  /**
+   * 入場時の瞬間移動(取得完了後の位置合わせ)を隠すための不透明度。
+   * 通常は1で、移動直後の一瞬だけ0になる。表示側は`transform`と一緒に
+   * `opacity`へ適用し、瞬間移動そのものが画面全体分の跳躍に見えないようにする。
+   */
+  contentOpacity: Animated.Value;
   panHandlers: PanResponderInstance['panHandlers'];
   movePrevious(): Promise<boolean>;
   moveNext(): Promise<boolean>;
@@ -51,21 +32,11 @@ export type HorizontalSwipeTransition = Readonly<{
   onLayout(width: number): void;
 }>;
 
-function runAnimation(value: Animated.Value, toValue: number): Promise<void> {
-  return new Promise((resolve) => {
-    Animated.timing(value, {
-      toValue,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => resolve());
-  });
-}
-
 export function useHorizontalSwipeTransition(
   input: UseHorizontalSwipeTransitionInput,
 ): HorizontalSwipeTransition {
   const [translateX] = useState(() => new Animated.Value(0));
+  const [contentOpacity] = useState(() => new Animated.Value(1));
   const [width, setWidth] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
   const [transitionGate] = useState(() => createTransitionGate());
@@ -80,7 +51,13 @@ export function useHorizontalSwipeTransition(
         if (!input.reduceMotion) await runAnimation(translateX, exitPosition);
         const succeeded = await callback();
         if (succeeded && !input.reduceMotion) {
+          // 取得完了後、新しい内容に合わせて位置を一気に合わせ直す(瞬間移動)。
+          // ここで不透明度を0にして間に挟むことで、ブリッジ遅延などにより
+          // 瞬間移動そのものが1フレーム描画されても、画面全体分跳んだように
+          // 見えず、スライドインは常に見た目通りの距離だけに保たれる。
+          contentOpacity.setValue(0);
           translateX.setValue(-exitPosition);
+          contentOpacity.setValue(1);
           await runAnimation(translateX, 0);
         } else if (!input.reduceMotion) {
           await runAnimation(translateX, 0);
@@ -96,7 +73,7 @@ export function useHorizontalSwipeTransition(
         setIsAnimating(false);
       }
     },
-    [input.onNext, input.onPrevious, input.reduceMotion, transitionGate, translateX, width],
+    [contentOpacity, input.onNext, input.onPrevious, input.reduceMotion, transitionGate, translateX, width],
   );
 
   const movePrevious = useCallback(() => move('previous'), [move]);
@@ -130,6 +107,7 @@ export function useHorizontalSwipeTransition(
 
   return {
     translateX,
+    contentOpacity,
     panHandlers: panResponder.panHandlers,
     movePrevious,
     moveNext,

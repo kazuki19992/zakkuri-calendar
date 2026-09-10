@@ -1,10 +1,17 @@
+import { PixelRatio } from 'react-native';
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   HOUR_HEIGHT,
   MIN_EVENT_HEIGHT,
+  NOW_LINE_HEIGHT,
   TIMELINE_HEIGHT,
+  computeHourLineTop,
+  computeNowLineTop,
+  computePeakOpacityOffset,
+  computeTimelineScale,
   createDayTimelineItems,
+  resolveTextAnchor,
 } from '../timeline-layout';
 
 const base = {
@@ -184,5 +191,99 @@ describe('日別タイムライン配置', () => {
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
     })).toEqual([]);
+  });
+});
+
+describe('タイムライン表示の縮尺計算', () => {
+  it('計測した高さを24時間分の基準高さに対する倍率へ変換する', () => {
+    expect(computeTimelineScale(TIMELINE_HEIGHT)).toBe(1);
+    expect(computeTimelineScale(TIMELINE_HEIGHT / 2)).toBe(0.5);
+  });
+
+  it('未計測(0以下)の高さは基準高さのまま等倍で表示する', () => {
+    expect(computeTimelineScale(0)).toBe(1);
+    expect(computeTimelineScale(-10)).toBe(1);
+  });
+
+  it('24で割り切れない高さでも、1時間の高さを実機ピクセルへ揃える', () => {
+    const hourHeight = HOUR_HEIGHT * computeTimelineScale(569);
+
+    expect(PixelRatio.roundToNearestPixel(hourHeight)).toBe(hourHeight);
+  });
+
+  // 切り上げると24時間分の全高が計測高を超え、overflow:hiddenで24:00付近が切れる。
+  it.each([516, 569, 620, 700, 812.4, 900])(
+    '計測高%pに対し、24時間分の全高が計測高を超えない',
+    (availableHeight) => {
+      const totalHeight = TIMELINE_HEIGHT * computeTimelineScale(availableHeight);
+
+      expect(totalHeight).toBeLessThanOrEqual(availableHeight);
+      // 切り捨てても1物理ピクセル分より多くは余らせない。
+      expect(availableHeight - totalHeight).toBeLessThan(24 / PixelRatio.get());
+    },
+  );
+});
+
+describe('罫線位置の物理ピクセルへの吸着', () => {
+  // 1時間の高さが物理ピクセルの整数倍にならない縮尺(例: 2xで21.5pt = 43px)では、
+  // ptのまま配置すると罫線が1本おきに半ピクセル境界へ落ち、アンチエイリアスで
+  // 薄くなって消えたように見える(間隔が1時間分飛んで見える原因)。
+  it('各罫線のtopを物理ピクセル境界へ吸着させる', () => {
+    const scale = computeTimelineScale(516); // 1時間 = 21.5pt → 2xで43px
+
+    for (let hour = 0; hour <= 24; hour += 1) {
+      const top = computeHourLineTop(hour, scale);
+      expect(PixelRatio.roundToNearestPixel(top)).toBe(top);
+      expect(top * PixelRatio.get()).toBeCloseTo(Math.round(top * PixelRatio.get()), 10);
+    }
+  });
+
+  it('吸着後も隣接する罫線の間隔のばらつきを物理ピクセル1つ以内に収める', () => {
+    const scale = computeTimelineScale(516);
+    const tops = Array.from({ length: 25 }, (_, hour) => computeHourLineTop(hour, scale));
+    const gaps = tops.slice(1).map((top, index) => top - tops[index]);
+
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1 / PixelRatio.get() + 1e-9);
+  });
+
+  it('0時は常に先頭、24時は24時間分の位置に対応する', () => {
+    expect(computeHourLineTop(0, 0.5)).toBe(0);
+    expect(computeHourLineTop(24, 1)).toBe(TIMELINE_HEIGHT);
+  });
+});
+
+describe('現在時刻の位置計算', () => {
+  it('23:59でも線全体が下端の内側へ収まるよう、線の太さ分だけ位置を制限する', () => {
+    expect(computeNowLineTop(1439, 1)).toBe(TIMELINE_HEIGHT - NOW_LINE_HEIGHT);
+    expect(computeNowLineTop(1439, 0.5)).toBe(TIMELINE_HEIGHT * 0.5 - NOW_LINE_HEIGHT);
+  });
+
+  it('0時からの分数と縮尺から現在時刻線のtop位置を求める', () => {
+    expect(computeNowLineTop(0, 1)).toBe(0);
+    expect(computeNowLineTop(90, 1)).toBe(84); // 1時間30分 * 56pt/時
+    expect(computeNowLineTop(90, 0.5)).toBe(42);
+  });
+});
+
+describe('予定テキストの配置(不透明度が最も濃い位置へ寄せる)', () => {
+  it.each([
+    [[{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }] as const, 0.5],
+    [[{ offset: 0, opacity: 0 }, { offset: 0.25, opacity: 1 }, { offset: 1, opacity: 1 }] as const, 0.625],
+    [[{ offset: 0, opacity: 1 }, { offset: 0.75, opacity: 1 }, { offset: 1, opacity: 0 }] as const, 0.375],
+    [[{ offset: 0, opacity: 0 }, { offset: 0.5, opacity: 1 }, { offset: 1, opacity: 0 }] as const, 0.5],
+  ])('opacityStops %o の最も濃い区間の中心offsetは%p', (stops, expected) => {
+    expect(computePeakOpacityOffset(stops)).toBe(expected);
+  });
+
+  it.each([
+    [0, 'flex-start'],
+    [0.3, 'flex-start'],
+    [1 / 3, 'flex-start'],
+    [0.5, 'center'],
+    [2 / 3, 'flex-end'],
+    [0.9, 'flex-end'],
+    [1, 'flex-end'],
+  ] as const)('中心offset%pを3段階のFlexbox配置%pへ変換する', (offset, expected) => {
+    expect(resolveTextAnchor(offset)).toBe(expected);
   });
 });

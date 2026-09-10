@@ -57,6 +57,14 @@ export function moveTwoDayWindow(anchorDate: string, offset: -1 | 1): string {
   return toCalendarDate(addDays(parseCalendarDate(anchorDate), offset));
 }
 
+/**
+ * 任意の日数だけ月・年境界を越えて日付をずらす。2日ビューのスワイプ用
+ * 予備列など、`-1 | 1`より広い範囲の日付計算が必要な箇所で使う。
+ */
+export function offsetCalendarDate(date: string, days: number): string {
+  return toCalendarDate(addDays(parseCalendarDate(date), days));
+}
+
 export function getMonthGrid(month: string, weekStartsOn: WeekStartsOn): readonly MonthGridDate[] {
   const date = parseCalendarDate(month);
   const monthStart = startOfMonth(date);

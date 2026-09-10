@@ -55,6 +55,50 @@ describe('カレンダーの横スワイプ遷移', () => {
     expect(result.current.isAnimating).toBe(false);
   });
 
+  it('入場の瞬間移動は不透明度0で隠してから戻し、スライドインが跳躍して見えないようにする', async () => {
+    const onNext = jest.fn().mockResolvedValue(true);
+    const { result } = await renderHook(() =>
+      useHorizontalSwipeTransition({
+        onPrevious: jest.fn().mockResolvedValue(true),
+        onNext,
+        reduceMotion: false,
+      }),
+    );
+    await act(() => result.current.onLayout(320));
+    const opacitySetValue = jest.spyOn(result.current.contentOpacity, 'setValue');
+    const positionSetValue = jest.spyOn(result.current.translateX, 'setValue');
+
+    await act(async () => expect(await result.current.moveNext()).toBe(true));
+
+    const hideOrder = opacitySetValue.mock.invocationCallOrder[
+      opacitySetValue.mock.calls.findIndex((call) => call[0] === 0)
+    ];
+    const jumpOrder = positionSetValue.mock.invocationCallOrder[
+      positionSetValue.mock.calls.findIndex((call) => call[0] === 320)
+    ];
+    const showOrder = opacitySetValue.mock.invocationCallOrder[
+      opacitySetValue.mock.calls.findLastIndex((call) => call[0] === 1)
+    ];
+    expect(hideOrder).toBeLessThan(jumpOrder);
+    expect(jumpOrder).toBeLessThan(showOrder);
+  });
+
+  it('視差効果を減らす場合は不透明度を変えずに即座に切り替える', async () => {
+    const onNext = jest.fn().mockResolvedValue(true);
+    const { result } = await renderHook(() =>
+      useHorizontalSwipeTransition({
+        onPrevious: jest.fn().mockResolvedValue(true),
+        onNext,
+        reduceMotion: true,
+      }),
+    );
+    const opacitySetValue = jest.spyOn(result.current.contentOpacity, 'setValue');
+
+    await act(async () => expect(await result.current.moveNext()).toBe(true));
+
+    expect(opacitySetValue).not.toHaveBeenCalledWith(0);
+  });
+
   it('取得失敗時は元位置へ戻し、視差効果を減らす場合はanimationを省略する', async () => {
     const onPrevious = jest.fn().mockResolvedValue(false);
     const timing = jest.spyOn(Animated, 'timing');

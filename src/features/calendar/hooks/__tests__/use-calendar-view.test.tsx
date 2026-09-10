@@ -109,13 +109,27 @@ describe('カレンダー表示の状態調整', () => {
       holidayName: 'テスト祝日',
       timelineItems: [{ title: '散歩', temporalLabel: '午後' }],
     });
+    // スワイプ用予備列(既定1日ずつ)の分だけ、表示2日より前後へ広げて取得する。
+    // 前日側はさらに、日跨ぎ予定の継続描画のため1日分広げる。
     expect(dependencies.events.listByAnchorRange).toHaveBeenCalledWith(
       calendar.id,
-      '2026-09-07',
-      '2026-09-09',
+      '2026-09-06',
+      '2026-09-10',
     );
     expect(dependencies.settings.getUndeterminedFadeMinutes).toHaveBeenCalledTimes(1);
     expect(dependencies.temporalDefinitions.getById).toHaveBeenCalledWith(event.temporalDefinitionId);
+  });
+
+  it('2日表示は前後の予備列を含めた4日分のストリップも提供する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.twoDayStrip.map((day) => day.date)).toEqual([
+      '2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10',
+    ]);
   });
 
   it('2日表示は前後へ1日単位で移動する', async () => {

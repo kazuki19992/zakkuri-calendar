@@ -1,6 +1,10 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
-import { createTwoDayViewModels } from '../two-day-view-model';
+import {
+  createTwoDayStripDates,
+  createTwoDayStripViewModels,
+  createTwoDayViewModels,
+} from '../two-day-view-model';
 
 const baseEvent = {
   calendarId: 'personal-default',
@@ -137,5 +141,52 @@ describe('2日表示の表示用モデル', () => {
       holidaySupport: 'unsupported', holidayName: null, allDayItems: [], timelineItems: [],
       accessibilityLabel: '2026年12月31日、木曜日、祝日情報未対応、予定なし',
     });
+  });
+});
+
+describe('2日ビューのスワイプ用予備列', () => {
+  it('前後に指定した日数分の予備列を加えた日付の並びを返す', () => {
+    const range = { from: '2026-09-30', through: '2026-10-01' };
+
+    expect(createTwoDayStripDates(range, 1)).toEqual([
+      '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02',
+    ]);
+    expect(createTwoDayStripDates(range, 2)).toEqual([
+      '2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03',
+    ]);
+  });
+
+  it('予備日数0では表示する2日だけを返す', () => {
+    expect(createTwoDayStripDates({ from: '2026-09-08', through: '2026-09-09' }, 0))
+      .toEqual(['2026-09-08', '2026-09-09']);
+  });
+
+  it('予備列も含めて各日の表示用モデルを作る', () => {
+    const events: readonly CalendarEvent[] = [
+      {
+        ...baseEvent, id: 'prev-event', title: '前日の予定', anchorDate: '2026-09-29',
+        temporalType: 'exact', startTime: '10:00', duration: { type: 'fixed', minutes: 30 },
+      },
+      {
+        ...baseEvent, id: 'next-event', title: '翌々日の予定', anchorDate: '2026-10-02',
+        temporalType: 'exact', startTime: '10:00', duration: { type: 'fixed', minutes: 30 },
+      },
+    ];
+
+    const result = createTwoDayStripViewModels({
+      range: { from: '2026-09-30', through: '2026-10-01' },
+      bufferDays: 1,
+      today: '2026-09-30',
+      events,
+      definitions: new Map(),
+      undeterminedFadeMinutes: 120,
+      holidayCoverage,
+    });
+
+    expect(result.map((day) => day.date)).toEqual([
+      '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02',
+    ]);
+    expect(result[0].timelineItems).toMatchObject([{ id: 'prev-event' }]);
+    expect(result[3].timelineItems).toMatchObject([{ id: 'next-event' }]);
   });
 });

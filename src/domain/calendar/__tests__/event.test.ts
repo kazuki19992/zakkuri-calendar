@@ -22,7 +22,6 @@ describe('parseEventDraft', () => {
   it.each([
     { ...validExact, startTime: null },
     { ...validExact, duration: null },
-    { ...validExact, duration: { type: 'fixed', minutes: 45 } },
     { ...validExact, duration: { type: 'fixed', minutes: '10' } },
     { ...validExact, startTime: '24:00' },
   ])('rejects invalid exact event data', (draft) => {
@@ -43,6 +42,12 @@ describe('parseEventDraft', () => {
 
   it('keeps wall-clock values and creation zone as metadata', () => {
     expect(parseEventDraft(validExact)).toEqual({ ok: true, value: validExact });
+  });
+
+  it('任意の固定分数を持つ正確な予定を受け付ける', () => {
+    const event = { ...validExact, duration: { type: 'fixed' as const, minutes: 135 } };
+
+    expect(parseEventDraft(event)).toEqual({ ok: true, value: event });
   });
 });
 

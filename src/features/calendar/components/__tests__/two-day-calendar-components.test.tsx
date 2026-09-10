@@ -3,6 +3,7 @@ import { Animated, PixelRatio, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/theme';
 import {
   HOUR_HEIGHT,
+  MIN_EVENT_HEIGHT,
   TIMELINE_HEIGHT,
   computeHourLineTop,
   computeTimelineScale,
@@ -206,6 +207,29 @@ describe('2日カレンダー表示コンポーネント', () => {
       .toMatchObject({ top: 406, height: 36 });
   });
 
+  it('日末の短い予定でも下端で切れないよう、最小表示高を保ったまま位置を内側へ寄せる', async () => {
+    // 23:59の瞬間予定。top(1343.06) + 最小表示高(36)が24時間分の高さ(1344)を超えるため、
+    // overflow: 'hidden'で下部が切れてしまう。
+    const lateItem = {
+      ...timelineItem,
+      id: 'late-event',
+      startMinute: 1439,
+      endMinute: 1439,
+      top: 1439 * (HOUR_HEIGHT / 60),
+      height: MIN_EVENT_HEIGHT,
+      isInstant: true,
+    };
+    const view = await renderTwoDayView({
+      strip: [prevBuffer, { ...day1, timelineItems: [lateItem] }, day2, nextBuffer],
+    });
+
+    const style = StyleSheet.flatten(view.getByTestId('timeline-event.late-event').props.style);
+    // 高さは最小表示高を保ち、視認・タップできる状態を維持する。
+    expect(style.height).toBe(MIN_EVENT_HEIGHT);
+    // 位置を上へ寄せて、ブロック全体が下端の内側へ収まるようにする。
+    expect(style.top + style.height).toBeLessThanOrEqual(TIMELINE_HEIGHT);
+  });
+
   it('24:00のラベルは軸の下端からはみ出さないよう、行の高さ分だけ上げて配置する', async () => {
     const view = await renderTwoDayView();
 
@@ -254,6 +278,13 @@ describe('2日カレンダー表示コンポーネント', () => {
     const nowLines = view.getAllByTestId('two-day-calendar.now-line');
     expect(nowLines).toHaveLength(1);
     expect(StyleSheet.flatten(nowLines[0].props.style)).toMatchObject({ top: 870 * (HOUR_HEIGHT / 60) });
+  });
+
+  it('23時台後半でも現在時刻線が下端で切れないよう、線の太さ分だけ内側へ収める', async () => {
+    const view = await renderTwoDayView({ now: () => new Date(2026, 8, 8, 23, 59) });
+
+    const style = StyleSheet.flatten(view.getAllByTestId('two-day-calendar.now-line')[0].props.style);
+    expect(style.top + style.height).toBeLessThanOrEqual(TIMELINE_HEIGHT);
   });
 
   it('表示中の2日がどちらも今日でなければ現在時刻を表示しない', async () => {

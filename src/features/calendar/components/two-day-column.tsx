@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
-import { TIMELINE_HEIGHT, computeHourLineTop } from '../timeline-layout';
+import { NOW_LINE_HEIGHT, TIMELINE_HEIGHT, computeHourLineTop } from '../timeline-layout';
 import type { TwoDayViewModel } from '../two-day-view-model';
 import { TimelineEventBlock } from './timeline-event-block';
 
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    height: 2,
+    height: NOW_LINE_HEIGHT,
     zIndex: 3,
   },
 });

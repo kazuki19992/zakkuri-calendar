@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import {
   MIN_EVENT_HEIGHT,
+  TIMELINE_HEIGHT,
   computePeakOpacityOffset,
   resolveTextAnchor,
   type TimelineItemViewModel,
@@ -23,8 +24,11 @@ export function TimelineEventBlock({ item, scale = 1 }: Readonly<{
   const width = `${100 / item.overlapCount}%` as const;
   const left = `${item.overlapIndex * (100 / item.overlapCount)}%` as const;
   // 縮小後も最小表示高(MIN_EVENT_HEIGHT)を下回らせず、極端な縮尺でも予定を視認・タップできるようにする。
-  const top = item.top * scale;
   const height = Math.max(item.height * scale, MIN_EVENT_HEIGHT);
+  // 23:59の瞬間予定のように、最小表示高を足すと下端(overflow: 'hidden')を
+  // 超える予定は、高さを削らず位置を内側へ寄せて全体を見せる。高さ側を
+  // 削ると残り高さが1pt未満になり、最小表示高を設けた意味がなくなる。
+  const top = Math.min(item.top * scale, Math.max(0, TIMELINE_HEIGHT * scale - height));
   const colors = item.opacityStops.map((stop) =>
     withOpacity(theme.calendarEvent, stop.opacity),
   ) as unknown as LinearGradientProps['colors'];

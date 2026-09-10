@@ -4,6 +4,7 @@ import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   HOUR_HEIGHT,
   MIN_EVENT_HEIGHT,
+  NOW_LINE_HEIGHT,
   TIMELINE_HEIGHT,
   computeHourLineTop,
   computeNowLineTop,
@@ -204,11 +205,23 @@ describe('タイムライン表示の縮尺計算', () => {
     expect(computeTimelineScale(-10)).toBe(1);
   });
 
-  it('24で割り切れない高さでも、1時間の高さを実機ピクセルへ丸めてから倍率を求める', () => {
-    const scale = computeTimelineScale(569);
+  it('24で割り切れない高さでも、1時間の高さを実機ピクセルへ揃える', () => {
+    const hourHeight = HOUR_HEIGHT * computeTimelineScale(569);
 
-    expect(HOUR_HEIGHT * scale).toBe(PixelRatio.roundToNearestPixel(569 / 24));
+    expect(PixelRatio.roundToNearestPixel(hourHeight)).toBe(hourHeight);
   });
+
+  // 切り上げると24時間分の全高が計測高を超え、overflow:hiddenで24:00付近が切れる。
+  it.each([516, 569, 620, 700, 812.4, 900])(
+    '計測高%pに対し、24時間分の全高が計測高を超えない',
+    (availableHeight) => {
+      const totalHeight = TIMELINE_HEIGHT * computeTimelineScale(availableHeight);
+
+      expect(totalHeight).toBeLessThanOrEqual(availableHeight);
+      // 切り捨てても1物理ピクセル分より多くは余らせない。
+      expect(availableHeight - totalHeight).toBeLessThan(24 / PixelRatio.get());
+    },
+  );
 });
 
 describe('罫線位置の物理ピクセルへの吸着', () => {
@@ -240,6 +253,11 @@ describe('罫線位置の物理ピクセルへの吸着', () => {
 });
 
 describe('現在時刻の位置計算', () => {
+  it('23:59でも線全体が下端の内側へ収まるよう、線の太さ分だけ位置を制限する', () => {
+    expect(computeNowLineTop(1439, 1)).toBe(TIMELINE_HEIGHT - NOW_LINE_HEIGHT);
+    expect(computeNowLineTop(1439, 0.5)).toBe(TIMELINE_HEIGHT * 0.5 - NOW_LINE_HEIGHT);
+  });
+
   it('0時からの分数と縮尺から現在時刻線のtop位置を求める', () => {
     expect(computeNowLineTop(0, 1)).toBe(0);
     expect(computeNowLineTop(90, 1)).toBe(84); // 1時間30分 * 56pt/時

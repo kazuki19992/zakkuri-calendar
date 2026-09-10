@@ -80,8 +80,28 @@ describe('予定編集の状態調整', () => {
     await act(async () => { result.current.setTitle('夜の歯医者'); await result.current.save(); });
     await act(async () => { await result.current.remove(); });
 
-    expect(repositories.events.update).toHaveBeenCalledWith(expect.objectContaining({ id: exactEvent.id, createdAt: exactEvent.createdAt, updatedAt: '2026-09-10T12:00:00.000Z' }));
+    expect(repositories.events.update).toHaveBeenCalledWith(expect.objectContaining({
+      id: exactEvent.id,
+      createdAt: exactEvent.createdAt,
+      createdTimeZoneId: exactEvent.createdTimeZoneId,
+      updatedAt: '2026-09-10T12:00:00.000Z',
+    }));
     expect(repositories.events.delete).toHaveBeenCalledWith(exactEvent.id);
+  });
+
+  it('別カレンダーの予定ではそのカレンダーの時間表現を読み込む', async () => {
+    const repositories = createRepositories();
+    const otherCalendarEvent = { ...exactEvent, calendarId: 'shared-calendar' };
+    repositories.events.getById.mockResolvedValue(otherCalendarEvent);
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      eventId: otherCalendarEvent.id,
+      initial: { date: '2026-09-01', startTime: '09:00', endTime: '10:00', temporalType: 'exact' },
+    }));
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(repositories.temporalDefinitions.listEnabled).toHaveBeenCalledWith('shared-calendar');
   });
 
   it('同じ開始終了時刻では保存せず入力を維持する', async () => {

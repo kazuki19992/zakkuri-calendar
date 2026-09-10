@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { NOW_LINE_HEIGHT, TIMELINE_HEIGHT, computeHourLineTop } from '../timeline-layout';
 import { resolveNearestTimelineHour } from '../timeline-tap-time';
@@ -83,11 +83,12 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
           : day.holidaySupport === 'unsupported' ? <Text style={[styles.support, { color: theme.textSecondary }]}>祝日情報未対応</Text> : null}
       </View>
       {day.allDayItems.map((item) => (
-        <View key={item.id} accessible accessibilityLabel={item.accessibilityLabel}
+        <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={item.accessibilityLabel}
+          onPress={() => onEditEvent?.(item.id)}
           style={[styles.item, { borderTopColor: theme.calendarBorder }] }>
           <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
           <Text style={[styles.itemTime, { color: theme.textSecondary }]}>{item.temporalLabel}</Text>
-        </View>
+        </Pressable>
       ))}
       {day.allDayItems.length === 0 && day.timelineItems.length === 0
         ? <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text>

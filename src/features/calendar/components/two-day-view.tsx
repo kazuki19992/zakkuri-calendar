@@ -59,7 +59,7 @@ export function TwoDayView({
         >
           <Animated.View testID="two-day-calendar.summary-strip"
             style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
-            {strip.map((day) => <TwoDayColumn key={day.date} day={day} />)}
+            {strip.map((day) => <TwoDayColumn key={day.date} day={day} onEditEvent={onEditEvent} />)}
           </Animated.View>
         </View>
       </View>

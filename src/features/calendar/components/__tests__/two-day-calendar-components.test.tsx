@@ -28,6 +28,13 @@ const timelineItem = {
   isInstant: false, continuesFromPreviousDay: false, continuesToNextDay: false,
 } as const;
 
+const allDayItem = {
+  id: 'all-day-event',
+  title: '休暇',
+  temporalLabel: '終日',
+  accessibilityLabel: '休暇、終日',
+} as const;
+
 function emptyDay(overrides: Partial<TwoDayViewModel> & Pick<TwoDayViewModel, 'date' | 'dateLabel' | 'weekdayLabel' | 'accessibilityLabel'>): TwoDayViewModel {
   return {
     isToday: false, holidayName: null, holidaySupport: 'available',
@@ -107,6 +114,18 @@ describe('2日カレンダー表示コンポーネント', () => {
     fireEvent.press(view.getByLabelText('歯医者、14:30・30分'));
 
     expect(onEditEvent).toHaveBeenCalledWith('event-1');
+  });
+
+  it('2日ビューの終日予定をタップすると編集対象のIDを渡す', async () => {
+    const onEditEvent = jest.fn();
+    const view = await renderTwoDayView({
+      onEditEvent,
+      strip: [prevBuffer, { ...day1, allDayItems: [allDayItem] }, day2, nextBuffer],
+    });
+
+    fireEvent.press(view.getByLabelText('休暇、終日'));
+
+    expect(onEditEvent).toHaveBeenCalledWith('all-day-event');
   });
 
   it('タイムラインの空き領域をダブルタップすると最も近い正時で予定を作成する', async () => {

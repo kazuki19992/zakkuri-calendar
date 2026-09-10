@@ -99,17 +99,19 @@ export function useEventEditor({
     let active = true;
     const load = async (): Promise<void> => {
       try {
-        const calendar = await calendars.getDefault();
-        const [loadedDefinitions, loadedEvent] = await Promise.all([
-          temporalDefinitions.listEnabled(calendar.id),
+        const [calendar, loadedEvent] = await Promise.all([
+          calendars.getDefault(),
           eventId === undefined ? Promise.resolve(null) : events.getById(eventId),
         ]);
         if (!active) return;
+        if (eventId !== undefined && loadedEvent === null) throw new Error('event not found');
+        const targetCalendarId = loadedEvent?.calendarId ?? calendar.id;
+        const loadedDefinitions = await temporalDefinitions.listEnabled(targetCalendarId);
+        if (!active) return;
         const dayDefinitions = loadedDefinitions.filter((definition) => definition.granularity === 'day');
-        setCalendarId(calendar.id);
+        setCalendarId(targetCalendarId);
         setDefinitions(dayDefinitions);
         setSelectedDefinitionId(dayDefinitions[0]?.id ?? null);
-        if (eventId !== undefined && loadedEvent === null) throw new Error('event not found');
         if (loadedEvent !== null) {
           setExistingEvent(loadedEvent);
           setTitleValue(loadedEvent.title);
@@ -145,7 +147,12 @@ export function useEventEditor({
   const save = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || status !== 'ready') return false;
     clearErrors();
-    const base = { calendarId: existingEvent?.calendarId, title: title.trim(), anchorDate, createdTimeZoneId: getTimeZoneId() };
+    const base = {
+      calendarId: existingEvent?.calendarId,
+      title: title.trim(),
+      anchorDate,
+      createdTimeZoneId: existingEvent?.createdTimeZoneId ?? getTimeZoneId(),
+    };
     let draft: EventDraft | null = null;
     if (temporalType === 'exact') {
       const duration = createFixedDurationFromTimes(startTime, endTime);

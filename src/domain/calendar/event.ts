@@ -2,7 +2,7 @@ import type { Result } from '@/domain/shared/result';
 
 export type ExactDuration =
   | Readonly<{ type: 'instant' }>
-  | Readonly<{ type: 'fixed'; minutes: 10 | 15 | 30 | 60 }>
+  | Readonly<{ type: 'fixed'; minutes: number }>
   | Readonly<{ type: 'undetermined' }>;
 
 type EventDraftBase = Readonly<{
@@ -51,9 +51,9 @@ export function parseExactDuration(value: unknown): Result<ExactDuration, EventV
   if (
     value.type === 'fixed' &&
     typeof value.minutes === 'number' &&
-    [10, 15, 30, 60].includes(value.minutes)
+    Number.isInteger(value.minutes) && value.minutes >= 1 && value.minutes < 24 * 60
   ) {
-    return { ok: true, value: { type: 'fixed', minutes: value.minutes as 10 | 15 | 30 | 60 } };
+    return { ok: true, value: { type: 'fixed', minutes: value.minutes } };
   }
   return fail('duration', 'invalid exact duration');
 }

@@ -28,6 +28,13 @@ const timelineItem = {
   isInstant: false, continuesFromPreviousDay: false, continuesToNextDay: false,
 } as const;
 
+const allDayItem = {
+  id: 'all-day-event',
+  title: '休暇',
+  temporalLabel: '終日',
+  accessibilityLabel: '休暇、終日',
+} as const;
+
 function emptyDay(overrides: Partial<TwoDayViewModel> & Pick<TwoDayViewModel, 'date' | 'dateLabel' | 'weekdayLabel' | 'accessibilityLabel'>): TwoDayViewModel {
   return {
     isToday: false, holidayName: null, holidaySupport: 'available',
@@ -65,7 +72,8 @@ function renderTwoDayView(overrides: Partial<{
   bufferDays: number;
   columnWidth: number;
   now: () => Date;
-  onAddEvent(date: string): void;
+  onEditEvent(id: string): void;
+  onCreateExactAt(date: string, startTime: string): void;
 }> = {}) {
   return render(
     <TwoDayView
@@ -75,7 +83,8 @@ function renderTwoDayView(overrides: Partial<{
       translateX={new Animated.Value(-(overrides.bufferDays ?? BUFFER_DAYS) * (overrides.columnWidth ?? COLUMN_WIDTH))}
       panHandlers={{}}
       onCarouselLayout={jest.fn()}
-      onAddEvent={overrides.onAddEvent ?? jest.fn()}
+      onEditEvent={overrides.onEditEvent}
+      onCreateExactAt={overrides.onCreateExactAt}
       now={overrides.now}
     />,
   );
@@ -98,11 +107,45 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getByText('祝日情報未対応')).toBeOnTheScreen();
   });
 
+  it('タイムライン上の予定をタップすると編集対象のIDを渡す', async () => {
+    const onEditEvent = jest.fn();
+    const view = await renderTwoDayView({ onEditEvent });
+
+    fireEvent.press(view.getByLabelText('歯医者、14:30・30分'));
+
+    expect(onEditEvent).toHaveBeenCalledWith('event-1');
+  });
+
+  it('2日ビューの終日予定をタップすると編集対象のIDを渡す', async () => {
+    const onEditEvent = jest.fn();
+    const view = await renderTwoDayView({
+      onEditEvent,
+      strip: [prevBuffer, { ...day1, allDayItems: [allDayItem] }, day2, nextBuffer],
+    });
+
+    fireEvent.press(view.getByLabelText('休暇、終日'));
+
+    expect(onEditEvent).toHaveBeenCalledWith('all-day-event');
+  });
+
+  it('タイムラインの空き領域をダブルタップすると最も近い正時で予定を作成する', async () => {
+    const onCreateExactAt = jest.fn();
+    const view = await renderTwoDayView({ onCreateExactAt });
+    const now = jest.spyOn(Date, 'now').mockReturnValueOnce(1_000).mockReturnValue(1_200);
+    const column = view.getAllByTestId('two-day-calendar.timeline-column')[1];
+
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: HOUR_HEIGHT * 10 } });
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: HOUR_HEIGHT * 10 } });
+
+    expect(onCreateExactAt).toHaveBeenCalledWith('2026-09-08', '10:00');
+    now.mockRestore();
+  });
+
   it('予備列も含めた幅でストリップを配置し、渡されたtranslateXで横方向へ動かす', async () => {
     const translateX = new Animated.Value(-195);
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH} translateX={translateX}
-        panHandlers={{}} onCarouselLayout={jest.fn()} onAddEvent={jest.fn()} />,
+        panHandlers={{}} onCarouselLayout={jest.fn()} />,
     );
 
     const stripStyle = StyleSheet.flatten(view.getByTestId('two-day-calendar.summary-strip').props.style);
@@ -115,7 +158,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH}
         translateX={new Animated.Value(-195)} panHandlers={{}} onCarouselLayout={onCarouselLayout}
-        onAddEvent={jest.fn()} />,
+        />,
     );
 
     // ルート(two-day-calendar)全体の幅ではなく、時間軸の48pt分の余白を
@@ -133,7 +176,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH}
         translateX={new Animated.Value(-195)} panHandlers={panHandlers} onCarouselLayout={jest.fn()}
-        onAddEvent={jest.fn()} />,
+        />,
     );
 
     expect(view.getByTestId('two-day-calendar').props.onStartShouldSetResponder).toBeDefined();
@@ -334,12 +377,9 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
   });
 
-  it('選んだ日付を予定追加へ渡す', async () => {
-    const onAddEvent = jest.fn();
-    const user = userEvent.setup();
-    const view = await renderTwoDayView({ onAddEvent });
-    await user.press(view.getByRole('button', { name: '9月9日に予定を追加' }));
-    expect(onAddEvent).toHaveBeenCalledWith('2026-09-09');
+  it('2日ビュー上部には予定追加ボタンを表示しない', async () => {
+    const view = await renderTwoDayView();
+    expect(view.queryByText('＋ 予定')).toBeNull();
   });
 
   it('2日と月の選択状態を切り替えられる', async () => {

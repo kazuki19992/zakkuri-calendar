@@ -17,6 +17,7 @@ export default function RootLayout() {
         <CalendarRefreshProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="events/new" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="events/[id]" options={{ presentation: 'modal' }} />
           </Stack>
         </CalendarRefreshProvider>
       </AppDatabaseProvider>

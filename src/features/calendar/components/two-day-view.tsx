@@ -13,7 +13,7 @@ import { TimelineAxis } from './timeline-axis';
 import { TwoDayColumn } from './two-day-column';
 
 export function TwoDayView({
-  strip, bufferDays, columnWidth, translateX, panHandlers, onCarouselLayout, onAddEvent, now,
+  strip, bufferDays, columnWidth, translateX, panHandlers, onCarouselLayout, now, onEditEvent, onCreateExactAt,
 }: Readonly<{
   /** 予備列→表示2日→予備列の順に並んだ日付の並び。 */
   strip: readonly TwoDayViewModel[];
@@ -24,7 +24,8 @@ export function TwoDayView({
   panHandlers: PanResponderInstance['panHandlers'];
   /** カルーセルが基準位置・スライド距離を計算するための画面幅の計測結果を通知する。 */
   onCarouselLayout(width: number): void;
-  onAddEvent(date: string): void;
+  onEditEvent?(id: string): void;
+  onCreateExactAt?(date: string, startTime: string): void;
   now?: () => Date;
 }>) {
   // timelineRowの実測高さ(親から配分された画面の残り高さ)に24時間軸を合わせ、
@@ -58,7 +59,7 @@ export function TwoDayView({
         >
           <Animated.View testID="two-day-calendar.summary-strip"
             style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
-            {strip.map((day) => <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} />)}
+            {strip.map((day) => <TwoDayColumn key={day.date} day={day} onEditEvent={onEditEvent} />)}
           </Animated.View>
         </View>
       </View>
@@ -68,7 +69,7 @@ export function TwoDayView({
           <Animated.View testID="two-day-calendar.timeline-strip"
             style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
             {strip.map((day) => (
-              <TwoDayColumn key={day.date} day={day} onAddEvent={onAddEvent} variant="timeline" scale={scale}
+              <TwoDayColumn key={day.date} day={day} variant="timeline" scale={scale} onEditEvent={onEditEvent} onCreateExactAt={onCreateExactAt}
                 nowTop={day.isToday ? nowTop : null} />
             ))}
           </Animated.View>

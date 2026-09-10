@@ -5,9 +5,9 @@ import NewEventRoute from '../new';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
 import {
-  useQuickCreateEvent,
-  type QuickCreateEventState,
-} from '@/features/events/hooks/use-quick-create-event';
+  useEventEditor,
+  type EventEditorState,
+} from '@/features/events/hooks/use-event-editor';
 
 jest.mock('@/global.css', () => ({}));
 jest.mock('expo-router', () => ({
@@ -17,12 +17,12 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('@/data/sqlite/app-database-provider', () => ({ useRepositories: jest.fn() }));
 jest.mock('@/features/calendar/calendar-refresh-context', () => ({ useCalendarRefresh: jest.fn() }));
-jest.mock('@/features/events/hooks/use-quick-create-event', () => ({ useQuickCreateEvent: jest.fn() }));
-jest.mock('@/features/events/screens/quick-create-event-screen', () => {
+jest.mock('@/features/events/hooks/use-event-editor', () => ({ useEventEditor: jest.fn() }));
+jest.mock('@/features/events/screens/event-editor-screen', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   const { Pressable, Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    QuickCreateEventScreen: ({ onSave, onCancel }: { onSave(): void; onCancel(): void }) =>
+    EventEditorScreen: ({ onSave, onCancel }: { onSave(): void; onCancel(): void }) =>
       React.createElement(
         View,
         null,
@@ -62,15 +62,18 @@ describe('予定作成ルート', () => {
       .mocked(useRepositories)
       .mockReturnValue(repositories as unknown as ReturnType<typeof useRepositories>);
     jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged });
-    jest.mocked(useQuickCreateEvent).mockReturnValue({ save } as unknown as QuickCreateEventState);
+    jest.mocked(useEventEditor).mockReturnValue({ save } as unknown as EventEditorState);
 
     await render(<NewEventRoute />);
 
-    expect(useQuickCreateEvent).toHaveBeenCalledWith({
+    expect(useEventEditor).toHaveBeenCalledWith({
       calendars: repositories.calendars,
       events: repositories.events,
       temporalDefinitions: repositories.temporalDefinitions,
-      initialDate: '2026-09-21',
+      initial: expect.objectContaining({
+        date: '2026-09-21',
+        temporalType: 'exact',
+      }),
     });
     await user.press(screen.getByRole('button', { name: '保存' }));
     expect(notifyChanged).toHaveBeenCalledTimes(1);
@@ -89,9 +92,9 @@ describe('予定作成ルート', () => {
       temporalDefinitions: {},
     } as ReturnType<typeof useRepositories>);
     jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged });
-    jest.mocked(useQuickCreateEvent).mockReturnValue({
+    jest.mocked(useEventEditor).mockReturnValue({
       save: jest.fn().mockResolvedValue(false),
-    } as unknown as QuickCreateEventState);
+    } as unknown as EventEditorState);
 
     await render(<NewEventRoute />);
     await user.press(screen.getByRole('button', { name: '保存' }));
@@ -113,15 +116,16 @@ describe('予定作成ルート', () => {
       temporalDefinitions: {},
     } as ReturnType<typeof useRepositories>);
     jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged: jest.fn() });
-    jest.mocked(useQuickCreateEvent).mockReturnValue({
+    jest.mocked(useEventEditor).mockReturnValue({
       isSaving: false,
+      isDeleting: false,
       save: jest.fn(),
-    } as unknown as QuickCreateEventState);
+    } as unknown as EventEditorState);
 
     await render(<NewEventRoute />);
 
-    expect(useQuickCreateEvent).toHaveBeenCalledWith(expect.objectContaining({
-      initialDate: '0999-09-09',
+    expect(useEventEditor).toHaveBeenCalledWith(expect.objectContaining({
+      initial: expect.objectContaining({ date: '0999-09-09' }),
     }));
   });
 
@@ -140,10 +144,11 @@ describe('予定作成ルート', () => {
       temporalDefinitions: {},
     } as ReturnType<typeof useRepositories>);
     jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged: jest.fn() });
-    jest.mocked(useQuickCreateEvent).mockReturnValue({
+    jest.mocked(useEventEditor).mockReturnValue({
       isSaving: true,
+      isDeleting: false,
       save: jest.fn(),
-    } as unknown as QuickCreateEventState);
+    } as unknown as EventEditorState);
 
     const view = await render(<NewEventRoute />);
 

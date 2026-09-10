@@ -26,6 +26,8 @@ export default function IndexRoute() {
     <CalendarScreen
       state={state}
       onAddEvent={(date) => router.push({ pathname: '/events/new', params: { date } })}
+      onEditEvent={(id) => router.push({ pathname: '/events/[id]', params: { id } })}
+      onCreateExactAt={(date, startTime) => router.push({ pathname: '/events/new', params: { date, startTime, temporalType: 'exact' } })}
     />
   );
 }

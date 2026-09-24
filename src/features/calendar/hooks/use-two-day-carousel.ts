@@ -32,6 +32,16 @@ export type TwoDayCarousel = Readonly<{
   onLayout(width: number): void;
 }>;
 
+export function shouldCaptureTwoDaySwipe(
+  gesture: Readonly<{ dx: number; dy: number; numberActiveTouches: number }>,
+  isAnimating: boolean,
+): boolean {
+  return gesture.numberActiveTouches === 1 &&
+    !isAnimating &&
+    Math.abs(gesture.dx) > 8 &&
+    Math.abs(gesture.dx) > Math.abs(gesture.dy) * horizontalDominance;
+}
+
 /**
  * 表示2日の前後に予備列を持つストリップを、ジャンプなく連続スライドさせる。
  * 予備列はすでに取得・描画済みのため、移動確定時は基準位置から1列分だけ
@@ -95,10 +105,7 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_, gesture) =>
-          !isAnimating &&
-          Math.abs(gesture.dx) > 8 &&
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) * horizontalDominance,
+        onMoveShouldSetPanResponderCapture: (_, gesture) => shouldCaptureTwoDaySwipe(gesture, isAnimating),
         onPanResponderMove: (_, gesture) => {
           if (!isAnimating) translateX.setValue(baseOffset + gesture.dx);
         },

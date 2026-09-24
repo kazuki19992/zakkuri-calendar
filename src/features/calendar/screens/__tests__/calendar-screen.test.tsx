@@ -4,7 +4,6 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import type { CalendarViewState } from '../../hooks/use-calendar-view';
-import { useHorizontalSwipeTransition } from '../../hooks/use-horizontal-swipe-transition';
 import { useTwoDayCarousel } from '../../hooks/use-two-day-carousel';
 import { CalendarScreen } from '../calendar-screen';
 
@@ -61,6 +60,8 @@ const callbacks = {
   showPreviousPeriod: jest.fn().mockResolvedValue(true),
   showNextPeriod: jest.fn().mockResolvedValue(true),
   showToday: jest.fn().mockResolvedValue(true),
+  showDate: jest.fn().mockResolvedValue(true),
+  loadDatePickerMonth: jest.fn().mockResolvedValue(true),
   selectDate: jest.fn().mockResolvedValue(true),
   retry: jest.fn().mockResolvedValue(true),
 };
@@ -88,8 +89,10 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
     status: 'ready', mode: 'twoDay', today: '2026-09-08', anchorDate: '2026-09-08',
     visibleMonth: '2026-09-01', selectedDate: '2026-09-08',
     twoDayDays, twoDayStrip,
-    monthDays: [], selectedAgendaItems: [], selectedHolidayName: null,
+    monthDays: [], datePickerMonth: '2026-09-01', datePickerDays: [],
+    selectedAgendaItems: [], selectedHolidayName: null,
     holidaySupport: 'available', isPeriodLoading: false, periodError: null,
+    isDatePickerLoading: false, datePickerError: null,
     ...callbacks, ...overrides,
   };
 }
@@ -97,14 +100,15 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
 describe('カレンダー画面', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('初期2日表示を共通のスワイプ領域へ表示し、常設ボタンから選択日の予定を追加する', async () => {
+  it('初期2日表示へトップバーと常設追加ボタンを表示する', async () => {
     const onAddEvent = jest.fn();
     const user = userEvent.setup();
     const state = createState();
     await renderWithSafeArea(<CalendarScreen state={state} onAddEvent={onAddEvent} />);
 
-    expect(screen.getByRole('tab', { name: '2日表示' }).props.accessibilityState).toEqual({ selected: true });
-    expect(screen.getByText('2026年9月8日〜9日')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: '表示メニューを開く' })).toBeOnTheScreen();
+    expect(screen.getByText('9月')).toBeOnTheScreen();
+    expect(screen.queryByText('2026年9月8日〜9日')).toBeNull();
     expect(screen.getByTestId('two-day-calendar').props.onStartShouldSetResponder).toBeDefined();
     expect(useTwoDayCarousel).toHaveBeenCalledWith({
       onPrevious: state.showPreviousPeriod,
@@ -117,38 +121,60 @@ describe('カレンダー画面', () => {
     expect(onAddEvent).toHaveBeenCalledWith('2026-09-08');
   });
 
-  it('2日表示の前後・今日ボタンは予備列付きカルーセルの移動関数を呼ぶ', async () => {
+  it('今日ボタンは現在日への移動を呼ぶ', async () => {
     const user = userEvent.setup();
     await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
 
-    await user.press(screen.getByRole('button', { name: '前の1日へ' }));
-    await user.press(screen.getByRole('button', { name: '今日' }));
-    await user.press(screen.getByRole('button', { name: '次の1日へ' }));
-
-    const carousel = jest.mocked(useTwoDayCarousel).mock.results[0]?.value;
-    expect(carousel.movePrevious).toHaveBeenCalledTimes(1);
+    await user.press(screen.getByRole('button', { name: '今日へ移動' }));
     expect(callbacks.showToday).toHaveBeenCalledTimes(1);
-    expect(carousel.moveNext).toHaveBeenCalledTimes(1);
   });
 
-  it('月表示の前後ボタンはuseHorizontalSwipeTransitionの移動関数を呼ぶ', async () => {
-    const user = userEvent.setup();
-    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
-
-    await user.press(screen.getByRole('button', { name: '前月へ' }));
-    await user.press(screen.getByRole('button', { name: '次月へ' }));
-
-    const transition = jest.mocked(useHorizontalSwipeTransition).mock.results[0]?.value;
-    expect(transition.movePrevious).toHaveBeenCalledTimes(1);
-    expect(transition.moveNext).toHaveBeenCalledTimes(1);
-  });
-
-  it('表示切替を状態へ渡す', async () => {
+  it('表示メニューから月表示へ切り替える', async () => {
     const user = userEvent.setup();
     await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
 
-    await user.press(screen.getByRole('tab', { name: '月表示' }));
+    await user.press(screen.getByRole('button', { name: '表示メニューを開く' }));
+    await user.press(screen.getByRole('menuitem', { name: '月表示' }));
     expect(callbacks.selectMode).toHaveBeenCalledWith('month');
+  });
+
+  it('月名から日付ピッカーを開いて任意日へ移動する', async () => {
+    const user = userEvent.setup();
+    const pickerDays = Array.from({ length: 42 }, (_, index) => ({
+      date: `2026-09-${String(index + 1).padStart(2, '0')}`, dayNumber: index + 1,
+      weekday: index % 7, isCurrentMonth: true, isToday: index === 7, isSelected: false,
+      hasEvents: false, holidaySupport: 'available' as const, holidayName: null,
+      accessibilityLabel: `ピッカー日付${index + 1}`,
+    }));
+    await renderWithSafeArea(<CalendarScreen state={createState({ datePickerDays: pickerDays })} onAddEvent={jest.fn()} />);
+
+    await user.press(screen.getByRole('button', { name: '2026年9月、日付を選択' }));
+    expect(callbacks.loadDatePickerMonth).toHaveBeenCalledWith('2026-09-01');
+    await user.press(screen.getByLabelText('ピッカー日付24'));
+    expect(callbacks.showDate).toHaveBeenCalledWith('2026-09-24');
+  });
+
+  it('月名をもう一度押すと日付ピッカーを閉じ、再読込しない', async () => {
+    const user = userEvent.setup();
+    await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
+
+    const monthButton = screen.getByRole('button', { name: '2026年9月、日付を選択' });
+    await user.press(monthButton);
+    expect(screen.getByTestId('calendar-date-picker.panel')).toBeOnTheScreen();
+    expect(callbacks.loadDatePickerMonth).toHaveBeenCalledTimes(1);
+
+    await user.press(monthButton);
+    expect(screen.queryByTestId('calendar-date-picker.panel')).toBeNull();
+    expect(callbacks.loadDatePickerMonth).toHaveBeenCalledTimes(1);
+  });
+
+  it('日付ピッカーはトップバーと同じ安全領域の下から表示する', async () => {
+    const user = userEvent.setup();
+    await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
+
+    await user.press(screen.getByRole('button', { name: '2026年9月、日付を選択' }));
+    expect(StyleSheet.flatten(screen.getByTestId('calendar-date-picker.backdrop').props.style))
+      .toMatchObject({ paddingTop: safeAreaMetrics.insets.top + 52 });
   });
 
   it('2日表示で画面全体にセーフエリア分の余白を確保する', async () => {
@@ -218,14 +244,19 @@ describe('カレンダー画面', () => {
     await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month', selectedDate: '2026-09-21', monthDays,
       selectedHolidayName: '敬老の日' })} onAddEvent={onAddEvent} />);
 
-    expect(screen.getByText('2026年9月')).toBeOnTheScreen();
+    expect(screen.getByText('9月')).toBeOnTheScreen();
     expect(screen.getAllByTestId('month-calendar.week')).toHaveLength(6);
     await user.press(screen.getByRole('button', { name: '予定を追加' }));
     expect(onAddEvent).toHaveBeenCalledWith('2026-09-21');
   });
 
-  it('Notion風のlightとdarkの具体色を提供する', () => {
-    expect(Colors.light).toMatchObject({ text: '#37352F', background: '#FFFFFF', calendarAccent: '#8B6F5A' });
-    expect(Colors.dark).toMatchObject({ text: '#EDECE9', background: '#191919', calendarAccent: '#C6A58A' });
+  it('カレンダー用lightとdarkのsemantic colorを提供する', () => {
+    expect(Colors.light).toMatchObject({
+      text: '#202124', background: '#FFFFFF', textSecondary: '#5F6368',
+      calendarAccent: '#1A73E8', calendarBorder: '#DADCE0', calendarEventText: '#174EA6',
+    });
+    expect(Colors.dark).toMatchObject({
+      text: '#E8EAED', background: '#202124', calendarEventText: '#D2E3FC',
+    });
   });
 });

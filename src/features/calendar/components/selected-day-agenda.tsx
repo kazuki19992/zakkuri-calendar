@@ -49,12 +49,12 @@ export function SelectedDayAgenda({
 }
 
 const styles = StyleSheet.create({
-  container: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingVertical: 12 },
-  title: { fontSize: 17, fontWeight: '700' },
-  holiday: { fontSize: 14, fontWeight: '600', marginTop: 4 },
-  support: { fontSize: 14, marginTop: 4 },
-  empty: { fontSize: 15, marginTop: 12 },
-  item: { minHeight: 44, flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
-  itemTitle: { flex: 1, fontSize: 16, fontWeight: '600' },
-  itemMeta: { fontSize: 14 },
+  container: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 8 },
+  title: { fontSize: 15, fontWeight: '600' },
+  holiday: { fontSize: 12, fontWeight: '500', marginTop: 2 },
+  support: { fontSize: 12, marginTop: 2 },
+  empty: { fontSize: 13, marginTop: 8 },
+  item: { minHeight: 44, flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  itemTitle: { flex: 1, fontSize: 14, fontWeight: '500' },
+  itemMeta: { fontSize: 12 },
 });

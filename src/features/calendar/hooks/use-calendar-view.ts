@@ -63,15 +63,21 @@ export type CalendarViewState = Readonly<{
    */
   twoDayStrip: readonly TwoDayViewModel[];
   monthDays: readonly MonthDayViewModel[];
+  datePickerMonth: string;
+  datePickerDays: readonly MonthDayViewModel[];
   selectedAgendaItems: readonly AgendaItemViewModel[];
   selectedHolidayName: string | null;
   holidaySupport: HolidaySupport;
   isPeriodLoading: boolean;
   periodError: string | null;
+  isDatePickerLoading: boolean;
+  datePickerError: string | null;
   selectMode(mode: CalendarViewMode): Promise<boolean>;
   showPreviousPeriod(): Promise<boolean>;
   showNextPeriod(): Promise<boolean>;
   showToday(): Promise<boolean>;
+  showDate(date: string): Promise<boolean>;
+  loadDatePickerMonth(month: string): Promise<boolean>;
   selectDate(date: string): Promise<boolean>;
   retry(): Promise<boolean>;
 }>;
@@ -98,6 +104,13 @@ type InternalState = ViewTarget &
     isPeriodLoading: boolean;
     periodError: string | null;
   }>;
+
+type DatePickerState = Readonly<{
+  month: string;
+  snapshot: CalendarSnapshot;
+  isLoading: boolean;
+  error: string | null;
+}>;
 
 const emptySnapshot: CalendarSnapshot = {
   events: [],
@@ -186,7 +199,14 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   });
   const stateRef = useRef(state);
   const requestIdRef = useRef(0);
+  const datePickerRequestIdRef = useRef(0);
   const mountedRef = useRef(true);
+  const [datePickerState, setDatePickerState] = useState<DatePickerState>({
+    month: state.visibleMonth,
+    snapshot: emptySnapshot,
+    isLoading: false,
+    error: null,
+  });
 
   useEffect(() => {
     inputRef.current = input;
@@ -201,6 +221,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     return () => {
       mountedRef.current = false;
       requestIdRef.current += 1;
+      datePickerRequestIdRef.current += 1;
     };
   }, []);
 
@@ -324,6 +345,42 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       selectedDate: today,
     });
   }, [transitionTo]);
+  const showDate = useCallback(
+    (date: string): Promise<boolean> => {
+      const current = stateRef.current;
+      return transitionTo({
+        ...current,
+        anchorDate: date,
+        visibleMonth: getMonthStart(date),
+        selectedDate: date,
+      });
+    },
+    [transitionTo],
+  );
+  const loadDatePickerMonth = useCallback(async (month: string): Promise<boolean> => {
+    const requestId = ++datePickerRequestIdRef.current;
+    setDatePickerState((current) => ({ ...current, isLoading: true, error: null }));
+    const current = stateRef.current;
+    const target: ViewTarget = {
+      ...current,
+      mode: 'month',
+      visibleMonth: month,
+    };
+    try {
+      const snapshot = await loadSnapshot(inputRef.current, target);
+      if (!mountedRef.current || requestId !== datePickerRequestIdRef.current) return false;
+      setDatePickerState({ month, snapshot, isLoading: false, error: null });
+      return true;
+    } catch {
+      if (!mountedRef.current || requestId !== datePickerRequestIdRef.current) return false;
+      setDatePickerState((value) => ({
+        ...value,
+        isLoading: false,
+        error: '月の予定を読み込めませんでした',
+      }));
+      return false;
+    }
+  }, []);
   const selectDate = useCallback(
     async (date: string): Promise<boolean> => {
       const current = stateRef.current;
@@ -377,6 +434,17 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       }),
     [input.weekStartsOn, state.selectedDate, state.snapshot, state.today, state.visibleMonth],
   );
+  const datePickerDays = useMemo(
+    () =>
+      createMonthDayViewModels({
+        grid: getMonthGrid(datePickerState.month, input.weekStartsOn),
+        selectedDate: state.selectedDate,
+        today: state.today,
+        events: datePickerState.snapshot.events,
+        holidayCoverage: datePickerState.snapshot.holidayCoverage,
+      }),
+    [datePickerState.month, datePickerState.snapshot, input.weekStartsOn, state.selectedDate, state.today],
+  );
   const selectedAgendaItems = useMemo(
     () =>
       createAgendaItems(
@@ -403,15 +471,21 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     twoDayDays,
     twoDayStrip,
     monthDays,
+    datePickerMonth: datePickerState.month,
+    datePickerDays,
     selectedAgendaItems,
     selectedHolidayName: selectedDay?.holidayName ?? null,
     holidaySupport: selectedDay?.holidaySupport ?? 'unsupported',
     isPeriodLoading: state.isPeriodLoading,
     periodError: state.periodError,
+    isDatePickerLoading: datePickerState.isLoading,
+    datePickerError: datePickerState.error,
     selectMode,
     showPreviousPeriod,
     showNextPeriod,
     showToday,
+    showDate,
+    loadDatePickerMonth,
     selectDate,
     retry,
   };

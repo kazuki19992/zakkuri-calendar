@@ -60,13 +60,17 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
           />
         ))}
         {nowTop !== null ? (
-          <View
-            testID="two-day-calendar.now-line"
-            accessible
-            accessibilityLabel="現在時刻"
-            pointerEvents="none"
-            style={[styles.nowLine, { top: nowTop, backgroundColor: theme.calendarNowIndicator }]}
-          />
+          <>
+            <View
+              testID="two-day-calendar.now-line"
+              accessible
+              accessibilityLabel="現在時刻"
+              pointerEvents="none"
+              style={[styles.nowLine, { top: nowTop, backgroundColor: theme.calendarNowIndicator }]}
+            />
+            <View testID="two-day-calendar.now-dot" pointerEvents="none"
+              style={[styles.nowDot, { top: nowTop - 3, backgroundColor: theme.calendarNowIndicator }]} />
+          </>
         ) : null}
       </View>
     );
@@ -74,10 +78,12 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
   return (
     <View testID="two-day-calendar.column" style={[styles.column, { borderColor: theme.calendarBorder }] }>
       <View accessible accessibilityLabel={day.accessibilityLabel} style={[styles.header, { borderBottomColor: theme.calendarBorder }] }>
-        <View style={styles.dateLine}>
-          <Text style={[styles.date, { color: theme.text }]}>{day.dateLabel}</Text>
-          <Text style={[styles.weekday, { color: theme.textSecondary }]}>（{day.weekdayLabel}）</Text>
-          {day.isToday ? <Text style={[styles.today, { color: theme.calendarAccent }]}>今日</Text> : null}
+        <Text style={[styles.weekday, { color: theme.textSecondary }]}>{day.weekdayLabel}</Text>
+        <View testID={day.isToday ? 'two-day-calendar.today-circle' : undefined}
+          style={[styles.dateCircle, day.isToday && { backgroundColor: theme.calendarAccent }] }>
+          <Text style={[styles.date, { color: day.isToday ? theme.background : theme.text }] }>
+            {Number(day.date.slice(8, 10))}
+          </Text>
         </View>
         {day.holidayName !== null ? <Text style={[styles.holiday, { color: theme.calendarHoliday }]}>{day.holidayName}</Text>
           : day.holidaySupport === 'unsupported' ? <Text style={[styles.support, { color: theme.textSecondary }]}>祝日情報未対応</Text> : null}
@@ -99,17 +105,16 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
 
 const styles = StyleSheet.create({
   column: { flex: 1, minWidth: 0, borderLeftWidth: StyleSheet.hairlineWidth },
-  header: { minHeight: 72, padding: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  dateLine: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' },
-  date: { fontSize: 17, fontWeight: '700' },
-  weekday: { fontSize: 13 },
-  today: { fontSize: 12, fontWeight: '700', marginLeft: 6 },
-  holiday: { fontSize: 12, fontWeight: '600', marginTop: 4 },
-  support: { fontSize: 12, marginTop: 4 },
-  empty: { fontSize: 13, padding: 10 },
-  item: { minHeight: 52, padding: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  itemTitle: { fontSize: 15, fontWeight: '600' },
-  itemTime: { fontSize: 13, marginTop: 3 },
+  header: { minHeight: 58, paddingHorizontal: 4, paddingVertical: 3, alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
+  weekday: { fontSize: 11, lineHeight: 14 },
+  dateCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  date: { fontSize: 22, fontWeight: '500', lineHeight: 26 },
+  holiday: { fontSize: 10, lineHeight: 12 },
+  support: { fontSize: 10, lineHeight: 12 },
+  empty: { fontSize: 11, paddingHorizontal: 6, paddingVertical: 4 },
+  item: { minHeight: 44, paddingHorizontal: 6, paddingVertical: 4, borderTopWidth: StyleSheet.hairlineWidth },
+  itemTitle: { fontSize: 12, fontWeight: '500' },
+  itemTime: { fontSize: 10, marginTop: 1 },
   timelineColumn: {
     flex: 1,
     minWidth: 0,
@@ -132,5 +137,13 @@ const styles = StyleSheet.create({
     right: 0,
     height: NOW_LINE_HEIGHT,
     zIndex: 3,
+  },
+  nowDot: {
+    position: 'absolute',
+    left: 0,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    zIndex: 4,
   },
 });

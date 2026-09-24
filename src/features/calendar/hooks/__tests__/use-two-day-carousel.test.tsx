@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react-native';
 import { Animated } from 'react-native';
-import { useTwoDayCarousel } from '../use-two-day-carousel';
+import { shouldCaptureTwoDaySwipe, useTwoDayCarousel } from '../use-two-day-carousel';
 
 function collectValues(value: Animated.Value): number[] {
   const values: number[] = [];
@@ -187,5 +187,21 @@ describe('2日ビューの予備列付きスワイプカルーセル', () => {
     await expect(secondMove).resolves.toBe(false);
     await act(async () => resolveNext(true));
     await expect(firstMove).resolves.toBe(true);
+  });
+
+  it('横スワイプは1本指だけを捕捉し、2本指のpinchへ干渉しない', async () => {
+    const { result } = await renderHook(() =>
+      useTwoDayCarousel({
+        onPrevious: jest.fn().mockResolvedValue(true),
+        onNext: jest.fn().mockResolvedValue(true),
+        reduceMotion: false,
+        bufferDays: 1,
+        leadingDate: '2026-09-07',
+      }),
+    );
+    expect(result.current.panHandlers.onMoveShouldSetResponderCapture).toBeDefined();
+    const gesture = { dx: 60, dy: 0, numberActiveTouches: 2 };
+    expect(shouldCaptureTwoDaySwipe(gesture, false)).toBe(false);
+    expect(shouldCaptureTwoDaySwipe({ ...gesture, numberActiveTouches: 1 }, false)).toBe(true);
   });
 });

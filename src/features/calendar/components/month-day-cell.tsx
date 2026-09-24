@@ -5,9 +5,10 @@ import { useTheme } from '@/hooks/use-theme';
 export type MonthDayCellProps = Readonly<{
   day: MonthDayViewModel;
   onPress(date: string): void;
+  variant?: 'month' | 'picker';
 }>;
 
-export function MonthDayCell({ day, onPress }: MonthDayCellProps) {
+export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellProps) {
   const theme = useTheme();
   const isHoliday = day.holidayName !== null || day.weekday === 0;
   const isSaturday = day.weekday === 6;
@@ -20,26 +21,28 @@ export function MonthDayCell({ day, onPress }: MonthDayCellProps) {
       onPress={() => onPress(day.date)}
       style={({ pressed }) => [
         styles.cell,
+        variant === 'picker' && styles.pickerCell,
         day.isSelected && { backgroundColor: theme.backgroundSelected },
-        day.isToday && {
-          borderColor: theme.calendarAccent,
-        },
-        !day.isToday && { borderColor: 'transparent' },
         !day.isCurrentMonth && styles.inactive,
         pressed && styles.pressed,
       ]}
     >
-      <Text
-        style={[
-          styles.dayNumber,
-          { color: theme.text },
-          isSaturday && { color: theme.calendarSaturday },
-          isHoliday && { color: theme.calendarHoliday },
-          day.isSelected && styles.selectedDayNumber,
-        ]}
+      <View
+        testID={`month-calendar.day-circle.${day.date}`}
+        style={[styles.dayCircle, day.isToday && { backgroundColor: theme.calendarAccent }]}
       >
-        {day.dayNumber}
-      </Text>
+        <Text
+          style={[
+            styles.dayNumber,
+            { color: theme.text },
+            isSaturday && { color: theme.calendarSaturday },
+            isHoliday && { color: theme.calendarHoliday },
+            day.isToday && { color: theme.background },
+          ]}
+        >
+          {day.dayNumber}
+        </Text>
+      </View>
       <View
         testID={`month-calendar.event-dot.${day.date}`}
         accessibilityElementsHidden
@@ -61,12 +64,10 @@ const styles = StyleSheet.create({
     minWidth: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderRadius: 8,
-    marginVertical: 1,
   },
-  dayNumber: { fontSize: 15, fontWeight: '600', lineHeight: 18 },
-  selectedDayNumber: { textDecorationLine: 'underline' },
+  pickerCell: { minHeight: 44 },
+  dayCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  dayNumber: { fontSize: 14, fontWeight: '500', lineHeight: 18 },
   eventDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
   hidden: { opacity: 0 },
   inactive: { opacity: 0.45 },

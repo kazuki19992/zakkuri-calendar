@@ -1,11 +1,15 @@
+import { useState } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getMonthStart, moveMonth } from '@/domain/calendar/month';
 import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { createCalendarTopBarModel } from '../calendar-top-bar-model';
 import { CalendarLoadState } from '../components/calendar-load-state';
 import { CalendarAddEventButton } from '../components/calendar-add-event-button';
-import { CalendarPeriodToolbar } from '../components/calendar-period-toolbar';
-import { CalendarViewSwitcher } from '../components/calendar-view-switcher';
+import { CalendarDatePicker } from '../components/calendar-date-picker';
+import { CALENDAR_TOP_BAR_HEIGHT, CalendarTopBar } from '../components/calendar-top-bar';
+import { CalendarViewMenu } from '../components/calendar-view-menu';
 import { MonthGrid } from '../components/month-grid';
 import { SelectedDayAgenda } from '../components/selected-day-agenda';
 import { TwoDayView } from '../components/two-day-view';
@@ -13,23 +17,6 @@ import { useHorizontalSwipeTransition } from '../hooks/use-horizontal-swipe-tran
 import { useTwoDayCarousel } from '../hooks/use-two-day-carousel';
 import type { CalendarViewState } from '../hooks/use-calendar-view';
 import { TWO_DAY_SWIPE_BUFFER_DAYS } from '../two-day-view-model';
-
-function formatMonth(month: string): string {
-  const [year, monthNumber] = month.split('-').map(Number);
-  return `${year}年${monthNumber}月`;
-}
-
-function formatTwoDayPeriod(from: string, through: string): string {
-  const [fromYear, fromMonth, fromDay] = from.split('-').map(Number);
-  const [throughYear, throughMonth, throughDay] = through.split('-').map(Number);
-  if (fromYear === throughYear && fromMonth === throughMonth) {
-    return `${fromYear}年${fromMonth}月${fromDay}日〜${throughDay}日`;
-  }
-  if (fromYear === throughYear) {
-    return `${fromYear}年${fromMonth}月${fromDay}日〜${throughMonth}月${throughDay}日`;
-  }
-  return `${fromYear}年${fromMonth}月${fromDay}日〜${throughYear}年${throughMonth}月${throughDay}日`;
-}
 
 export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt }: Readonly<{
   state: CalendarViewState;
@@ -40,6 +27,8 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
+  const [isViewMenuVisible, setViewMenuVisible] = useState(false);
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   // 月ビューの横スワイプ・アニメーションを担う(2日ビューはuseTwoDayCarouselが担う)。
   const transition = useHorizontalSwipeTransition({
     onPrevious: state.showPreviousPeriod,
@@ -56,27 +45,18 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
     leadingDate: state.twoDayStrip[0]?.date ?? state.anchorDate,
   });
   const isTwoDay = state.mode === 'twoDay';
-  const periodLabel = isTwoDay
-    ? formatTwoDayPeriod(state.twoDayDays[0].date, state.twoDayDays[1].date)
-    : formatMonth(state.visibleMonth);
-  const previousLabel = isTwoDay ? '前の1日へ' : '前月へ';
-  const nextLabel = isTwoDay ? '次の1日へ' : '次月へ';
-  const movePrevious = isTwoDay ? carousel.movePrevious : transition.movePrevious;
-  const moveNext = isTwoDay ? carousel.moveNext : transition.moveNext;
   const isMoving = isTwoDay ? carousel.isAnimating : transition.isAnimating;
+  const displayDate = isTwoDay ? state.anchorDate : state.visibleMonth;
+  const topBarModel = createCalendarTopBarModel(displayDate, state.today);
 
-  const headerControls = (
-    <>
-      <CalendarViewSwitcher mode={state.mode} onSelectMode={(mode) => void state.selectMode(mode)} />
-      <CalendarPeriodToolbar periodLabel={periodLabel} previousAccessibilityLabel={previousLabel}
-        nextAccessibilityLabel={nextLabel} isLoading={state.isPeriodLoading || isMoving}
-        onPrevious={() => void movePrevious()} onToday={() => void state.showToday()}
-        onNext={() => void moveNext()} />
-      {state.periodError !== null ? (
-        <Text accessibilityRole="alert" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
-      ) : null}
-    </>
-  );
+  const toggleDatePicker = () => {
+    if (isDatePickerVisible) {
+      setDatePickerVisible(false);
+      return;
+    }
+    setDatePickerVisible(true);
+    void state.loadDatePickerMonth(getMonthStart(displayDate));
+  };
 
   const swipeContent = (
     <>
@@ -97,11 +77,24 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
         paddingLeft: insets.left,
         paddingRight: insets.right,
       }]}>
+        <CalendarTopBar model={topBarModel} isLoading={state.isPeriodLoading || isMoving}
+          onOpenMenu={() => setViewMenuVisible(true)} onToggleDatePicker={toggleDatePicker}
+          onToday={() => void state.showToday()} />
+        {state.periodError !== null ? (
+          <Text accessibilityRole="alert" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
+        ) : null}
+        <CalendarViewMenu visible={isViewMenuVisible} mode={state.mode}
+          onSelectMode={state.selectMode} onClose={() => setViewMenuVisible(false)} />
+        <CalendarDatePicker visible={isDatePickerVisible} month={state.datePickerMonth}
+          days={state.datePickerDays} isLoading={state.isDatePickerLoading} error={state.datePickerError}
+          topOffset={insets.top + CALENDAR_TOP_BAR_HEIGHT}
+          onPreviousMonth={() => void state.loadDatePickerMonth(moveMonth(state.datePickerMonth, -1))}
+          onNextMonth={() => void state.loadDatePickerMonth(moveMonth(state.datePickerMonth, 1))}
+          onSelectDate={state.showDate} onClose={() => setDatePickerVisible(false)} />
         {isTwoDay ? (
           // 2日表示は画面の残り高さいっぱいにタイムラインを収め、ページ全体のスクロールを行わない。
           // 横スワイプは予備列を持つTwoDayView自身が担うため、外側の変形・不透明度制御は不要。
           <>
-            {headerControls}
             <TwoDayView
               strip={state.twoDayStrip}
               bufferDays={TWO_DAY_SWIPE_BUFFER_DAYS}
@@ -121,7 +114,6 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
           <View testID="calendar.swipe-area" style={styles.fill} {...transition.panHandlers}
             onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}>
             <ScrollView testID="calendar.scroll" style={styles.scroll} contentContainerStyle={styles.content}>
-              {headerControls}
               <Animated.View testID="calendar.animated-content"
                 style={{
                   transform: [{ translateX: transition.translateX }],

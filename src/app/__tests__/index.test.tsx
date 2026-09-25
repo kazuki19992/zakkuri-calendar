@@ -94,6 +94,8 @@ describe('ホームルート', () => {
         getDefaultExactDuration: jest.fn(),
         setDefaultExactDuration: jest.fn(),
         getUndeterminedFadeMinutes: jest.fn(),
+        getCalendarVisible: jest.fn(),
+        setCalendarVisible: jest.fn(),
       },
     };
     const state = { mode: 'twoDay' } as CalendarViewState;

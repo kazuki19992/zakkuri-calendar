@@ -63,6 +63,7 @@ const callbacks = {
   showDate: jest.fn().mockResolvedValue(true),
   loadDatePickerMonth: jest.fn().mockResolvedValue(true),
   selectDate: jest.fn().mockResolvedValue(true),
+  setCalendarVisible: jest.fn().mockResolvedValue(true),
   retry: jest.fn().mockResolvedValue(true),
 };
 
@@ -93,6 +94,8 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
     selectedAgendaItems: [], selectedHolidayName: null,
     holidaySupport: 'available', isPeriodLoading: false, periodError: null,
     isDatePickerLoading: false, datePickerError: null,
+    calendarName: 'マイカレンダー', calendarColorId: 'blue', isCalendarVisible: true,
+    isCalendarVisibilityUpdating: false, calendarVisibilityError: null,
     ...callbacks, ...overrides,
   };
 }

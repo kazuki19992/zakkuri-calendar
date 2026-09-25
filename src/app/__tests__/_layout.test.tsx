@@ -1,8 +1,17 @@
 import { render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import RootLayout from '../_layout';
 
 jest.mock('@/global.css', () => ({}));
+
+jest.mock('react-native-gesture-handler', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    GestureHandlerRootView: (props: React.ComponentProps<typeof View>) => React.createElement(View, props),
+  };
+});
 
 jest.mock('expo-router', () => {
   const React = jest.requireActual<typeof import('react')>('react');
@@ -66,5 +75,13 @@ describe('ルートレイアウト', () => {
     expect(stack.parent).toBe(calendarRefreshProvider);
     expect(screen.getByTestId('stack-screen.events/new')).toHaveTextContent('modal');
     expect(screen.getByTestId('stack-screen.events/[id]')).toHaveTextContent('modal');
+  });
+
+  it('すべての画面をflex 1のgesture handler root配下へ置く', async () => {
+    await render(<RootLayout />);
+
+    const gestureRoot = screen.getByTestId('gesture-handler-root');
+    expect(StyleSheet.flatten(gestureRoot.props.style)).toMatchObject({ flex: 1 });
+    expect(screen.getByTestId('theme-provider').parent).toBe(gestureRoot);
   });
 });

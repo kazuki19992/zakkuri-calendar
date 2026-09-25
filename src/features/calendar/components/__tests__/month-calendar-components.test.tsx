@@ -47,19 +47,33 @@ describe('独自月カレンダー表示', () => {
     expect(onSelectDate).toHaveBeenCalledWith('2026-09-21');
   });
 
-  it('選択日を色以外の下線でも示し、操作領域を44pt以上にする', async () => {
+  it('選択日を読み上げ状態と淡い背景で示し、操作領域を44pt以上にする', async () => {
     const day = createDays().find((item) => item.date === '2026-09-21');
     if (day === undefined) throw new Error('テスト用の日付がありません');
     const view = await render(<MonthDayCell day={day} onPress={jest.fn()} />);
 
-    expect(StyleSheet.flatten(view.getByText('21').props.style)).toMatchObject({
-      textDecorationLine: 'underline',
-    });
+    expect(view.getByRole('button').props.accessibilityState).toEqual({ selected: true });
     expect(StyleSheet.flatten(view.getByRole('button').props.style)).toMatchObject({
       minHeight: 44,
       minWidth: 44,
       backgroundColor: Colors.light.backgroundSelected,
     });
+    expect(StyleSheet.flatten(view.getByRole('button').props.style).borderRadius).toBeUndefined();
+  });
+
+  it('今日の日付数字を円形アクセントで示す', async () => {
+    const day = createDays().find((item) => item.date === '2026-09-08');
+    if (day === undefined) throw new Error('テスト用の日付がありません');
+    const view = await render(<MonthDayCell day={day} onPress={jest.fn()} />);
+
+    expect(StyleSheet.flatten(view.getByTestId('month-calendar.day-circle.2026-09-08').props.style))
+      .toMatchObject({
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: Colors.light.calendarAccent,
+      });
+    expect(StyleSheet.flatten(view.getByText('8').props.style).color).toBe(Colors.light.background);
   });
 
   it('読み込み失敗から再試行できる', async () => {

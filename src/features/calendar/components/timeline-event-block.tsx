@@ -63,8 +63,8 @@ export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
         />
         {item.isInstant ? <View style={[styles.instantLine, { backgroundColor: theme.calendarEventBorder }]} /> : null}
         <View testID={`timeline-event.${item.id}.text`} style={[styles.text, { justifyContent: textAnchor }]}>
-          <Text numberOfLines={2} style={[styles.title, { color: theme.text }]}>{item.title}</Text>
-          <Text numberOfLines={1} style={[styles.time, { color: theme.text }]}>{item.temporalLabel}</Text>
+          <Text numberOfLines={2} style={[styles.title, { color: theme.calendarEventText }]}>{item.title}</Text>
+          <Text numberOfLines={1} style={[styles.time, { color: theme.calendarEventText }]}>{item.temporalLabel}</Text>
         </View>
       </View>
     </Pressable>
@@ -76,12 +76,12 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     overflow: 'hidden',
-    borderRadius: 5,
-    paddingHorizontal: 5,
-    paddingVertical: 3,
+    borderRadius: 3,
+    paddingHorizontal: 3,
+    paddingVertical: 2,
   },
   instantLine: { position: 'absolute', left: 0, right: 0, top: 0, height: 2 },
   text: { flex: 1 },
-  title: { fontSize: 12, fontWeight: '600', lineHeight: 15 },
-  time: { fontSize: 10, lineHeight: 13 },
+  title: { fontSize: 12, fontWeight: '500', lineHeight: 14 },
+  time: { fontSize: 10, lineHeight: 12 },
 });

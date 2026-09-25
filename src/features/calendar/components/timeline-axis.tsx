@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { TIMELINE_HEIGHT, computeHourLineTop } from '../timeline-layout';
 
-const labelHours = Array.from({ length: 9 }, (_, index) => index * 3);
+const labelHours = Array.from({ length: 25 }, (_, hour) => hour);
 
 export function TimelineAxis({ scale = 1, now = null }: Readonly<{
   scale?: number;
@@ -12,13 +12,12 @@ export function TimelineAxis({ scale = 1, now = null }: Readonly<{
   return (
     <View
       testID="two-day-calendar.timeline-axis"
-      accessible
-      accessibilityLabel="0時から24時までの時間軸"
       style={[styles.axis, { height: TIMELINE_HEIGHT * scale }]}
     >
       {labelHours.map((hour) => (
         <Text
           key={hour}
+          testID="two-day-calendar.hour-label"
           style={[styles.label, {
             // 24:00は軸の下端と同じ位置になり、そのまま上端基準で置くとラベルが
             // はみ出して見切れるため、行の高さ分だけ上げて下端に揃える。

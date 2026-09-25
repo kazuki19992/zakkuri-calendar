@@ -145,6 +145,102 @@ describe('カレンダー表示の状態調整', () => {
     expect(result.current.anchorDate).toBe('2026-09-08');
   });
 
+  it('2日表示で選択した任意日を基準日にして表示する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => expect(await result.current.showDate('2026-09-30')).toBe(true));
+
+    expect(result.current).toMatchObject({
+      anchorDate: '2026-09-30',
+      visibleMonth: '2026-09-01',
+      selectedDate: '2026-09-30',
+    });
+  });
+
+  it('月表示で選択した任意日の月と選択日を同期する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => expect(await result.current.selectMode('month')).toBe(true));
+
+    await act(async () => expect(await result.current.showDate('2026-10-15')).toBe(true));
+
+    expect(result.current).toMatchObject({
+      anchorDate: '2026-10-15',
+      visibleMonth: '2026-10-01',
+      selectedDate: '2026-10-15',
+    });
+  });
+
+  it('任意日の取得に失敗した場合は現在表示を維持する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    dependencies.events.listByAnchorRange.mockRejectedValueOnce(new Error('database unavailable'));
+
+    await act(async () => expect(await result.current.showDate('2026-10-15')).toBe(false));
+
+    expect(result.current).toMatchObject({
+      anchorDate: '2026-09-08',
+      visibleMonth: '2026-09-01',
+      selectedDate: '2026-09-08',
+      periodError: '表示期間を読み込めませんでした',
+    });
+  });
+
+  it('日付ピッカーは月グリッド42日分の予定を現在表示から独立して取得する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () =>
+      expect(await result.current.loadDatePickerMonth('2026-10-01')).toBe(true));
+
+    expect(result.current.datePickerMonth).toBe('2026-10-01');
+    expect(result.current.datePickerDays).toHaveLength(42);
+    expect(result.current).toMatchObject({
+      anchorDate: '2026-09-08',
+      visibleMonth: '2026-09-01',
+      datePickerError: null,
+      isDatePickerLoading: false,
+    });
+    expect(dependencies.events.listByAnchorRange).toHaveBeenLastCalledWith(
+      calendar.id,
+      '2026-09-28',
+      '2026-11-08',
+    );
+  });
+
+  it('日付ピッカーの月取得に失敗しても既存表示を維持する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    dependencies.events.listByAnchorRange.mockRejectedValueOnce(new Error('database unavailable'));
+
+    await act(async () =>
+      expect(await result.current.loadDatePickerMonth('2026-10-01')).toBe(false));
+
+    expect(result.current).toMatchObject({
+      anchorDate: '2026-09-08',
+      visibleMonth: '2026-09-01',
+      datePickerMonth: '2026-09-01',
+      datePickerError: '月の予定を読み込めませんでした',
+      isDatePickerLoading: false,
+    });
+  });
+
   it('月表示と2日表示を選択日を保って切り替える', async () => {
     const dependencies = createDependencies();
     const { result } = await renderHook(() =>
@@ -158,7 +254,7 @@ describe('カレンダー表示の状態調整', () => {
     expect(dependencies.events.listByAnchorRange).toHaveBeenLastCalledWith(
       calendar.id,
       '2026-08-31',
-      '2026-09-30',
+      '2026-10-11',
     );
     await act(async () => expect(await result.current.selectDate('2026-09-09')).toBe(true));
     await act(async () => expect(await result.current.selectMode('twoDay')).toBe(true));

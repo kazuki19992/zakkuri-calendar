@@ -1,4 +1,4 @@
-import { fireEvent, render, userEvent } from '@testing-library/react-native';
+import { fireEvent, render, waitFor, within } from '@testing-library/react-native';
 import { Animated, PixelRatio, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/theme';
 import {
@@ -9,8 +9,7 @@ import {
   computeTimelineScale,
 } from '../../timeline-layout';
 import type { TwoDayViewModel } from '../../two-day-view-model';
-import { CalendarPeriodToolbar } from '../calendar-period-toolbar';
-import { CalendarViewSwitcher } from '../calendar-view-switcher';
+import { CalendarAddEventButton } from '../calendar-add-event-button';
 import { TwoDayView } from '../two-day-view';
 
 jest.mock('@/global.css', () => ({}));
@@ -101,10 +100,25 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getByText('0:00')).toBeOnTheScreen();
     expect(view.getByText('21:00')).toBeOnTheScreen();
     expect(view.getByText('24:00')).toBeOnTheScreen();
+    expect(view.getAllByTestId('two-day-calendar.hour-label')).toHaveLength(25);
     expect(view.getByLabelText('歯医者、14:30・30分')).toBeOnTheScreen();
     // 予備列(前日・翌々日)もday2と同じく予定なしのため、3列分表示される。
     expect(view.getAllByText('予定はありません')).toHaveLength(3);
     expect(view.getByText('祝日情報未対応')).toBeOnTheScreen();
+  });
+
+  it('曜日と日付数字をcompactに表示し、今日を文字ではなく円で示す', async () => {
+    const view = await renderTwoDayView();
+
+    expect(view.getByText('火')).toBeOnTheScreen();
+    expect(view.getByText('8')).toBeOnTheScreen();
+    expect(view.queryByText('今日')).toBeNull();
+    expect(view.getByLabelText(/今日/)).toBeOnTheScreen();
+    expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.today-circle').props.style)).toMatchObject({
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+    });
   });
 
   it('タイムライン上の予定をタップすると編集対象のIDを渡す', async () => {
@@ -250,6 +264,58 @@ describe('2日カレンダー表示コンポーネント', () => {
       .toMatchObject({ top: 406, height: 36 });
   });
 
+  it('fit倍率では縦scrollせず、拡大後だけscrollして初期高さ未満へ縮小しない', async () => {
+    const view = await renderTwoDayView();
+    const timeline = view.getByTestId('two-day-calendar.timeline');
+    await fireEvent(timeline, 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: TIMELINE_HEIGHT / 2 } },
+    });
+
+    expect(view.getByTestId('two-day-calendar.timeline-scroll').props.scrollEnabled).toBe(false);
+    const zoom = view.getByTestId('two-day-calendar.timeline-zoom');
+    expect(within(zoom).queryByLabelText('歯医者、14:30・30分')).toBeNull();
+    expect(zoom.props.accessibilityActions).toEqual([
+      { name: 'increment', label: '拡大' },
+      { name: 'decrement', label: '縮小' },
+    ]);
+    await fireEvent(zoom, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(view.getByTestId('two-day-calendar.timeline-scroll').props.scrollEnabled).toBe(true);
+    expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-axis').props.style).height)
+      .toBeGreaterThan(TIMELINE_HEIGHT / 2);
+
+    for (let index = 0; index < 10; index += 1) {
+      await fireEvent(zoom, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    }
+    expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-axis').props.style).height)
+      .toBe(TIMELINE_HEIGHT / 2);
+  });
+
+  it('拡大後も予定tapと空き領域double tapを維持する', async () => {
+    const onEditEvent = jest.fn();
+    const onCreateExactAt = jest.fn();
+    const view = await renderTwoDayView({ onEditEvent, onCreateExactAt });
+    await fireEvent(view.getByTestId('two-day-calendar.timeline'), 'layout', {
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: TIMELINE_HEIGHT / 2 } },
+    });
+    await fireEvent(view.getByTestId('two-day-calendar.timeline-zoom'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'increment' },
+    });
+    await waitFor(() => {
+      expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-axis').props.style).height)
+        .toBeCloseTo(TIMELINE_HEIGHT * 0.6);
+    });
+
+    await fireEvent.press(view.getByLabelText('歯医者、14:30・30分'));
+    const now = jest.spyOn(Date, 'now').mockReturnValueOnce(1_000).mockReturnValue(1_200);
+    const column = view.getAllByTestId('two-day-calendar.timeline-column')[1];
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: HOUR_HEIGHT * 0.6 * 10 } });
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: HOUR_HEIGHT * 0.6 * 10 } });
+
+    expect(onEditEvent).toHaveBeenCalledWith('event-1');
+    expect(onCreateExactAt).toHaveBeenCalledWith('2026-09-08', '10:00');
+    now.mockRestore();
+  });
+
   it('日末の短い予定でも下端で切れないよう、最小表示高を保ったまま位置を内側へ寄せる', async () => {
     // 23:59の瞬間予定。top(1343.06) + 最小表示高(36)が24時間分の高さ(1344)を超えるため、
     // overflow: 'hidden'で下部が切れてしまう。
@@ -336,6 +402,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getByText('14:30')).toBeOnTheScreen();
     const nowLines = view.getAllByTestId('two-day-calendar.now-line');
     expect(nowLines).toHaveLength(1);
+    expect(view.getAllByTestId('two-day-calendar.now-dot')).toHaveLength(1);
     expect(StyleSheet.flatten(nowLines[0].props.style)).toMatchObject({ top: 870 * (HOUR_HEIGHT / 60) });
   });
 
@@ -369,11 +436,30 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(StyleSheet.flatten(card.props.style).borderWidth).toBeFalsy();
   });
 
-  it('小さい時間ラベルを予定背景上で読める本文色にする', async () => {
+  it('予定を小さい角丸とcalendar event本文色で表示する', async () => {
     const view = await renderTwoDayView();
 
+    expect(StyleSheet.flatten(view.getByTestId('timeline-event.event-1.card').props.style)).toMatchObject({
+      borderRadius: 3,
+      overflow: 'hidden',
+    });
+    expect(StyleSheet.flatten(view.getByText('歯医者').props.style)).toMatchObject({
+      color: Colors.light.calendarEventText,
+    });
     expect(StyleSheet.flatten(view.getByText('14:30・30分').props.style)).toMatchObject({
-      color: Colors.light.text,
+      color: Colors.light.calendarEventText,
+    });
+  });
+
+  it('FABを56ptの軽いshadow付き円形ボタンとして表示する', async () => {
+    const view = await render(<CalendarAddEventButton onPress={jest.fn()} />);
+    expect(StyleSheet.flatten(view.getByRole('button', { name: '予定を追加' }).props.style)).toMatchObject({
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      right: 18,
+      bottom: 18,
+      elevation: 3,
     });
   });
 
@@ -382,43 +468,4 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.queryByText('＋ 予定')).toBeNull();
   });
 
-  it('2日と月の選択状態を切り替えられる', async () => {
-    const onSelectMode = jest.fn();
-    const user = userEvent.setup();
-    const view = await render(<CalendarViewSwitcher mode="twoDay" onSelectMode={onSelectMode} />);
-    expect(view.getByRole('tab', { name: '2日表示' }).props.accessibilityState).toEqual({ selected: true });
-    await user.press(view.getByRole('tab', { name: '月表示' }));
-    expect(onSelectMode).toHaveBeenCalledWith('month');
-  });
-
-  it('期間ツールバーの操作領域を44pt以上にして前後・今日を実行する', async () => {
-    const onPrevious = jest.fn();
-    const onToday = jest.fn();
-    const onNext = jest.fn();
-    const user = userEvent.setup();
-    const view = await render(
-      <CalendarPeriodToolbar periodLabel="2026年9月8日〜9日" previousAccessibilityLabel="前の1日へ"
-        nextAccessibilityLabel="次の1日へ" isLoading={false} onPrevious={onPrevious}
-        onToday={onToday} onNext={onNext} />,
-    );
-    expect(StyleSheet.flatten(view.getByRole('button', { name: '前の1日へ' }).props.style)).toMatchObject({
-      minHeight: 44, minWidth: 44,
-    });
-    await user.press(view.getByRole('button', { name: '前の1日へ' }));
-    await user.press(view.getByRole('button', { name: '今日' }));
-    await user.press(view.getByRole('button', { name: '次の1日へ' }));
-    expect([onPrevious.mock.calls.length, onToday.mock.calls.length, onNext.mock.calls.length]).toEqual([1, 1, 1]);
-  });
-
-  it('読み込み中も次期間ボタンを維持して無効化する', async () => {
-    const view = await render(
-      <CalendarPeriodToolbar periodLabel="2026年9月8日〜9日" previousAccessibilityLabel="前の1日へ"
-        nextAccessibilityLabel="次の1日へ" isLoading onPrevious={jest.fn()}
-        onToday={jest.fn()} onNext={jest.fn()} />,
-    );
-
-    const nextButton = view.getByRole('button', { name: '次の1日へ' });
-    expect(nextButton.props.accessibilityState).toEqual({ disabled: true });
-    expect(view.getByTestId('calendar-period.loading')).toBeOnTheScreen();
-  });
 });

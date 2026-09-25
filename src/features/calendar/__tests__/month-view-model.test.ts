@@ -20,6 +20,22 @@ const gridDate: MonthGridDate = {
 };
 
 describe('月表示の表示用モデル', () => {
+  it('祝日だけの日は祝日名を示すが予定ありの点には数えない', () => {
+    const result = createMonthDayViewModels({
+      grid: [gridDate],
+      selectedDate: '2026-09-20',
+      today: '2026-09-20',
+      events: [],
+      holidayCoverage: [{
+        from: '2026-09-01', through: '2026-09-30',
+        result: { status: 'available', holidays: [{ date: '2026-09-21', name: '敬老の日' }] },
+      }],
+    });
+
+    expect(result[0]).toMatchObject({ holidayName: '敬老の日', hasEvents: false });
+    expect(result[0].accessibilityLabel).toBe('2026年9月21日、敬老の日');
+  });
+
   it('今日で選択中かつ祝日と予定ありの日を読み上げ可能な文言へ変換する', () => {
     const result = createMonthDayViewModels({
       grid: [gridDate],

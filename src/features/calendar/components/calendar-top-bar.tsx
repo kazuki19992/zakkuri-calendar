@@ -37,8 +37,8 @@ export function CalendarTopBar({
       <View style={styles.spacer} />
       <Pressable accessibilityRole="button" accessibilityLabel="今日へ移動"
         accessibilityState={{ disabled: isLoading }} disabled={isLoading}
-        onPress={onToday} style={styles.iconButton}>
-        <Text style={[styles.todayIcon, { color: isLoading ? theme.textSecondary : theme.calendarAccent }]}>◎</Text>
+        onPress={onToday} style={[styles.iconButton, styles.todayButton]}>
+        <Text style={[styles.todayLabel, { color: isLoading ? theme.textSecondary : theme.calendarAccent }]}>今日</Text>
       </Pressable>
     </View>
   );
@@ -54,5 +54,6 @@ const styles = StyleSheet.create({
   month: { fontSize: 21, fontWeight: '500', lineHeight: 25 },
   chevron: { fontSize: 8, marginLeft: 5 },
   spacer: { flex: 1 },
-  todayIcon: { fontSize: 22, fontWeight: '600' },
+  todayButton: { paddingHorizontal: 8 },
+  todayLabel: { fontSize: 14, fontWeight: '500' },
 });

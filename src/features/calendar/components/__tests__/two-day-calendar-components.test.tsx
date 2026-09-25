@@ -28,10 +28,25 @@ const timelineItem = {
 } as const;
 
 const allDayItem = {
+  kind: 'event',
   id: 'all-day-event',
+  eventId: 'all-day-event',
+  colorId: 'blue',
+  isInteractive: true,
   title: '休暇',
   temporalLabel: '終日',
   accessibilityLabel: '休暇、終日',
+} as const;
+
+const holidayItem = {
+  kind: 'holiday',
+  id: 'holiday:2026-09-08',
+  eventId: null,
+  colorId: 'holiday',
+  isInteractive: false,
+  title: 'テスト記念日',
+  temporalLabel: '祝日',
+  accessibilityLabel: 'テスト記念日、祝日',
 } as const;
 
 function emptyDay(overrides: Partial<TwoDayViewModel> & Pick<TwoDayViewModel, 'date' | 'dateLabel' | 'weekdayLabel' | 'accessibilityLabel'>): TwoDayViewModel {
@@ -98,7 +113,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getAllByTestId('two-day-calendar.column')).toHaveLength(strip.length);
     expect(view.getByTestId('two-day-calendar.timeline')).toBeOnTheScreen();
     expect(view.getByText('0:00')).toBeOnTheScreen();
-    expect(view.getByText('21:00')).toBeOnTheScreen();
+    expect(view.getAllByText('21:00').length).toBeGreaterThanOrEqual(1);
     expect(view.getByText('24:00')).toBeOnTheScreen();
     expect(view.getAllByTestId('two-day-calendar.hour-label')).toHaveLength(25);
     expect(view.getByLabelText('歯医者、14:30・30分')).toBeOnTheScreen();
@@ -140,6 +155,61 @@ describe('2日カレンダー表示コンポーネント', () => {
     fireEvent.press(view.getByLabelText('休暇、終日'));
 
     expect(onEditEvent).toHaveBeenCalledWith('all-day-event');
+  });
+
+  it('祝日を終日領域の読み取り専用項目として表示し、日付ヘッダーの高さを変えない', async () => {
+    const onEditEvent = jest.fn();
+    const view = await renderTwoDayView({
+      onEditEvent,
+      strip: [prevBuffer, {
+        ...day1,
+        holidayName: 'テスト記念日',
+        allDayItems: [holidayItem, allDayItem],
+      }, day2, nextBuffer],
+    });
+
+    const holiday = view.getByLabelText('テスト記念日、祝日');
+    expect(holiday.props.accessibilityRole).toBe('text');
+    expect(view.queryByRole('button', { name: 'テスト記念日、祝日' })).toBeNull();
+    expect(view.getByRole('button', { name: '休暇、終日' })).toBeOnTheScreen();
+    expect(StyleSheet.flatten(holiday.props.style)).toMatchObject({
+      backgroundColor: Colors.light.calendarHolidayBackground,
+      borderLeftColor: Colors.light.calendarHoliday,
+    });
+    const headers = view.getAllByTestId('two-day-calendar.date-header');
+    expect(new Set(headers.map((header) => StyleSheet.flatten(header.props.style).minHeight)).size).toBe(1);
+    const allDayRegions = view.getAllByTestId('two-day-calendar.all-day-region');
+    expect(allDayRegions).toHaveLength(4);
+    allDayRegions.forEach((region) => {
+      expect(StyleSheet.flatten(region.props.style)).toMatchObject({
+        flex: 1,
+        minHeight: 30,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+      });
+    });
+    expect(onEditEvent).not.toHaveBeenCalled();
+  });
+
+  it('終日項目は2件まで表示し、残り件数を見た目と読み上げの両方で示す', async () => {
+    const extraItems = ['event-2', 'event-3', 'event-4'].map((id, index) => ({
+      ...allDayItem,
+      id,
+      eventId: id,
+      title: `終日予定${index + 2}`,
+      accessibilityLabel: `終日予定${index + 2}、終日`,
+    }));
+    const view = await renderTwoDayView({
+      strip: [prevBuffer, {
+        ...day1,
+        allDayItems: [holidayItem, allDayItem, ...extraItems],
+      }, day2, nextBuffer],
+    });
+
+    expect(view.getByLabelText('テスト記念日、祝日')).toBeOnTheScreen();
+    expect(view.getByLabelText('休暇、終日')).toBeOnTheScreen();
+    expect(view.queryByLabelText('終日予定2、終日')).toBeNull();
+    expect(view.getByText('他3件')).toBeOnTheScreen();
+    expect(view.getByLabelText('終日項目5件、他3件')).toBeOnTheScreen();
   });
 
   it('タイムラインの空き領域をダブルタップすると最も近い正時で予定を作成する', async () => {

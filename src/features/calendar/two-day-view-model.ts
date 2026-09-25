@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
+import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/constants/event-colors';
 import { offsetCalendarDate, type TwoDayRange } from '@/domain/calendar/month';
 import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
@@ -6,7 +7,6 @@ import { getDay, parse } from 'date-fns';
 import {
   createAgendaItems,
   getHolidayInfo,
-  type AgendaItemViewModel,
   type HolidayRangeCoverage,
   type HolidaySupport,
 } from './calendar-view-model';
@@ -21,8 +21,19 @@ export type TwoDayViewModel = Readonly<{
   isToday: boolean;
   holidayName: string | null;
   holidaySupport: HolidaySupport;
-  allDayItems: readonly AgendaItemViewModel[];
+  allDayItems: readonly TwoDayAllDayItemViewModel[];
   timelineItems: readonly TimelineItemViewModel[];
+  accessibilityLabel: string;
+}>;
+
+export type TwoDayAllDayItemViewModel = Readonly<{
+  kind: 'event' | 'holiday';
+  id: string;
+  eventId: string | null;
+  colorId: EventColorId | 'holiday';
+  isInteractive: boolean;
+  title: string;
+  temporalLabel: string;
   accessibilityLabel: string;
 }>;
 
@@ -49,7 +60,7 @@ function createDayViewModel(
     [...input.definitions.values()].map((definition) => [definition.id, definition.label] as const),
   );
   const eventsForDate = input.events.filter((event) => event.anchorDate === date);
-  const allDayItems = createAgendaItems(
+  const eventAllDayItems = createAgendaItems(
     eventsForDate.filter((event) => {
       const definition = event.temporalType === 'fuzzy'
         ? input.definitions.get(event.temporalDefinitionId) ?? null
@@ -61,14 +72,31 @@ function createDayViewModel(
       }).kind !== 'timed';
     }),
     definitionLabels,
-  );
+  ).map((item): TwoDayAllDayItemViewModel => ({
+    ...item,
+    kind: 'event',
+    eventId: item.id,
+    colorId: DEFAULT_EVENT_COLOR_ID,
+    isInteractive: true,
+  }));
+  const holidayItems: readonly TwoDayAllDayItemViewModel[] = holiday.name === null ? [] : [{
+    kind: 'holiday',
+    id: `holiday:${date}`,
+    eventId: null,
+    colorId: 'holiday',
+    isInteractive: false,
+    title: holiday.name,
+    temporalLabel: '祝日',
+    accessibilityLabel: `${holiday.name}、祝日`,
+  }];
+  const allDayItems = [...holidayItems, ...eventAllDayItems];
   const timelineItems = createDayTimelineItems({
     date,
     events: input.events,
     definitions: input.definitions,
     undeterminedFadeMinutes: input.undeterminedFadeMinutes,
   });
-  const itemCount = new Set([...allDayItems, ...timelineItems].map((item) => item.id)).size;
+  const itemCount = new Set([...eventAllDayItems, ...timelineItems].map((item) => item.id)).size;
   const labels = [`${year}年${month}月${day}日`, `${weekdayLabel}曜日`];
   if (holiday.name !== null) labels.push(holiday.name);
   if (holiday.support === 'unsupported') labels.push('祝日情報未対応');

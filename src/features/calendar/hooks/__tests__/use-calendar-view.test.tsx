@@ -196,7 +196,7 @@ describe('カレンダー表示の状態調整', () => {
     });
   });
 
-  it('日付ピッカーの月を現在表示から独立して取得する', async () => {
+  it('日付ピッカーは月グリッド42日分の予定を現在表示から独立して取得する', async () => {
     const dependencies = createDependencies();
     const { result } = await renderHook(() =>
       useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
@@ -216,8 +216,8 @@ describe('カレンダー表示の状態調整', () => {
     });
     expect(dependencies.events.listByAnchorRange).toHaveBeenLastCalledWith(
       calendar.id,
-      '2026-09-30',
-      '2026-10-31',
+      '2026-09-28',
+      '2026-11-08',
     );
   });
 
@@ -254,7 +254,7 @@ describe('カレンダー表示の状態調整', () => {
     expect(dependencies.events.listByAnchorRange).toHaveBeenLastCalledWith(
       calendar.id,
       '2026-08-31',
-      '2026-09-30',
+      '2026-10-11',
     );
     await act(async () => expect(await result.current.selectDate('2026-09-09')).toBe(true));
     await act(async () => expect(await result.current.selectMode('twoDay')).toBe(true));

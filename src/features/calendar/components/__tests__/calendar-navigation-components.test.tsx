@@ -134,4 +134,18 @@ describe('カレンダーのトップナビゲーション', () => {
     expect(StyleSheet.flatten(view.getByTestId('calendar-date-picker.backdrop').props.style))
       .toMatchObject({ paddingHorizontal: 0 });
   });
+
+  it('日付ピッカーはAndroidでステータスバーを含む座標系を使う', async () => {
+    const view = await render(
+      <CalendarDatePicker
+        visible month="2026-09-01" days={days} isLoading={false} error={null}
+        topOffset={52}
+        onPreviousMonth={jest.fn()} onNextMonth={jest.fn()}
+        onSelectDate={jest.fn().mockResolvedValue(true)} onClose={jest.fn()}
+      />,
+    );
+
+    expect(view.getByTestId('calendar-date-picker.backdrop').parent?.type).toBe('Modal');
+    expect(view.getByTestId('calendar-date-picker.backdrop').parent?.props.statusBarTranslucent).toBe(true);
+  });
 });

@@ -123,7 +123,10 @@ function getSystemTime(): Date {
   return new Date();
 }
 
-function getTargetRange(target: ViewTarget): Readonly<{ from: string; through: string }> {
+function getTargetRange(
+  target: ViewTarget,
+  weekStartsOn: WeekStartsOn,
+): Readonly<{ from: string; through: string }> {
   if (target.mode === 'twoDay') {
     const range = getTwoDayRange(target.anchorDate);
     // スワイプ用予備列(前後TWO_DAY_SWIPE_BUFFER_DAYS日)の分だけ広く取得する。
@@ -133,8 +136,8 @@ function getTargetRange(target: ViewTarget): Readonly<{ from: string; through: s
       through: offsetCalendarDate(range.through, TWO_DAY_SWIPE_BUFFER_DAYS),
     };
   }
-  const monthRange = getMonthRange(target.visibleMonth);
-  return { from: offsetCalendarDate(monthRange.from, -1), through: monthRange.through };
+  const grid = getMonthGrid(target.visibleMonth, weekStartsOn);
+  return { from: grid[0].date, through: grid[grid.length - 1].date };
 }
 
 function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): readonly string[] {
@@ -147,7 +150,7 @@ function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): reado
 
 async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Promise<CalendarSnapshot> {
   const calendar = await input.calendars.getDefault();
-  const range = getTargetRange(target);
+  const range = getTargetRange(target, input.weekStartsOn);
   const events = await input.events.listByAnchorRange(calendar.id, range.from, range.through);
   const holidayCoverage = getHolidayMonths(target, input.weekStartsOn).map((month) => {
     const monthRange = getMonthRange(month);

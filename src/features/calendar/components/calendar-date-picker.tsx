@@ -34,7 +34,7 @@ export function CalendarDatePicker({
     if (succeeded) onClose();
   };
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
       <Pressable testID="calendar-date-picker.backdrop" style={[styles.backdrop, {
         backgroundColor: theme.calendarBackdrop,
         paddingTop: topOffset,

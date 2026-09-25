@@ -177,6 +177,18 @@ describe('カレンダー画面', () => {
       .toMatchObject({ paddingTop: safeAreaMetrics.insets.top + 52 });
   });
 
+  it('日付選択の表示取得に失敗した理由をピッカー内に表示する', async () => {
+    const user = userEvent.setup();
+    await renderWithSafeArea(
+      <CalendarScreen state={createState({ periodError: '表示期間を読み込めませんでした' })}
+        onAddEvent={jest.fn()} />,
+    );
+
+    await user.press(screen.getByRole('button', { name: '2026年9月、日付を選択' }));
+    expect(within(screen.getByTestId('calendar-date-picker.panel')).getByRole('alert'))
+      .toHaveTextContent('表示期間を読み込めませんでした');
+  });
+
   it('2日表示で画面全体にセーフエリア分の余白を確保する', async () => {
     await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
 

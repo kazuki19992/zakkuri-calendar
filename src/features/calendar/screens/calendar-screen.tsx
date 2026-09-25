@@ -86,7 +86,8 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
         <CalendarViewMenu visible={isViewMenuVisible} mode={state.mode}
           onSelectMode={state.selectMode} onClose={() => setViewMenuVisible(false)} />
         <CalendarDatePicker visible={isDatePickerVisible} month={state.datePickerMonth}
-          days={state.datePickerDays} isLoading={state.isDatePickerLoading} error={state.datePickerError}
+          days={state.datePickerDays} isLoading={state.isDatePickerLoading}
+          error={state.datePickerError ?? state.periodError}
           topOffset={insets.top + CALENDAR_TOP_BAR_HEIGHT}
           onPreviousMonth={() => void state.loadDatePickerMonth(moveMonth(state.datePickerMonth, -1))}
           onNextMonth={() => void state.loadDatePickerMonth(moveMonth(state.datePickerMonth, 1))}

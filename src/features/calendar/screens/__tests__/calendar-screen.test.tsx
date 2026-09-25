@@ -1,4 +1,4 @@
-import { render, screen, userEvent, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
@@ -139,6 +139,30 @@ describe('カレンダー画面', () => {
     await user.press(screen.getByRole('button', { name: '表示メニューを開く' }));
     await user.press(screen.getByRole('menuitem', { name: '月表示' }));
     expect(callbacks.selectMode).toHaveBeenCalledWith('month');
+  });
+
+  it('サイドメニューからマイカレンダーの表示を切り替える', async () => {
+    const user = userEvent.setup();
+    await renderWithSafeArea(<CalendarScreen state={createState()} onAddEvent={jest.fn()} />);
+
+    await user.press(screen.getByRole('button', { name: '表示メニューを開く' }));
+    await act(async () => {
+      fireEvent(screen.getByRole('switch', { name: 'マイカレンダーを表示' }), 'valueChange', false);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(callbacks.setCalendarVisible).toHaveBeenCalledWith(false));
+  });
+
+  it('サイドメニューに設定画面への導線を表示する', async () => {
+    const user = userEvent.setup();
+    const onOpenSettings = jest.fn();
+    await renderWithSafeArea(
+      <CalendarScreen state={createState()} onAddEvent={jest.fn()} onOpenSettings={onOpenSettings} />,
+    );
+
+    await user.press(screen.getByRole('button', { name: '表示メニューを開く' }));
+    expect(screen.getByRole('button', { name: '設定を開く' })).toBeOnTheScreen();
   });
 
   it('月名から日付ピッカーを開いて任意日へ移動する', async () => {

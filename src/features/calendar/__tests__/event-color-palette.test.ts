@@ -18,6 +18,19 @@ describe('予定の固定色パレット', () => {
     expect(getEventColor('blue', 'dark')).toBe(EVENT_COLOR_PALETTE[0].dark);
   });
 
+  it('各IDに利用者向けの固定色名を持つ', () => {
+    expect(EVENT_COLOR_PALETTE.map(({ id, label }) => [id, label])).toEqual([
+      ['blue', '青'],
+      ['teal', '青緑'],
+      ['green', '緑'],
+      ['ochre', '黄土'],
+      ['orange', '橙'],
+      ['red', '赤'],
+      ['purple', '紫'],
+      ['gray', '灰'],
+    ]);
+  });
+
   it('テーマ背景色を文字色にしたとき全色が4.5対1以上のコントラストを持つ', () => {
     for (const color of EVENT_COLOR_PALETTE) {
       expect(getContrastRatio(color.light, Colors.light.background)).toBeGreaterThanOrEqual(4.5);

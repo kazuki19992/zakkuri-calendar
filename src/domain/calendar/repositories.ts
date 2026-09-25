@@ -24,4 +24,6 @@ export interface SettingsRepository {
   getDefaultExactDuration(): Promise<ExactDuration>;
   setDefaultExactDuration(value: ExactDuration, updatedAt: string): Promise<void>;
   getUndeterminedFadeMinutes(): Promise<number>;
+  getCalendarVisible(calendarId: string): Promise<boolean>;
+  setCalendarVisible(calendarId: string, visible: boolean, updatedAt: string): Promise<void>;
 }

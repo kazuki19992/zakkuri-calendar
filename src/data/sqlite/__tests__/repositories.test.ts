@@ -111,6 +111,43 @@ describe('SQLite repositories', () => {
     });
   });
 
+  it.each([
+    [null, true],
+    [{ value_json: 'true' }, true],
+    [{ value_json: 'false' }, false],
+    [{ value_json: '"false"' }, true],
+    [{ value_json: '0' }, true],
+    [{ value_json: 'broken' }, true],
+  ])('カレンダー表示設定の欠損・正常値・不正値を安全に読み込む', async (row, expected) => {
+    const db = createDatabaseDouble();
+    db.first.mockResolvedValue(row);
+    await expect(new SqliteSettingsRepository(db.database).getCalendarVisible('personal-default'))
+      .resolves.toBe(expected);
+    expect(db.first).toHaveBeenCalledWith(expect.stringContaining('WHERE key = $key'), {
+      $key: 'calendar_visible:personal-default',
+    });
+  });
+
+  it('カレンダーID別の表示設定をbound parameterでupsertする', async () => {
+    const db = createDatabaseDouble();
+    await new SqliteSettingsRepository(db.database)
+      .setCalendarVisible('personal-default', false, now);
+    expect(db.run).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(key) DO UPDATE'), {
+      $key: 'calendar_visible:personal-default',
+      $valueJson: 'false',
+      $updatedAt: now,
+    });
+  });
+
+  it('空のカレンダーIDでは表示設定を読み書きしない', async () => {
+    const db = createDatabaseDouble();
+    const settings = new SqliteSettingsRepository(db.database);
+    await expect(settings.getCalendarVisible('   ')).rejects.toThrow('calendarId must not be empty');
+    await expect(settings.setCalendarVisible('', true, now)).rejects.toThrow('calendarId must not be empty');
+    expect(db.first).not.toHaveBeenCalled();
+    expect(db.run).not.toHaveBeenCalled();
+  });
+
   it('constructs one complete repository container', () => {
     const container = createRepositoryContainer(createDatabaseDouble().database);
     expect(Object.keys(container).sort()).toEqual(['calendars', 'events', 'settings', 'temporalDefinitions']);

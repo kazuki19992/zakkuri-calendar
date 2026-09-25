@@ -7,6 +7,7 @@ import type { TwoDayViewModel } from '../two-day-view-model';
 import { TimelineEventBlock } from './timeline-event-block';
 
 const hourLines = Array.from({ length: 25 }, (_, hour) => hour);
+const ALL_DAY_VISIBLE_ITEM_LIMIT = 2;
 
 /** 罫線の太さ。位置を下端内へ収める計算とstyleの両方で参照する。 */
 const HOUR_LINE_THICKNESS = StyleSheet.hairlineWidth;
@@ -75,9 +76,12 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
       </View>
     );
   }
+  const visibleAllDayItems = day.allDayItems.slice(0, ALL_DAY_VISIBLE_ITEM_LIMIT);
+  const hiddenAllDayItemCount = day.allDayItems.length - visibleAllDayItems.length;
   return (
     <View testID="two-day-calendar.column" style={[styles.column, { borderColor: theme.calendarBorder }] }>
-      <View accessible accessibilityLabel={day.accessibilityLabel} style={[styles.header, { borderBottomColor: theme.calendarBorder }] }>
+      <View testID="two-day-calendar.date-header" accessible accessibilityLabel={day.accessibilityLabel}
+        style={[styles.header, { borderBottomColor: theme.calendarBorder }] }>
         <Text style={[styles.weekday, { color: theme.textSecondary }]}>{day.weekdayLabel}</Text>
         <View testID={day.isToday ? 'two-day-calendar.today-circle' : undefined}
           style={[styles.dateCircle, day.isToday && { backgroundColor: theme.calendarAccent }] }>
@@ -85,20 +89,40 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
             {Number(day.date.slice(8, 10))}
           </Text>
         </View>
-        {day.holidayName !== null ? <Text style={[styles.holiday, { color: theme.calendarHoliday }]}>{day.holidayName}</Text>
-          : day.holidaySupport === 'unsupported' ? <Text style={[styles.support, { color: theme.textSecondary }]}>祝日情報未対応</Text> : null}
       </View>
-      {day.allDayItems.map((item) => (
-        <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={item.accessibilityLabel}
-          onPress={() => onEditEvent?.(item.id)}
-          style={[styles.item, { borderTopColor: theme.calendarBorder }] }>
-          <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
-          <Text style={[styles.itemTime, { color: theme.textSecondary }]}>{item.temporalLabel}</Text>
-        </Pressable>
-      ))}
-      {day.allDayItems.length === 0 && day.timelineItems.length === 0
-        ? <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text>
-        : null}
+      <View testID="two-day-calendar.all-day-region"
+        style={[styles.allDayRegion, { borderBottomColor: theme.calendarBorder }] }>
+        {visibleAllDayItems.map((item) => item.kind === 'holiday' ? (
+          <View key={item.id} accessible accessibilityRole="text" accessibilityLabel={item.accessibilityLabel}
+            style={[styles.item, styles.holidayItem, {
+              backgroundColor: theme.calendarHolidayBackground,
+              borderLeftColor: theme.calendarHoliday,
+            }] }>
+            <Text numberOfLines={1} style={[styles.itemTitle, { color: theme.calendarHoliday }]}>{item.title}</Text>
+            <Text numberOfLines={1} style={[styles.itemTime, { color: theme.calendarHoliday }]}>{item.temporalLabel}</Text>
+          </View>
+        ) : (
+          <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={item.accessibilityLabel}
+            onPress={() => item.eventId === null ? undefined : onEditEvent?.(item.eventId)}
+            style={[styles.item, { backgroundColor: theme.calendarEvent }] }>
+            <Text numberOfLines={1} style={[styles.itemTitle, { color: theme.calendarEventText }]}>{item.title}</Text>
+            <Text numberOfLines={1} style={[styles.itemTime, { color: theme.calendarEventText }]}>{item.temporalLabel}</Text>
+          </Pressable>
+        ))}
+        {hiddenAllDayItemCount > 0 ? (
+          <Text accessible accessibilityRole="text"
+            accessibilityLabel={`終日項目${day.allDayItems.length}件、他${hiddenAllDayItemCount}件`}
+            style={[styles.overflow, { color: theme.textSecondary }]}>
+            他{hiddenAllDayItemCount}件
+          </Text>
+        ) : null}
+        {day.holidaySupport === 'unsupported'
+          ? <Text style={[styles.support, { color: theme.textSecondary }]}>祝日情報未対応</Text>
+          : null}
+        {day.allDayItems.length === 0 && day.timelineItems.length === 0
+          ? <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text>
+          : null}
+      </View>
     </View>
   );
 }
@@ -109,10 +133,12 @@ const styles = StyleSheet.create({
   weekday: { fontSize: 11, lineHeight: 14 },
   dateCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   date: { fontSize: 22, fontWeight: '500', lineHeight: 26 },
-  holiday: { fontSize: 10, lineHeight: 12 },
   support: { fontSize: 10, lineHeight: 12 },
   empty: { fontSize: 11, paddingHorizontal: 6, paddingVertical: 4 },
-  item: { minHeight: 44, paddingHorizontal: 6, paddingVertical: 4, borderTopWidth: StyleSheet.hairlineWidth },
+  allDayRegion: { flex: 1, minHeight: 30, padding: 2, borderBottomWidth: StyleSheet.hairlineWidth },
+  item: { minHeight: 44, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 3 },
+  holidayItem: { borderLeftWidth: 3 },
+  overflow: { minHeight: 24, paddingHorizontal: 6, textAlignVertical: 'center' },
   itemTitle: { fontSize: 12, fontWeight: '500' },
   itemTime: { fontSize: 10, marginTop: 1 },
   timelineColumn: {

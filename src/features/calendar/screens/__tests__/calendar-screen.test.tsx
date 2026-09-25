@@ -265,10 +265,12 @@ describe('カレンダー画面', () => {
   it('カレンダー用lightとdarkのsemantic colorを提供する', () => {
     expect(Colors.light).toMatchObject({
       text: '#202124', background: '#FFFFFF', textSecondary: '#5F6368',
-      calendarAccent: '#1A73E8', calendarBorder: '#DADCE0', calendarEventText: '#174EA6',
+      calendarAccent: '#1A73E8', calendarBorder: '#DADCE0', calendarEvent: '#185ABC',
     });
     expect(Colors.dark).toMatchObject({
-      text: '#E8EAED', background: '#202124', calendarEventText: '#D2E3FC',
+      text: '#E8EAED', background: '#202124', calendarEvent: '#AECBFA',
     });
+    expect(Colors.light.calendarEventText).toBe(Colors.light.background);
+    expect(Colors.dark.calendarEventText).toBe(Colors.dark.background);
   });
 });

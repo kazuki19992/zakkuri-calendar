@@ -6,6 +6,7 @@
 import '@/global.css';
 
 import { Platform } from 'react-native';
+import { DEFAULT_EVENT_COLOR_ID, getEventColor } from './event-colors';
 
 export const Colors = {
   light: {
@@ -15,12 +16,13 @@ export const Colors = {
     backgroundSelected: '#E8F0FE',
     textSecondary: '#5F6368',
     calendarSaturday: '#1967D2',
-    calendarHoliday: '#D93025',
+    calendarHoliday: '#B3261E',
     calendarAccent: '#1A73E8',
     calendarBorder: '#DADCE0',
-    calendarEvent: '#D2E3FC',
-    calendarEventText: '#174EA6',
-    calendarEventBorder: '#8AB4F8',
+    calendarEvent: getEventColor(DEFAULT_EVENT_COLOR_ID, 'light'),
+    calendarEventText: '#FFFFFF',
+    calendarEventBorder: '#0D47A1',
+    calendarHolidayBackground: '#FCE8E6',
     calendarNowIndicator: '#EA4335',
     calendarOverlay: '#FFFFFF',
     calendarBackdrop: 'rgba(32, 33, 36, 0.32)',
@@ -35,9 +37,10 @@ export const Colors = {
     calendarHoliday: '#F28B82',
     calendarAccent: '#8AB4F8',
     calendarBorder: '#3C4043',
-    calendarEvent: '#174EA6',
-    calendarEventText: '#D2E3FC',
+    calendarEvent: getEventColor(DEFAULT_EVENT_COLOR_ID, 'dark'),
+    calendarEventText: '#202124',
     calendarEventBorder: '#8AB4F8',
+    calendarHolidayBackground: '#5C1A1A',
     calendarNowIndicator: '#F28B82',
     calendarOverlay: '#292A2D',
     calendarBackdrop: 'rgba(0, 0, 0, 0.56)',

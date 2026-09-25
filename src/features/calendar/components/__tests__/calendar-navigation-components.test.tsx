@@ -41,7 +41,9 @@ describe('カレンダーのトップナビゲーション', () => {
     const today = view.getByRole('button', { name: '今日へ移動' });
     expect(menu.props.style).toEqual(expect.objectContaining({ minHeight: 44, minWidth: 44 }));
     expect(month.props.style).toEqual(expect.objectContaining({ minHeight: 44 }));
-    expect(today.props.style).toEqual(expect.objectContaining({ minHeight: 44, minWidth: 44 }));
+    expect(StyleSheet.flatten(today.props.style)).toEqual(expect.objectContaining({ minHeight: 44, minWidth: 44 }));
+    expect(today).toHaveTextContent('今日');
+    expect(view.queryByText('◎')).toBeNull();
     await user.press(menu);
     await user.press(month);
     await user.press(today);

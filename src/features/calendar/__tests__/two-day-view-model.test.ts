@@ -81,6 +81,11 @@ describe('2日表示の表示用モデル', () => {
     });
     expect(result[1]).toMatchObject({
       date: '2026-10-01', holidayName: 'テスト記念日',
+      allDayItems: [{
+        kind: 'holiday', id: 'holiday:2026-10-01', eventId: null, colorId: 'holiday', isInteractive: false,
+        title: 'テスト記念日', temporalLabel: '祝日',
+        accessibilityLabel: 'テスト記念日、祝日',
+      }],
       timelineItems: [{ id: 'event-2', temporalLabel: '午後' }],
       accessibilityLabel: '2026年10月1日、木曜日、テスト記念日、予定1件',
     });
@@ -100,10 +105,42 @@ describe('2日表示の表示用モデル', () => {
     });
 
     expect(result[0].allDayItems).toEqual([
-      { id: 'all-day', title: '休暇', temporalLabel: '終日', accessibilityLabel: '休暇、終日' },
-      { id: 'missing', title: '未解決', temporalLabel: 'ざっくり', accessibilityLabel: '未解決、ざっくり' },
+      {
+        kind: 'event', id: 'all-day', eventId: 'all-day', colorId: 'blue', isInteractive: true, title: '休暇',
+        temporalLabel: '終日', accessibilityLabel: '休暇、終日',
+      },
+      {
+        kind: 'event', id: 'missing', eventId: 'missing', colorId: 'blue', isInteractive: true, title: '未解決',
+        temporalLabel: 'ざっくり', accessibilityLabel: '未解決、ざっくり',
+      },
     ]);
     expect(result[0].timelineItems).toEqual([]);
+  });
+
+  it('祝日と利用者の終日予定を分け、祝日を先頭の読み取り専用項目にする', () => {
+    const result = createTwoDayViewModels({
+      range: { from: '2026-10-01', through: '2026-10-02' },
+      today: '2026-09-30',
+      events: [{
+        ...baseEvent, id: 'all-day', title: '休暇', anchorDate: '2026-10-01', temporalType: 'allDay',
+      }],
+      definitions: new Map(),
+      undeterminedFadeMinutes: 120,
+      holidayCoverage,
+    });
+
+    expect(result[0].allDayItems).toEqual([
+      {
+        kind: 'holiday', id: 'holiday:2026-10-01', eventId: null, colorId: 'holiday', isInteractive: false,
+        title: 'テスト記念日', temporalLabel: '祝日',
+        accessibilityLabel: 'テスト記念日、祝日',
+      },
+      {
+        kind: 'event', id: 'all-day', eventId: 'all-day', colorId: 'blue', isInteractive: true, title: '休暇',
+        temporalLabel: '終日', accessibilityLabel: '休暇、終日',
+      },
+    ]);
+    expect(result[0].accessibilityLabel).toBe('2026年10月1日、木曜日、テスト記念日、予定1件');
   });
 
   it('前日から続く予定を翌日の時間軸にも表示する', () => {

@@ -9,7 +9,7 @@ import { CalendarLoadState } from '../components/calendar-load-state';
 import { CalendarAddEventButton } from '../components/calendar-add-event-button';
 import { CalendarDatePicker } from '../components/calendar-date-picker';
 import { CALENDAR_TOP_BAR_HEIGHT, CalendarTopBar } from '../components/calendar-top-bar';
-import { CalendarViewMenu } from '../components/calendar-view-menu';
+import { CalendarSideMenu } from '../components/calendar-side-menu';
 import { MonthGrid } from '../components/month-grid';
 import { SelectedDayAgenda } from '../components/selected-day-agenda';
 import { TwoDayView } from '../components/two-day-view';
@@ -18,11 +18,12 @@ import { useTwoDayCarousel } from '../hooks/use-two-day-carousel';
 import type { CalendarViewState } from '../hooks/use-calendar-view';
 import { TWO_DAY_SWIPE_BUFFER_DAYS } from '../two-day-view-model';
 
-export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt }: Readonly<{
+export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt, onOpenSettings }: Readonly<{
   state: CalendarViewState;
   onAddEvent(date: string): void;
   onEditEvent?(id: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
+  onOpenSettings?(): void;
 }>) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -83,8 +84,16 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
         {state.periodError !== null ? (
           <Text accessibilityRole="alert" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
         ) : null}
-        <CalendarViewMenu visible={isViewMenuVisible} mode={state.mode}
-          onSelectMode={state.selectMode} onClose={() => setViewMenuVisible(false)} />
+        <CalendarSideMenu visible={isViewMenuVisible} mode={state.mode}
+          calendarName={state.calendarName} calendarColorId={state.calendarColorId}
+          isCalendarVisible={state.isCalendarVisible}
+          isCalendarVisibilityUpdating={state.isCalendarVisibilityUpdating}
+          calendarVisibilityError={state.calendarVisibilityError}
+          topInset={insets.top} bottomInset={insets.bottom}
+          reduceMotion={reduceMotion} onSelectMode={state.selectMode}
+          onSetCalendarVisible={state.setCalendarVisible}
+          onOpenSettings={() => onOpenSettings?.()}
+          onClose={() => setViewMenuVisible(false)} />
         <CalendarDatePicker visible={isDatePickerVisible} month={state.datePickerMonth}
           days={state.datePickerDays} isLoading={state.isDatePickerLoading}
           error={state.datePickerError ?? state.periodError}

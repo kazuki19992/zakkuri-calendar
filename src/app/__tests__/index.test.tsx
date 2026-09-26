@@ -33,11 +33,13 @@ jest.mock('@/features/calendar/screens/calendar-screen', () => {
       onAddEvent,
       onEditEvent,
       onCreateExactAt,
+      onOpenSettings,
     }: {
       state: CalendarViewState;
       onAddEvent(date: string): void;
       onEditEvent?(id: string): void;
       onCreateExactAt?(date: string, startTime: string): void;
+      onOpenSettings?(): void;
     }) => {
       const { Pressable } = jest.requireActual<typeof import('react-native')>('react-native');
       return React.createElement(
@@ -57,6 +59,11 @@ jest.mock('@/features/calendar/screens/calendar-screen', () => {
           Pressable,
           { accessibilityRole: 'button', accessibilityLabel: '時刻から予定を追加', onPress: () => onCreateExactAt?.('2026-09-22', '14:00') },
           React.createElement(Text, null, '時刻から予定を追加'),
+        ),
+        React.createElement(
+          Pressable,
+          { accessibilityRole: 'button', accessibilityLabel: '設定を開く', onPress: onOpenSettings },
+          React.createElement(Text, null, '設定を開く'),
         ),
       );
     },
@@ -94,6 +101,8 @@ describe('ホームルート', () => {
         getDefaultExactDuration: jest.fn(),
         setDefaultExactDuration: jest.fn(),
         getUndeterminedFadeMinutes: jest.fn(),
+        getCalendarVisible: jest.fn(),
+        setCalendarVisible: jest.fn(),
       },
     };
     const state = { mode: 'twoDay' } as CalendarViewState;
@@ -122,5 +131,7 @@ describe('ホームルート', () => {
       pathname: '/events/new',
       params: { date: '2026-09-22', startTime: '14:00', temporalType: 'exact' },
     });
+    await user.press(screen.getByRole('button', { name: '設定を開く' }));
+    expect(push).toHaveBeenCalledWith('/settings');
   });
 });

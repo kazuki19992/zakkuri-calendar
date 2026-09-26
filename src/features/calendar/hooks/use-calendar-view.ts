@@ -228,6 +228,8 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   const requestIdRef = useRef(0);
   const datePickerRequestIdRef = useRef(0);
   const calendarVisibilityBusyRef = useRef(false);
+  const calendarVisibilityVersionRef = useRef(0);
+  const latestCalendarVisibilityRef = useRef(emptySnapshot.isCalendarVisible);
   const mountedRef = useRef(true);
   const [datePickerState, setDatePickerState] = useState<DatePickerState>({
     month: state.visibleMonth,
@@ -253,8 +255,20 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     };
   }, []);
 
+  const resolveCalendarVisibility = useCallback(
+    (snapshot: CalendarSnapshot, requestedVersion: number): CalendarSnapshot => {
+      if (requestedVersion === calendarVisibilityVersionRef.current) {
+        latestCalendarVisibilityRef.current = snapshot.isCalendarVisible;
+        return snapshot;
+      }
+      return { ...snapshot, isCalendarVisible: latestCalendarVisibilityRef.current };
+    },
+    [],
+  );
+
   useEffect(() => {
     const requestId = ++requestIdRef.current;
+    const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
     const target = stateRef.current;
     if (target.status === 'error') {
       setState((current) => ({ ...current, status: 'loading', periodError: null }));
@@ -265,7 +279,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         setState((current) => ({
           ...current,
           status: 'ready',
-          snapshot,
+          snapshot: resolveCalendarVisibility(snapshot, calendarVisibilityVersion),
           isPeriodLoading: false,
           periodError: null,
         }));
@@ -287,10 +301,12 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     input.settings,
     input.temporalDefinitions,
     input.weekStartsOn,
+    resolveCalendarVisibility,
   ]);
 
   const transitionTo = useCallback(async (target: ViewTarget): Promise<boolean> => {
     const requestId = ++requestIdRef.current;
+    const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
     setState((current) => ({ ...current, isPeriodLoading: true, periodError: null }));
     try {
       const snapshot = await loadSnapshot(inputRef.current, target);
@@ -299,7 +315,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         ...current,
         ...target,
         status: 'ready',
-        snapshot,
+        snapshot: resolveCalendarVisibility(snapshot, calendarVisibilityVersion),
         isPeriodLoading: false,
         periodError: null,
       }));
@@ -313,7 +329,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       }));
       return false;
     }
-  }, []);
+  }, [resolveCalendarVisibility]);
 
   const selectMode = useCallback(
     async (mode: CalendarViewMode): Promise<boolean> => {
@@ -387,6 +403,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   );
   const loadDatePickerMonth = useCallback(async (month: string): Promise<boolean> => {
     const requestId = ++datePickerRequestIdRef.current;
+    const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
     setDatePickerState((current) => ({ ...current, isLoading: true, error: null }));
     const current = stateRef.current;
     const target: ViewTarget = {
@@ -397,7 +414,12 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     try {
       const snapshot = await loadSnapshot(inputRef.current, target);
       if (!mountedRef.current || requestId !== datePickerRequestIdRef.current) return false;
-      setDatePickerState({ month, snapshot, isLoading: false, error: null });
+      setDatePickerState({
+        month,
+        snapshot: resolveCalendarVisibility(snapshot, calendarVisibilityVersion),
+        isLoading: false,
+        error: null,
+      });
       return true;
     } catch {
       if (!mountedRef.current || requestId !== datePickerRequestIdRef.current) return false;
@@ -408,7 +430,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       }));
       return false;
     }
-  }, []);
+  }, [resolveCalendarVisibility]);
   const selectDate = useCallback(
     async (date: string): Promise<boolean> => {
       const current = stateRef.current;
@@ -440,6 +462,8 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       const now = (inputRef.current.now ?? getSystemTime)().toISOString();
       await inputRef.current.settings.setCalendarVisible(current.snapshot.calendarId, visible, now);
       if (!mountedRef.current) return false;
+      latestCalendarVisibilityRef.current = visible;
+      calendarVisibilityVersionRef.current += 1;
       setState((value) => ({
         ...value,
         snapshot: { ...value.snapshot, isCalendarVisible: visible },

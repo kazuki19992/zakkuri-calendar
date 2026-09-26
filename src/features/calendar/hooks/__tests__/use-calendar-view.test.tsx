@@ -212,6 +212,56 @@ describe('カレンダー表示の状態調整', () => {
     expect(result.current.isCalendarVisibilityUpdating).toBe(false);
   });
 
+  it('期間移動の読込中に非表示へ切り替えても古い表示設定で上書きしない', async () => {
+    const dependencies = createDependencies();
+    const pendingVisibility = createDeferred<boolean>();
+    dependencies.settings.getCalendarVisible
+      .mockResolvedValueOnce(true)
+      .mockReturnValueOnce(pendingVisibility.promise);
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let transition!: Promise<boolean>;
+    await act(async () => {
+      transition = result.current.showNextPeriod();
+      await Promise.resolve();
+    });
+    await act(async () => expect(await result.current.setCalendarVisible(false)).toBe(true));
+    await act(async () => pendingVisibility.resolve(true));
+
+    await expect(transition).resolves.toBe(true);
+    expect(result.current.isCalendarVisible).toBe(false);
+    expect(result.current.twoDayDays.flatMap((day) => day.timelineItems)).toEqual([]);
+  });
+
+  it('日付ピッカーの読込中に非表示へ切り替えても古い表示設定で上書きしない', async () => {
+    const dependencies = createDependencies();
+    const pendingVisibility = createDeferred<boolean>();
+    dependencies.settings.getCalendarVisible
+      .mockResolvedValueOnce(true)
+      .mockReturnValueOnce(pendingVisibility.promise);
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let pickerLoad!: Promise<boolean>;
+    await act(async () => {
+      pickerLoad = result.current.loadDatePickerMonth('2026-09-01');
+      await Promise.resolve();
+    });
+    await act(async () => expect(await result.current.setCalendarVisible(false)).toBe(true));
+    await act(async () => pendingVisibility.resolve(true));
+
+    await expect(pickerLoad).resolves.toBe(true);
+    expect(result.current.isCalendarVisible).toBe(false);
+    expect(result.current.datePickerDays.find((day) => day.date === event.anchorDate)).toMatchObject({
+      hasEvents: false,
+    });
+  });
+
   it('2日表示は前後の予備列を含めた4日分のストリップも提供する', async () => {
     const dependencies = createDependencies();
     const { result } = await renderHook(() =>

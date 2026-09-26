@@ -44,11 +44,15 @@ export function CalendarSideMenu({
   const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const [translateX] = useState(() => new Animated.Value(CLOSED_TRANSLATE_X));
   const closingRef = useRef(false);
+  const operationVersionRef = useRef(0);
   const [isSelecting, setSelecting] = useState(false);
   const isBusy = isSelecting || isCalendarVisibilityUpdating;
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      operationVersionRef.current += 1;
+      return;
+    }
     closingRef.current = false;
     if (reduceMotion) {
       translateX.setValue(0);
@@ -65,6 +69,8 @@ export function CalendarSideMenu({
   const close = useCallback((afterClose?: () => void) => {
     if (closingRef.current) return;
     closingRef.current = true;
+    operationVersionRef.current += 1;
+    setSelecting(false);
     const finish = () => {
       onClose();
       afterClose?.();
@@ -86,16 +92,20 @@ export function CalendarSideMenu({
 
   const selectMode = async (nextMode: CalendarViewMode) => {
     if (isBusy) return;
+    const operationVersion = ++operationVersionRef.current;
     setSelecting(true);
     const succeeded = await onSelectMode(nextMode);
+    if (operationVersion !== operationVersionRef.current) return;
     setSelecting(false);
     if (succeeded) close();
   };
 
   const setCalendarVisible = async (nextVisible: boolean) => {
     if (isBusy) return;
+    const operationVersion = ++operationVersionRef.current;
     setSelecting(true);
     const succeeded = await onSetCalendarVisible(nextVisible);
+    if (operationVersion !== operationVersionRef.current) return;
     setSelecting(false);
     if (succeeded) close();
   };

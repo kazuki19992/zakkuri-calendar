@@ -20,6 +20,14 @@ const days: readonly MonthDayViewModel[] = Array.from({ length: 42 }, (_, index)
   accessibilityLabel: `2026年9月${index + 1}日`,
 }));
 
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('カレンダーのトップナビゲーション', () => {
   it('メニュー、月名、今日の各操作を44pt以上で表示する', async () => {
     const user = userEvent.setup();
@@ -138,6 +146,49 @@ describe('カレンダーのトップナビゲーション', () => {
     await user.press(view.getByRole('button', { name: '設定を開く' }));
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it('閉じる前に開始した操作の完了で再表示後のメニューを閉じない', async () => {
+    const user = userEvent.setup();
+    const modeResult = createDeferred<boolean>();
+    const visibilityResult = createDeferred<boolean>();
+    const onSelectMode = jest.fn().mockReturnValue(modeResult.promise);
+    const onSetCalendarVisible = jest.fn().mockReturnValue(visibilityResult.promise);
+    const onClose = jest.fn();
+    const props = {
+      mode: 'twoDay' as const,
+      calendarName: 'マイカレンダー',
+      calendarColorId: 'blue' as const,
+      isCalendarVisible: true,
+      isCalendarVisibilityUpdating: false,
+      calendarVisibilityError: null,
+      topInset: 0,
+      bottomInset: 0,
+      reduceMotion: true,
+      onSelectMode,
+      onSetCalendarVisible,
+      onOpenSettings: jest.fn(),
+      onClose,
+    };
+    const view = await render(<CalendarSideMenu {...props} visible />);
+
+    await user.press(view.getByRole('menuitem', { name: '月表示' }));
+    await user.press(view.getByTestId('calendar-side-menu.backdrop'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      modeResult.resolve(true);
+      await modeResult.promise;
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    await user.press(view.getByRole('switch', { name: 'マイカレンダーを表示' }));
+    await user.press(view.getByTestId('calendar-side-menu.backdrop'));
+    expect(onClose).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      visibilityResult.resolve(true);
+      await visibilityResult.promise;
+    });
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('日付ピッカーは月移動と日付選択を提供する', async () => {

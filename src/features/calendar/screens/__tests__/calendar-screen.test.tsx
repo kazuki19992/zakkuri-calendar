@@ -163,6 +163,11 @@ describe('カレンダー画面', () => {
 
     await user.press(screen.getByRole('button', { name: '表示メニューを開く' }));
     expect(screen.getByRole('button', { name: '設定を開く' })).toBeOnTheScreen();
+    expect(StyleSheet.flatten(screen.getByTestId('calendar-side-menu.panel').props.style))
+      .toMatchObject({
+        paddingTop: safeAreaMetrics.insets.top + 12,
+        paddingBottom: safeAreaMetrics.insets.bottom,
+      });
   });
 
   it('月名から日付ピッカーを開いて任意日へ移動する', async () => {

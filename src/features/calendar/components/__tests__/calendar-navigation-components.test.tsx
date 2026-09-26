@@ -60,6 +60,7 @@ describe('カレンダーのトップナビゲーション', () => {
       <CalendarSideMenu
         visible mode="twoDay" calendarName="マイカレンダー" calendarColorId="blue"
         isCalendarVisible isCalendarVisibilityUpdating={false} calendarVisibilityError={null}
+        topInset={0} bottomInset={0}
         reduceMotion onSelectMode={onSelectMode}
         onSetCalendarVisible={jest.fn().mockResolvedValue(true)}
         onOpenSettings={jest.fn()} onClose={onClose}
@@ -87,6 +88,7 @@ describe('カレンダーのトップナビゲーション', () => {
       <CalendarSideMenu
         visible mode="twoDay" calendarName="マイカレンダー" calendarColorId="blue"
         isCalendarVisible isCalendarVisibilityUpdating={false} calendarVisibilityError={null}
+        topInset={0} bottomInset={0}
         reduceMotion onSelectMode={jest.fn().mockResolvedValue(true)}
         onSetCalendarVisible={onSetCalendarVisible}
         onOpenSettings={jest.fn()} onClose={onClose}
@@ -105,6 +107,7 @@ describe('カレンダーのトップナビゲーション', () => {
         visible mode="twoDay" calendarName="マイカレンダー" calendarColorId="blue"
         isCalendarVisible isCalendarVisibilityUpdating={false}
         calendarVisibilityError="カレンダー表示設定を保存できませんでした"
+        topInset={0} bottomInset={0}
         reduceMotion onSelectMode={jest.fn().mockResolvedValue(true)}
         onSetCalendarVisible={onSetCalendarVisible}
         onOpenSettings={jest.fn()} onClose={onClose}
@@ -121,6 +124,7 @@ describe('カレンダーのトップナビゲーション', () => {
       <CalendarSideMenu
         visible mode="twoDay" calendarName="マイカレンダー" calendarColorId="blue"
         isCalendarVisible isCalendarVisibilityUpdating={false} calendarVisibilityError={null}
+        topInset={0} bottomInset={0}
         reduceMotion onSelectMode={jest.fn().mockResolvedValue(true)}
         onSetCalendarVisible={jest.fn().mockResolvedValue(true)}
         onOpenSettings={onOpenSettings} onClose={onClose}

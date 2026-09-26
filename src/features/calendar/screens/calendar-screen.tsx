@@ -89,6 +89,7 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
           isCalendarVisible={state.isCalendarVisible}
           isCalendarVisibilityUpdating={state.isCalendarVisibilityUpdating}
           calendarVisibilityError={state.calendarVisibilityError}
+          topInset={insets.top} bottomInset={insets.bottom}
           reduceMotion={reduceMotion} onSelectMode={state.selectMode}
           onSetCalendarVisible={state.setCalendarVisible}
           onOpenSettings={() => onOpenSettings?.()}

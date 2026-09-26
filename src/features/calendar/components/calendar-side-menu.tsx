@@ -17,6 +17,8 @@ export function CalendarSideMenu({
   isCalendarVisible,
   isCalendarVisibilityUpdating,
   calendarVisibilityError,
+  topInset,
+  bottomInset,
   reduceMotion,
   onSelectMode,
   onSetCalendarVisible,
@@ -30,6 +32,8 @@ export function CalendarSideMenu({
   isCalendarVisible: boolean;
   isCalendarVisibilityUpdating: boolean;
   calendarVisibilityError: string | null;
+  topInset: number;
+  bottomInset: number;
   reduceMotion: boolean;
   onSelectMode(mode: CalendarViewMode): Promise<boolean>;
   onSetCalendarVisible(visible: boolean): Promise<boolean>;
@@ -38,7 +42,7 @@ export function CalendarSideMenu({
 }>) {
   const theme = useTheme();
   const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const translateX = useRef(new Animated.Value(CLOSED_TRANSLATE_X)).current;
+  const [translateX] = useState(() => new Animated.Value(CLOSED_TRANSLATE_X));
   const closingRef = useRef(false);
   const [isSelecting, setSelecting] = useState(false);
   const isBusy = isSelecting || isCalendarVisibilityUpdating;
@@ -103,7 +107,12 @@ export function CalendarSideMenu({
         style={[styles.backdrop, { backgroundColor: theme.calendarBackdrop }]}
         accessible={false} onPress={() => close()}>
         <Animated.View testID="calendar-side-menu.panel" accessibilityViewIsModal
-          style={[styles.panel, { backgroundColor: theme.calendarOverlay, transform: [{ translateX }] }]}
+          style={[styles.panel, {
+            backgroundColor: theme.calendarOverlay,
+            paddingTop: topInset + 12,
+            paddingBottom: Math.max(bottomInset, 16),
+            transform: [{ translateX }],
+          }]}
           onStartShouldSetResponder={() => true}>
           <Text accessibilityRole="header" style={[styles.appName, { color: theme.text }]}>ざっくりカレンダー</Text>
           <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>表示</Text>
@@ -155,8 +164,6 @@ const styles = StyleSheet.create({
     width: '80%',
     maxWidth: 360,
     height: '100%',
-    paddingTop: 52,
-    paddingBottom: 16,
     shadowOpacity: 0.24,
     shadowRadius: 12,
     shadowOffset: { width: 3, height: 0 },

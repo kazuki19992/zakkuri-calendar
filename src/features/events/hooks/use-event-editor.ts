@@ -1,16 +1,20 @@
 import * as Crypto from 'expo-crypto';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createCalendarEvent,
   parseCalendarEvent,
   type CalendarEvent,
   type EventDraft,
+  type EventEditorTab,
 } from '@/domain/calendar/event';
 import type { EventAggregate } from '@/domain/calendar/event-reminder';
+import { isCalendarDate, offsetCalendarDate } from '@/domain/calendar/month';
 import { createFixedDurationFromTimes, toMinutesOfDay, toWallClockTime } from '@/domain/calendar/time';
 import type {
   CalendarRepository,
   EventRepository,
+  SettingsRepository,
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
@@ -48,8 +52,10 @@ export type EventEditorState = Readonly<{
 type UseEventEditorInput = Readonly<{
   calendars: CalendarRepository;
   events: EventRepository;
+  settings: SettingsRepository;
   temporalDefinitions: TemporalDefinitionRepository;
   initial: Readonly<{ date: string; startTime: string; endTime: string; temporalType: EditorTemporalType }>;
+  initialTab?: EventEditorTab;
   eventId?: string;
   createId?: () => string;
   now?: () => string;
@@ -67,11 +73,23 @@ function endTimeForEvent(event: CalendarEvent): string {
   return toWallClockTime((startMinutes + event.duration.minutes) % (24 * 60)) ?? event.startTime;
 }
 
+function editorTabForTemporalType(temporalType: EditorTemporalType): EventEditorTab {
+  return temporalType === 'fuzzy' ? 'fuzzy' : 'exact';
+}
+
+function movedAllDayEndDate(event: Extract<CalendarEvent, { temporalType: 'allDay' }>, anchorDate: string): string {
+  if (anchorDate === event.anchorDate || !isCalendarDate(anchorDate)) return event.endDate;
+  const inclusiveSpanOffset = differenceInCalendarDays(parseISO(event.endDate), parseISO(event.anchorDate));
+  return offsetCalendarDate(anchorDate, inclusiveSpanOffset);
+}
+
 export function useEventEditor({
   calendars,
   events,
+  settings,
   temporalDefinitions,
   initial,
+  initialTab,
   eventId,
   createId = Crypto.randomUUID,
   now = defaultNow,
@@ -100,9 +118,12 @@ export function useEventEditor({
     let active = true;
     const load = async (): Promise<void> => {
       try {
-        const [calendar, loadedEvent] = await Promise.all([
+        const [calendar, loadedEvent, savedTab] = await Promise.all([
           calendars.getDefault(),
           eventId === undefined ? Promise.resolve(null) : events.getById(eventId),
+          eventId === undefined && initialTab === undefined
+            ? settings.getLastEventEditorTab()
+            : Promise.resolve(null),
         ]);
         if (!active) return;
         if (eventId !== undefined && loadedEvent === null) throw new Error('event not found');
@@ -125,6 +146,12 @@ export function useEventEditor({
           } else if (existingEvent.temporalType === 'fuzzy') {
             setSelectedDefinitionId(existingEvent.temporalDefinitionId);
           }
+        } else {
+          setTemporalTypeValue(
+            initial.temporalType === 'allDay'
+              ? 'allDay'
+              : (initialTab ?? savedTab ?? initial.temporalType),
+          );
         }
         setStatus('ready');
       } catch {
@@ -133,14 +160,22 @@ export function useEventEditor({
     };
     void load();
     return () => { active = false; };
-  }, [calendars, eventId, events, loadRevision, temporalDefinitions]);
+  }, [calendars, eventId, events, initial.temporalType, initialTab, loadRevision, settings, temporalDefinitions]);
 
   const clearErrors = useCallback(() => {
     setTitleError(null); setDateError(null); setEndTimeError(null); setSaveError(null);
   }, []);
   const setTitle = useCallback((value: string) => { setTitleValue(value); clearErrors(); }, [clearErrors]);
   const setAnchorDate = useCallback((value: string) => { setAnchorDateValue(value); clearErrors(); }, [clearErrors]);
-  const setTemporalType = useCallback((value: EditorTemporalType) => { setTemporalTypeValue(value); clearErrors(); }, [clearErrors]);
+  const setTemporalType = useCallback((value: EditorTemporalType) => {
+    const previousTab = editorTabForTemporalType(temporalType);
+    const nextTab = editorTabForTemporalType(value);
+    setTemporalTypeValue(value);
+    clearErrors();
+    if (status === 'ready' && previousTab !== nextTab) {
+      void settings.setLastEventEditorTab(nextTab, now()).catch(() => {});
+    }
+  }, [clearErrors, now, settings, status, temporalType]);
   const setStartTime = useCallback((value: string) => { setStartTimeValue(value); clearErrors(); }, [clearErrors]);
   const setEndTime = useCallback((value: string) => { setEndTimeValue(value); clearErrors(); }, [clearErrors]);
   const selectDefinition = useCallback((value: string) => { setSelectedDefinitionId(value); setSaveError(null); }, []);
@@ -162,7 +197,11 @@ export function useEventEditor({
     };
     let draft: EventDraft | null = null;
     if (temporalType === 'exact') {
-      const duration = createFixedDurationFromTimes(startTime, endTime);
+      const duration = existingEvent?.temporalType === 'exact' &&
+          startTime === existingEvent.startTime &&
+          endTime === endTimeForEvent(existingEvent)
+        ? { ok: true as const, value: existingEvent.duration }
+        : createFixedDurationFromTimes(startTime, endTime);
       if (!duration.ok) { setEndTimeError(duration.error.message); return false; }
       draft = { ...base, calendarId: base.calendarId ?? '', temporalType, startTime, duration: duration.value };
     } else if (temporalType === 'allDay') {
@@ -170,7 +209,9 @@ export function useEventEditor({
         ...base,
         calendarId: base.calendarId ?? '',
         temporalType,
-        endDate: existingEvent?.temporalType === 'allDay' ? existingEvent.endDate : anchorDate,
+        endDate: existingEvent?.temporalType === 'allDay'
+          ? movedAllDayEndDate(existingEvent, anchorDate)
+          : anchorDate,
       };
     } else if (selectedDefinitionId !== null) {
       draft = { ...base, calendarId: base.calendarId ?? '', temporalType, temporalDefinitionId: selectedDefinitionId };

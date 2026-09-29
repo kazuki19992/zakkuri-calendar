@@ -5,6 +5,7 @@ import type { EventAggregate } from '@/domain/calendar/event-reminder';
 import type {
   CalendarRepository,
   EventRepository,
+  SettingsRepository,
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
@@ -35,11 +36,21 @@ const exactAggregate: EventAggregate = {
 function createRepositories(): Readonly<{
   calendars: jest.Mocked<CalendarRepository>;
   events: jest.Mocked<EventRepository>;
+  settings: jest.Mocked<SettingsRepository>;
   temporalDefinitions: jest.Mocked<TemporalDefinitionRepository>;
 }> {
   return {
     calendars: { getDefault: jest.fn().mockResolvedValue(calendar), setColor: jest.fn() },
     events: { create: jest.fn(), getById: jest.fn().mockResolvedValue(null), listByAnchorRange: jest.fn(), update: jest.fn(), delete: jest.fn() },
+    settings: {
+      getDefaultExactDuration: jest.fn(),
+      setDefaultExactDuration: jest.fn().mockResolvedValue(undefined),
+      getUndeterminedFadeMinutes: jest.fn(),
+      getCalendarVisible: jest.fn(),
+      setCalendarVisible: jest.fn().mockResolvedValue(undefined),
+      getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'),
+      setLastEventEditorTab: jest.fn().mockResolvedValue(undefined),
+    },
     temporalDefinitions: { listEnabled: jest.fn().mockResolvedValue([morning]), getById: jest.fn(), disable: jest.fn() },
   };
 }
@@ -49,6 +60,7 @@ describe('予定編集の状態調整', () => {
     const repositories = createRepositories();
     const { result } = await renderHook(() => useEventEditor({
       ...repositories, initial: { date: '2026-09-09', startTime: '09:30', endTime: '11:45', temporalType: 'exact' },
+      initialTab: 'exact',
       createId: () => 'event-new', now: () => '2026-09-09T12:00:00.000Z', getTimeZoneId: () => 'Asia/Tokyo',
     }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
@@ -68,6 +80,7 @@ describe('予定編集の状態調整', () => {
     const repositories = createRepositories();
     const { result } = await renderHook(() => useEventEditor({
       ...repositories, initial: { date: '2026-09-09', startTime: '23:30', endTime: '00:30', temporalType: 'exact' },
+      initialTab: 'exact',
       createId: () => 'event-new', now: () => '2026-09-09T12:00:00.000Z', getTimeZoneId: () => 'Asia/Tokyo',
     }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
@@ -111,6 +124,30 @@ describe('予定編集の状態調整', () => {
     expect(repositories.events.delete).toHaveBeenCalledWith(exactEvent.id);
   });
 
+  it.each([
+    ['instant', { type: 'instant' } as const],
+    ['undetermined', { type: 'undetermined' } as const],
+    ['24時間超のfixed', { type: 'fixed', minutes: 2_940 } as const],
+  ])('時刻入力を変更しなければ%s durationを保持する', async (_label, duration) => {
+    const repositories = createRepositories();
+    const event = { ...exactEvent, startTime: '09:30', duration };
+    repositories.events.getById.mockResolvedValue({ event, reminders: exactAggregate.reminders });
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      eventId: event.id,
+      initial: { date: '2026-09-01', startTime: '09:00', endTime: '10:00', temporalType: 'exact' },
+      now: () => '2026-09-10T12:00:00.000Z',
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => { result.current.setTitle('更新後'); });
+    await act(async () => { await result.current.save(); });
+
+    expect(repositories.events.update).toHaveBeenCalledWith(expect.objectContaining({
+      event: expect.objectContaining({ startTime: '09:30', duration }),
+    }));
+  });
+
   it('別カレンダーの予定ではそのカレンダーの時間表現を読み込む', async () => {
     const repositories = createRepositories();
     const otherCalendarEvent = { ...exactEvent, calendarId: 'shared-calendar' };
@@ -130,6 +167,7 @@ describe('予定編集の状態調整', () => {
     const repositories = createRepositories();
     const { result } = await renderHook(() => useEventEditor({
       ...repositories, initial: { date: '2026-09-09', startTime: '09:30', endTime: '09:30', temporalType: 'exact' },
+      initialTab: 'exact',
     }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
     await act(async () => { result.current.setTitle('会議'); await result.current.save(); });
@@ -184,6 +222,82 @@ describe('予定編集の状態調整', () => {
       event: expect.objectContaining({ temporalType: 'allDay', endDate: '2026-09-11' }),
       reminders: aggregate.reminders,
     }));
+  });
+
+  it.each([
+    ['1日予定を翌日へ移動', '2026-09-09', '2026-09-09', '2026-09-10', '2026-09-10'],
+    ['3日予定を前月へ移動', '2026-09-09', '2026-09-11', '2026-08-30', '2026-09-01'],
+  ])('%sしても包含日数を保持する', async (_label, originalStart, originalEnd, nextStart, nextEnd) => {
+    const repositories = createRepositories();
+    const aggregate: EventAggregate = {
+      event: {
+        ...exactEvent,
+        temporalType: 'allDay',
+        anchorDate: originalStart,
+        endDate: originalEnd,
+      },
+      reminders: [],
+    };
+    repositories.events.getById.mockResolvedValue(aggregate);
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      eventId: exactEvent.id,
+      initial: { date: '2026-09-01', startTime: '09:00', endTime: '10:00', temporalType: 'exact' },
+      now: () => '2026-09-10T12:00:00.000Z',
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => { result.current.setAnchorDate(nextStart); });
+    await act(async () => { await result.current.save(); });
+
+    expect(repositories.events.update).toHaveBeenCalledWith(expect.objectContaining({
+      event: expect.objectContaining({ anchorDate: nextStart, endDate: nextEnd }),
+    }));
+  });
+
+  it('新規予定では最後に開いたexactタブを復元する', async () => {
+    const repositories = createRepositories();
+    repositories.settings.getLastEventEditorTab.mockResolvedValue('exact');
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      initial: { date: '2026-09-09', startTime: '09:00', endTime: '10:00', temporalType: 'fuzzy' },
+    }));
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.temporalType).toBe('exact');
+  });
+
+  it('明示されたexactタブは保存済みタブより優先する', async () => {
+    const repositories = createRepositories();
+    repositories.settings.getLastEventEditorTab.mockResolvedValue('fuzzy');
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      initial: { date: '2026-09-09', startTime: '09:00', endTime: '10:00', temporalType: 'exact' },
+      initialTab: 'exact',
+    }));
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.temporalType).toBe('exact');
+    expect(repositories.settings.getLastEventEditorTab).not.toHaveBeenCalled();
+  });
+
+  it('タブを変更すると次回復元用に保存する', async () => {
+    const repositories = createRepositories();
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      initial: { date: '2026-09-09', startTime: '09:00', endTime: '10:00', temporalType: 'fuzzy' },
+      now: () => '2026-09-10T12:00:00.000Z',
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => { result.current.setTemporalType('exact'); });
+
+    await waitFor(() => expect(repositories.settings.setLastEventEditorTab).toHaveBeenCalledWith(
+      'exact',
+      '2026-09-10T12:00:00.000Z',
+    ));
   });
 
   it('新規予定を終日へ切り替えると基準日を終了日にする', async () => {

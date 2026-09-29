@@ -18,13 +18,15 @@ export default function NewEventRoute() {
   const state = useEventEditor({
     calendars: repositories.calendars,
     events: repositories.events,
+    settings: repositories.settings,
     temporalDefinitions: repositories.temporalDefinitions,
     initial: {
       date: params.date ?? toCalendarDate(new Date()),
       startTime,
       endTime: params.endTime ?? toWallClockTime((startMinutes + 60) % (24 * 60)) ?? '10:00',
-      temporalType: params.temporalType ?? 'exact',
+      temporalType: params.temporalType ?? 'fuzzy',
     },
+    initialTab: params.temporalType === 'exact' ? 'exact' : undefined,
   });
 
   const save = useCallback(async (): Promise<void> => {

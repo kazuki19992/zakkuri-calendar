@@ -40,7 +40,7 @@ describe('予定編集ルート', () => {
     const remove = jest.fn().mockResolvedValue(true);
     const back = jest.fn();
     const notifyChanged = jest.fn();
-    const repositories = { calendars: {}, events: {}, temporalDefinitions: {} };
+    const repositories = { calendars: {}, events: {}, settings: {}, temporalDefinitions: {} };
     jest.mocked(useLocalSearchParams).mockReturnValue({ id: 'event-1' });
     jest.mocked(useRouter).mockReturnValue({ back } as unknown as ReturnType<typeof useRouter>);
     jest.mocked(useRepositories).mockReturnValue(repositories as ReturnType<typeof useRepositories>);

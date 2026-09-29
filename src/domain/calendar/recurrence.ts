@@ -1,4 +1,5 @@
 import type { Result } from '@/domain/shared/result';
+import { isCalendarDate } from './month';
 
 export type RecurrenceRuleV1 = Readonly<{
   version: 1;
@@ -21,14 +22,6 @@ const fail = (field: string, message: string): Result<never, RecurrenceValidatio
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-function isRealDate(value: unknown): value is string {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(0);
-  date.setUTCFullYear(year, month - 1, day);
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 1;
 
@@ -48,7 +41,7 @@ export function parseRecurrenceRule(value: unknown): Result<RecurrenceRuleV1, Re
   if (!isRecord(value.end)) return fail('end', 'invalid recurrence end');
   if (value.end.type === 'never') {
     end = { type: 'never' };
-  } else if (value.end.type === 'until' && isRealDate(value.end.date)) {
+  } else if (value.end.type === 'until' && isCalendarDate(value.end.date)) {
     end = { type: 'until', date: value.end.date };
   } else if (value.end.type === 'count' && isPositiveInteger(value.end.count)) {
     end = { type: 'count', count: value.end.count };

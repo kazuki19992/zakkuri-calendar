@@ -1,5 +1,6 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { EventValidationError, ExactDuration } from './event';
+import { isCalendarDate } from './month';
 import type { Result } from '@/domain/shared/result';
 
 const MINUTES_PER_DAY = 24 * 60;
@@ -47,6 +48,7 @@ export function createFixedDurationFromDateTimes(
 ): Result<ExactDuration, EventValidationError> {
   const startMinutes = toMinutesOfDay(startTime);
   const endMinutes = toMinutesOfDay(endTime);
+  if (!isCalendarDate(startDate) || !isCalendarDate(endDate)) return durationError();
   const calendarDayDifference = differenceInCalendarDays(parseISO(endDate), parseISO(startDate));
   if (startMinutes === null || endMinutes === null || !Number.isSafeInteger(calendarDayDifference)) {
     return durationError();

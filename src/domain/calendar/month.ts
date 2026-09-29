@@ -5,6 +5,7 @@ import {
   endOfMonth,
   endOfWeek,
   format,
+  isValid,
   parse,
   startOfMonth,
   startOfWeek,
@@ -24,6 +25,12 @@ const CALENDAR_DATE_FORMAT = 'yyyy-MM-dd';
 
 function parseCalendarDate(date: string): Date {
   return parse(date, CALENDAR_DATE_FORMAT, new Date());
+}
+
+export function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = parseCalendarDate(value);
+  return isValid(date) && toCalendarDate(date) === value;
 }
 
 export function toCalendarDate(date: Date): string {

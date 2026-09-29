@@ -53,6 +53,15 @@ describe('予定時刻の変換', () => {
     });
   });
 
+  it('日時またはoffsetを含む日付入力を受け付けない', () => {
+    expect(
+      createFixedDurationFromDateTimes('2026-09-30T23:00:00-01:00', '23:30', '2026-10-02', '00:30'),
+    ).toEqual({
+      ok: false,
+      error: { field: 'duration', message: '終了時刻を開始時刻と異なる時刻にしてください' },
+    });
+  });
+
   it('終了日時が開始日時以下なら拒否する', () => {
     expect(createFixedDurationFromDateTimes('2026-10-02', '00:30', '2026-10-02', '00:30')).toEqual({
       ok: false,

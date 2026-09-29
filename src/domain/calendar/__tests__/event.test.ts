@@ -1,4 +1,9 @@
-import { createCalendarEvent, parseCalendarEvent, parseEventDraft } from '../event';
+import {
+  createCalendarEvent,
+  parseCalendarEvent,
+  parseEventDraft,
+  parseExactDuration,
+} from '../event';
 
 const base = {
   calendarId: 'personal-default',
@@ -49,6 +54,13 @@ describe('parseEventDraft', () => {
     const event = { ...validExact, duration: { type: 'fixed' as const, minutes: 135 } };
 
     expect(parseEventDraft(event)).toEqual({ ok: true, value: event });
+  });
+
+  it('24時間を超える固定分数を受け付ける', () => {
+    expect(parseExactDuration({ type: 'fixed', minutes: 3 * 24 * 60 })).toEqual({
+      ok: true,
+      value: { type: 'fixed', minutes: 4320 },
+    });
   });
 
   it('終日予定は開始日を含む終了日までを受け付ける', () => {

@@ -43,6 +43,16 @@ describe('予定時刻の変換', () => {
     });
   });
 
+  it.each([
+    ['年境界', '2026-12-31', '23:30', '2027-01-02', '00:30'],
+    ['うるう日', '2024-02-28', '23:30', '2024-03-01', '00:30'],
+  ])('%sをまたぐ日時から暦日基準の固定長を作る', (_, startDate, startTime, endDate, endTime) => {
+    expect(createFixedDurationFromDateTimes(startDate, startTime, endDate, endTime)).toEqual({
+      ok: true,
+      value: { type: 'fixed', minutes: 1500 },
+    });
+  });
+
   it('終了日時が開始日時以下なら拒否する', () => {
     expect(createFixedDurationFromDateTimes('2026-10-02', '00:30', '2026-10-02', '00:30')).toEqual({
       ok: false,

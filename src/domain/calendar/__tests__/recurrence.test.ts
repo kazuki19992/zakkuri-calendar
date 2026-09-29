@@ -16,6 +16,7 @@ describe('繰り返し規則', () => {
   it.each([
     ['0の間隔', { ...weekly, interval: 0 }],
     ['不正な曜日', { ...weekly, weekdays: [1, 7] }],
+    ['不正なfrequency', { ...weekly, frequency: 'fortnightly' }],
     ['実在しない終了日', { ...weekly, end: { type: 'until', date: '2026-02-30' } }],
     ['0の終了回数', { ...weekly, end: { type: 'count', count: 0 } }],
     ['未知のversion', { ...weekly, version: 2 }],

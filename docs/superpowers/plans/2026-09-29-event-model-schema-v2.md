@@ -96,16 +96,16 @@ const reminders = normalizeEventReminders('event-1', [
   { id: 'r1', eventId: 'event-1', minutesBefore: 10, sortOrder: 4 },
   { id: 'duplicate', eventId: 'event-1', minutesBefore: 30, sortOrder: 10 },
 ]);
-expect(reminders).toEqual([
+expect(reminders).toEqual({ ok: true, value: [
   { id: 'r1', eventId: 'event-1', minutesBefore: 10, sortOrder: 0 },
   { id: 'r2', eventId: 'event-1', minutesBefore: 30, sortOrder: 1 },
-]);
+] });
 expect(parseEventReminder({ id: 'r', eventId: 'event-1', minutesBefore: -1, sortOrder: 0 }).ok).toBe(false);
 ```
 
 - [ ] **Step 7: `EventReminder`と`EventAggregate`を実装する**
 
-`normalizeEventReminders`は入力`sortOrder`、次にIDで安定sortし、同じ`minutesBefore`の2件目以降を除外して、0始まりの連続`sortOrder`を付ける。event ID不一致や不正整数はfailureとして保存前に拒否する。
+`normalizeEventReminders`は`Result<readonly EventReminder[], EventValidationError>`を返す。入力`sortOrder`、次にIDで安定sortし、同じ`minutesBefore`の2件目以降を除外して、0始まりの連続`sortOrder`を付ける。event ID不一致や不正整数はfailureとして保存前に拒否する。
 
 - [ ] **Step 8: 拡張予定モデルの失敗テストを書く**
 

@@ -1,4 +1,5 @@
 import { createDefaultCalendar, DEFAULT_CALENDAR_ID } from '../calendar';
+import { DEFAULT_EVENT_COLOR_ID } from '../event-color';
 
 describe('createDefaultCalendar', () => {
   it('creates the single MVP calendar with a stable id and wall-clock timezone zone', () => {
@@ -6,6 +7,7 @@ describe('createDefaultCalendar', () => {
       id: DEFAULT_CALENDAR_ID,
       name: 'マイカレンダー',
       timeZoneId: 'Asia/Tokyo',
+      colorId: DEFAULT_EVENT_COLOR_ID,
       createdAt: '2026-09-08T00:00:00.000Z',
       updatedAt: '2026-09-08T00:00:00.000Z',
     });

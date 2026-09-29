@@ -1,10 +1,11 @@
-import { parseExactDuration, type ExactDuration } from '@/domain/calendar/event';
+import { parseExactDuration, type EventEditorTab, type ExactDuration } from '@/domain/calendar/event';
 import type { SettingsRepository } from '@/domain/calendar/repositories';
 import type { AppDatabase } from './database';
 
 type SettingRow = Readonly<{ value_json: string }>;
 const DEFAULT_DURATION: ExactDuration = { type: 'instant' };
 const DEFAULT_FADE_MINUTES = 120;
+const DEFAULT_EVENT_EDITOR_TAB: EventEditorTab = 'fuzzy';
 
 function parseJson(value: string): unknown {
   try {
@@ -17,6 +18,10 @@ function parseJson(value: string): unknown {
 function getCalendarVisibilityKey(calendarId: string): string {
   if (calendarId.trim().length === 0) throw new Error('calendarId must not be empty');
   return `calendar_visible:${calendarId}`;
+}
+
+function parseEventEditorTab(value: unknown): EventEditorTab | null {
+  return value === 'fuzzy' || value === 'exact' ? value : null;
 }
 
 export class SqliteSettingsRepository implements SettingsRepository {
@@ -75,6 +80,29 @@ export class SqliteSettingsRepository implements SettingsRepository {
       {
         $key: getCalendarVisibilityKey(calendarId),
         $valueJson: JSON.stringify(visible),
+        $updatedAt: updatedAt,
+      },
+    );
+  }
+
+  async getLastEventEditorTab(): Promise<EventEditorTab> {
+    const row = await this.database.first<SettingRow>(
+      'SELECT value_json FROM app_settings WHERE key = $key',
+      { $key: 'last_event_editor_tab' },
+    );
+    if (!row) return DEFAULT_EVENT_EDITOR_TAB;
+    return parseEventEditorTab(parseJson(row.value_json)) ?? DEFAULT_EVENT_EDITOR_TAB;
+  }
+
+  async setLastEventEditorTab(tab: EventEditorTab, updatedAt: string): Promise<void> {
+    if (parseEventEditorTab(tab) === null) throw new Error('Invalid event editor tab');
+    await this.database.run(
+      `INSERT INTO app_settings (key, value_json, updated_at)
+       VALUES ($key, $valueJson, $updatedAt)
+       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+      {
+        $key: 'last_event_editor_tab',
+        $valueJson: JSON.stringify(tab),
         $updatedAt: updatedAt,
       },
     );

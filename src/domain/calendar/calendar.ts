@@ -1,9 +1,12 @@
+import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from './event-color';
+
 export const DEFAULT_CALENDAR_ID = 'personal-default';
 
 export type Calendar = Readonly<{
   id: string;
   name: string;
   timeZoneId: string;
+  colorId: EventColorId;
   createdAt: string;
   updatedAt: string;
 }>;
@@ -21,6 +24,7 @@ export function createDefaultCalendar(timeZoneId: string, now: string): Calendar
     id: DEFAULT_CALENDAR_ID,
     name: 'マイカレンダー',
     timeZoneId,
+    colorId: DEFAULT_EVENT_COLOR_ID,
     createdAt: now,
     updatedAt: now,
   };

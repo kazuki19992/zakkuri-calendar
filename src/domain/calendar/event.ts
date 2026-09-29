@@ -1,4 +1,7 @@
 import type { Result } from '@/domain/shared/result';
+import { parseEventColorId, type EventColorId } from './event-color';
+import { isCalendarDate } from './month';
+import { parseRecurrenceRule, type RecurrenceRuleV1 } from './recurrence';
 
 export type ExactDuration =
   | Readonly<{ type: 'instant' }>
@@ -10,17 +13,23 @@ type EventDraftBase = Readonly<{
   title: string;
   anchorDate: string;
   createdTimeZoneId: string;
+  location: string | null;
+  notes: string | null;
+  colorId: EventColorId | null;
+  recurrenceRule: RecurrenceRuleV1 | null;
 }>;
 
 export type EventDraft =
   | (EventDraftBase & Readonly<{ temporalType: 'exact'; startTime: string; duration: ExactDuration }>)
-  | (EventDraftBase & Readonly<{ temporalType: 'allDay' }>)
+  | (EventDraftBase & Readonly<{ temporalType: 'allDay'; endDate: string }>)
   | (EventDraftBase & Readonly<{ temporalType: 'fuzzy'; temporalDefinitionId: string }>);
 
 export type CalendarEvent = EventDraft &
   Readonly<{ id: string; createdAt: string; updatedAt: string }>;
 
 export type EventValidationError = Readonly<{ field: string; message: string }>;
+
+export type EventEditorTab = 'fuzzy' | 'exact';
 
 const fail = (field: string, message: string): Result<never, EventValidationError> => ({
   ok: false,
@@ -30,14 +39,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 const isNonBlank = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
-
-function isRealDate(value: unknown): value is string {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(0);
-  date.setUTCFullYear(year, month - 1, day);
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
 
 function isWallClockTime(value: unknown): value is string {
   return typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
@@ -51,7 +52,7 @@ export function parseExactDuration(value: unknown): Result<ExactDuration, EventV
   if (
     value.type === 'fixed' &&
     typeof value.minutes === 'number' &&
-    Number.isInteger(value.minutes) && value.minutes >= 1 && value.minutes < 24 * 60
+    Number.isSafeInteger(value.minutes) && value.minutes >= 1
   ) {
     return { ok: true, value: { type: 'fixed', minutes: value.minutes } };
   }
@@ -62,16 +63,37 @@ export function parseEventDraft(input: unknown): Result<EventDraft, EventValidat
   if (!isRecord(input)) return fail('event', 'event must be an object');
   if (!isNonBlank(input.calendarId)) return fail('calendarId', 'calendarId must not be blank');
   if (!isNonBlank(input.title)) return fail('title', 'title must not be blank');
-  if (!isRealDate(input.anchorDate)) return fail('anchorDate', 'anchorDate must be a real date');
+  if (!isCalendarDate(input.anchorDate)) return fail('anchorDate', 'anchorDate must be a real date');
   if (!isNonBlank(input.createdTimeZoneId)) return fail('createdTimeZoneId', 'createdTimeZoneId must not be blank');
+
+  const location = normalizeOptionalText(input.location);
+  if (location === undefined) return fail('location', 'location must be a string or null');
+  const notes = normalizeOptionalText(input.notes);
+  if (notes === undefined) return fail('notes', 'notes must be a string or null');
+  const colorId = parseOptionalColorId(input.colorId);
+  if (!colorId.ok) return colorId;
+  const recurrenceRule = parseOptionalRecurrenceRule(input.recurrenceRule);
+  if (!recurrenceRule.ok) return recurrenceRule;
+  if (recurrenceRule.value?.end.type === 'until' && recurrenceRule.value.end.date < input.anchorDate) {
+    return fail('recurrenceRule', 'recurrence until date must not be before anchor date');
+  }
 
   const base = {
     calendarId: input.calendarId,
     title: input.title,
     anchorDate: input.anchorDate,
     createdTimeZoneId: input.createdTimeZoneId,
+    location,
+    notes,
+    colorId: colorId.value,
+    recurrenceRule: recurrenceRule.value,
   };
-  if (input.temporalType === 'allDay') return { ok: true, value: { ...base, temporalType: 'allDay' } };
+  if (input.temporalType === 'allDay') {
+    if (!isCalendarDate(input.endDate) || input.endDate < input.anchorDate) {
+      return fail('endDate', 'all-day end date must not be before anchor date');
+    }
+    return { ok: true, value: { ...base, temporalType: 'allDay', endDate: input.endDate } };
+  }
   if (input.temporalType === 'fuzzy') {
     if (!isNonBlank(input.temporalDefinitionId)) {
       return fail('temporalDefinitionId', 'fuzzy events require a temporal definition');
@@ -85,6 +107,24 @@ export function parseEventDraft(input: unknown): Result<EventDraft, EventValidat
     return { ok: true, value: { ...base, temporalType: 'exact', startTime: input.startTime, duration: duration.value } };
   }
   return fail('temporalType', 'invalid temporal type');
+}
+
+function normalizeOptionalText(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return undefined;
+  return value.trim().length === 0 ? null : value;
+}
+
+function parseOptionalColorId(value: unknown): Result<EventColorId | null, EventValidationError> {
+  if (value === null || value === undefined) return { ok: true, value: null };
+  return parseEventColorId(value);
+}
+
+function parseOptionalRecurrenceRule(
+  value: unknown,
+): Result<RecurrenceRuleV1 | null, EventValidationError> {
+  if (value === null || value === undefined) return { ok: true, value: null };
+  return parseRecurrenceRule(value);
 }
 
 export function parseCalendarEvent(input: unknown): Result<CalendarEvent, EventValidationError> {

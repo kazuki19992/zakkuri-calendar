@@ -11,7 +11,7 @@ export default function EditEventRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const repositories = useRepositories();
   const { notifyChanged } = useCalendarRefresh();
-  const state = useEventEditor({ calendars: repositories.calendars, events: repositories.events, temporalDefinitions: repositories.temporalDefinitions,
+  const state = useEventEditor({ calendars: repositories.calendars, events: repositories.events, settings: repositories.settings, temporalDefinitions: repositories.temporalDefinitions,
     eventId: id, initial: { date: '2000-01-01', startTime: '09:00', endTime: '10:00', temporalType: 'exact' } });
   const complete = useCallback(async (operation: () => Promise<boolean>) => { if (await operation()) { notifyChanged(); router.back(); } }, [notifyChanged, router]);
   useEffect(() => {

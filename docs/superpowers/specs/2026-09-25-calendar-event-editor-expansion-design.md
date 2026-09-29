@@ -187,6 +187,17 @@ Expo Routerへ薄いrouteを追加し、feature screenに「設定」とだけ�
 
 予定へ場所、メモ、任意の`colorId`、任意の`RecurrenceRule`を追加する。`colorId: null`はカレンダー既定色の継承を意味する。不明なIDは読み込み境界で既定色へfallbackし、保存値をログへ出さない。
 
+通知は予定本体の値へ埋め込まず、次の集約で扱う。
+
+```ts
+type EventAggregate = Readonly<{
+  event: CalendarEvent;
+  reminders: readonly EventReminder[];
+}>;
+```
+
+`EventRepository`の作成・単件取得・更新は`EventAggregate`を入出力し、期間表示用の一覧取得は通知を必要としないため`CalendarEvent[]`を返す。これにより、カレンダー表示へ通知行を読み込まず、編集時だけ予定と通知を一体として扱う。
+
 ## 8. 繰り返し
 
 ### 8.1 規則
@@ -234,6 +245,8 @@ schema versionを1段進め、既存データを保持するmigrationを追加�
 
 予定と1対多の通知設定を保存する。一意ID、予定IDと外部キー、何分前かを表す非負整数、表示順を持つ。予定削除時は関連通知も同じtransactionで削除する。runtime値はすべてbound parameterで渡す。
 
+`EventRepository`は予定本体と通知を同じtransaction境界で保存する。作成では予定行と通知行をまとめて追加し、更新では予定行の更新と対象予定の通知行の置換をまとめて行う。途中で失敗した場合は全変更をrollbackし、片方だけが保存された状態を作らない。通知専用Repositoryを公開したり、feature hookへtransaction調整を委ねたりしない。
+
 ### 9.4 app_settings
 
 既存の設定Repository境界を拡張する。第2段階でマイカレンダーの表示状態を保存し、第3段階で最後に開いた予定編集タブを追加する。未設定・不正値はそれぞれ表示状態と`fuzzy`へfallbackする。
@@ -248,6 +261,8 @@ schema versionを1段進め、既存データを保持するmigrationを追加�
 - `src/app`: routeとRepositoryの組み立て。
 
 UIはSQLite row、SQL、祝日ライブラリへ直接依存しない。予定保存と通知保存はRepositoryのtransaction境界内で一貫して行う。
+
+第3段階ではRepositoryと既存feature hookを新しい集約契約へ追従させるが、入力項目や画面構成は変更しない。第4段階で追加項目の編集UIと繰り返し発生回の展開を接続する。
 
 ## 11. Validationとエラー
 

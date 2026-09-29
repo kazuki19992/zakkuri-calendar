@@ -33,6 +33,12 @@ describe('migrateDatabase', () => {
     expect(schemaSql).toContain('fade_in_ratio + fade_out_ratio <= 1');
     expect(schemaSql).toContain('CREATE INDEX IF NOT EXISTS events_anchor_range_idx');
     expect(schemaSql).toContain('CREATE INDEX IF NOT EXISTS temporal_definitions_enabled_idx');
+    expect(schemaSql).toContain("ALTER TABLE calendars ADD COLUMN color_id TEXT NOT NULL DEFAULT 'blue'");
+    expect(schemaSql).toContain('ALTER TABLE events ADD COLUMN end_date TEXT');
+    expect(schemaSql).toContain('CREATE TABLE event_reminders');
+    expect(schemaSql).toContain('ON DELETE CASCADE');
+    expect(schemaSql).toContain('CREATE INDEX event_reminders_event_order_idx');
+    expect(schemaSql).toContain('CREATE INDEX events_recurrence_anchor_idx');
   });
 
   it('seeds stable defaults with bound values without overwriting existing values', async () => {
@@ -41,7 +47,7 @@ describe('migrateDatabase', () => {
     await migrateDatabase(database.database, environment);
 
     const writes = database.run.mock.calls as [string, Record<string, unknown>][];
-    expect(writes).toHaveLength(26);
+    expect(writes).toHaveLength(27);
     expect(writes.every(([sql]) => sql.includes('ON CONFLICT DO NOTHING'))).toBe(true);
     expect(writes[0][1]).toMatchObject({
       $id: 'personal-default',
@@ -65,12 +71,41 @@ describe('migrateDatabase', () => {
       expect.stringContaining('app_settings'),
       expect.objectContaining({ $key: 'undetermined_fade_minutes', $valueJson: '120' }),
     ]);
+    expect(writes.at(-2)?.[1]).toMatchObject({ $version: 1 });
     expect(writes.at(-1)?.[1]).toMatchObject({ $version: LATEST_SCHEMA_VERSION });
   });
 
-  it('does not rerun schema or seed writes for an existing version 1 database', async () => {
+  it('migrates an existing version 1 database to version 2 without deleting events', async () => {
     const database = createDatabaseDouble();
     database.first.mockResolvedValue({ version: 1 });
+
+    await migrateDatabase(database.database, environment);
+
+    const schemaSql = database.exec.mock.calls.map(([sql]) => sql).join('\n');
+    expect(schemaSql).toContain("ALTER TABLE calendars ADD COLUMN color_id TEXT NOT NULL DEFAULT 'blue'");
+    expect(schemaSql).toContain('ALTER TABLE events ADD COLUMN end_date TEXT');
+    expect(schemaSql).toContain('CREATE TABLE event_reminders');
+    expect(schemaSql).not.toContain('DELETE FROM events');
+    expect(database.run).toHaveBeenCalledWith(expect.stringContaining('schema_migrations'), {
+      $version: 2,
+      $appliedAt: environment.now(),
+    });
+  });
+
+  it('backfills an end date only for existing all-day events', async () => {
+    const database = createDatabaseDouble();
+    database.first.mockResolvedValue({ version: 1 });
+
+    await migrateDatabase(database.database, environment);
+
+    expect(database.exec).toHaveBeenCalledWith(expect.stringContaining(
+      "UPDATE events SET end_date = anchor_date WHERE temporal_type = 'allDay' AND end_date IS NULL",
+    ));
+  });
+
+  it('does not rerun schema or write migration rows for an existing version 2 database', async () => {
+    const database = createDatabaseDouble();
+    database.first.mockResolvedValue({ version: 2 });
 
     await migrateDatabase(database.database, environment);
 
@@ -87,6 +122,23 @@ describe('migrateDatabase', () => {
     expect(database.run).not.toHaveBeenCalledWith(
       expect.stringContaining('schema_migrations'),
       expect.objectContaining({ $version: 1 }),
+    );
+  });
+
+  it('does not record version 2 after its schema changes fail', async () => {
+    const database = createDatabaseDouble();
+    database.first.mockResolvedValue({ version: 1 });
+    database.exec
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('migration failed'));
+
+    await expect(migrateDatabase(database.database, environment)).rejects.toThrow('migration failed');
+
+    expect(database.run).not.toHaveBeenCalledWith(
+      expect.stringContaining('schema_migrations'),
+      expect.objectContaining({ $version: 2 }),
     );
   });
 });

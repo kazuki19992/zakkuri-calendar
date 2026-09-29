@@ -9,6 +9,10 @@ import {
 const baseEvent = {
   calendarId: 'personal-default',
   createdTimeZoneId: 'Asia/Tokyo',
+  location: null,
+  notes: null,
+  colorId: null,
+  recurrenceRule: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 } as const;
@@ -93,7 +97,10 @@ describe('2日表示の表示用モデル', () => {
 
   it('終日予定と未解決予定を時間軸外に残す', () => {
     const events: readonly CalendarEvent[] = [
-      { ...baseEvent, id: 'all-day', title: '休暇', anchorDate: '2026-09-30', temporalType: 'allDay' },
+      {
+        ...baseEvent, id: 'all-day', title: '休暇', anchorDate: '2026-09-30',
+        temporalType: 'allDay', endDate: '2026-09-30',
+      },
       {
         ...baseEvent, id: 'missing', title: '未解決', anchorDate: '2026-09-30',
         temporalType: 'fuzzy', temporalDefinitionId: 'missing-definition',
@@ -122,7 +129,8 @@ describe('2日表示の表示用モデル', () => {
       range: { from: '2026-10-01', through: '2026-10-02' },
       today: '2026-09-30',
       events: [{
-        ...baseEvent, id: 'all-day', title: '休暇', anchorDate: '2026-10-01', temporalType: 'allDay',
+        ...baseEvent, id: 'all-day', title: '休暇', anchorDate: '2026-10-01',
+        temporalType: 'allDay', endDate: '2026-10-01',
       }],
       definitions: new Map(),
       undeterminedFadeMinutes: 120,

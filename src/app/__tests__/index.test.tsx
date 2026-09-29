@@ -84,7 +84,7 @@ describe('ホームルート', () => {
     const push = jest.fn();
     jest.mocked(useRouter).mockReturnValue({ push } as unknown as ReturnType<typeof useRouter>);
     const repositories = {
-      calendars: { getDefault: jest.fn() },
+      calendars: { getDefault: jest.fn(), setColor: jest.fn() },
       events: {
         create: jest.fn(),
         getById: jest.fn(),
@@ -103,6 +103,8 @@ describe('ホームルート', () => {
         getUndeterminedFadeMinutes: jest.fn(),
         getCalendarVisible: jest.fn(),
         setCalendarVisible: jest.fn(),
+        getLastEventEditorTab: jest.fn(),
+        setLastEventEditorTab: jest.fn(),
       },
     };
     const state = { mode: 'twoDay' } as CalendarViewState;

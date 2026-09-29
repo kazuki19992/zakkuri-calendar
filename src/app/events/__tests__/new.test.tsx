@@ -51,6 +51,7 @@ describe('予定作成ルート', () => {
     const repositories = {
       calendars: { getDefault: jest.fn() },
       events: { create: jest.fn() },
+      settings: { getLastEventEditorTab: jest.fn() },
       temporalDefinitions: { listEnabled: jest.fn() },
     };
     const back = jest.fn();
@@ -69,15 +70,48 @@ describe('予定作成ルート', () => {
     expect(useEventEditor).toHaveBeenCalledWith({
       calendars: repositories.calendars,
       events: repositories.events,
+      settings: repositories.settings,
       temporalDefinitions: repositories.temporalDefinitions,
       initial: expect.objectContaining({
         date: '2026-09-21',
-        temporalType: 'exact',
+        temporalType: 'fuzzy',
       }),
     });
     await user.press(screen.getByRole('button', { name: '保存' }));
     expect(notifyChanged).toHaveBeenCalledTimes(1);
     expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  it('時刻枠からの明示的なexact作成を保存済みタブより優先する', async () => {
+    const repositories = {
+      calendars: {},
+      events: {},
+      settings: {},
+      temporalDefinitions: {},
+    };
+    jest.mocked(useLocalSearchParams).mockReturnValue({
+      date: '2026-09-21',
+      startTime: '14:00',
+      temporalType: 'exact',
+    });
+    jest.mocked(useRouter).mockReturnValue({ back: jest.fn() } as unknown as ReturnType<
+      typeof useRouter
+    >);
+    jest.mocked(useRepositories).mockReturnValue(repositories as ReturnType<typeof useRepositories>);
+    jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged: jest.fn() });
+    jest.mocked(useEventEditor).mockReturnValue({
+      isSaving: false,
+      isDeleting: false,
+      save: jest.fn(),
+    } as unknown as EventEditorState);
+
+    await render(<NewEventRoute />);
+
+    expect(useEventEditor).toHaveBeenCalledWith(expect.objectContaining({
+      settings: repositories.settings,
+      initial: expect.objectContaining({ temporalType: 'exact' }),
+      initialTab: 'exact',
+    }));
   });
 
   it('保存失敗時は作成画面を閉じない', async () => {

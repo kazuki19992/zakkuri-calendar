@@ -14,6 +14,7 @@ const calendar: Calendar = {
   id: 'personal-default',
   name: 'マイカレンダー',
   timeZoneId: 'Asia/Tokyo',
+  colorId: 'blue',
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
@@ -25,6 +26,10 @@ const event: CalendarEvent = {
   anchorDate: '2026-09-09',
   temporalType: 'fuzzy',
   temporalDefinitionId: 'personal-default:afternoon',
+  location: null,
+  notes: null,
+  colorId: null,
+  recurrenceRule: null,
   createdTimeZoneId: 'Asia/Tokyo',
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -41,6 +46,7 @@ function createDeferred<T>() {
 function createDependencies() {
   const calendars: jest.Mocked<CalendarRepository> = {
     getDefault: jest.fn().mockResolvedValue(calendar),
+    setColor: jest.fn(),
   };
   const events: jest.Mocked<EventRepository> = {
     create: jest.fn(),
@@ -80,6 +86,8 @@ function createDependencies() {
     getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(90),
     getCalendarVisible: jest.fn().mockResolvedValue(true),
     setCalendarVisible: jest.fn().mockResolvedValue(undefined),
+    getLastEventEditorTab: jest.fn(),
+    setLastEventEditorTab: jest.fn(),
   };
   return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }
@@ -144,6 +152,18 @@ describe('カレンダー表示の状態調整', () => {
       timelineItems: [],
     });
     expect(result.current.selectedAgendaItems).toEqual([]);
+  });
+
+  it('保存済みのカレンダー色をサイドメニュー用の状態として返す', async () => {
+    const dependencies = createDependencies();
+    dependencies.calendars.getDefault.mockResolvedValue({ ...calendar, colorId: 'teal' });
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.calendarColorId).toBe('teal');
   });
 
   it('マイカレンダー表示設定の保存成功後に予定表示を更新する', async () => {

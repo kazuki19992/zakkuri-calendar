@@ -1,14 +1,10 @@
-export type EventColorId =
-  | 'blue'
-  | 'teal'
-  | 'green'
-  | 'ochre'
-  | 'orange'
-  | 'red'
-  | 'purple'
-  | 'gray';
+import {
+  DEFAULT_EVENT_COLOR_ID,
+  EVENT_COLOR_IDS,
+  type EventColorId,
+} from '@/domain/calendar/event-color';
 
-export const DEFAULT_EVENT_COLOR_ID: EventColorId = 'blue';
+export { DEFAULT_EVENT_COLOR_ID, EVENT_COLOR_IDS, type EventColorId };
 
 export const EVENT_COLOR_PALETTE: readonly Readonly<{
   id: EventColorId;

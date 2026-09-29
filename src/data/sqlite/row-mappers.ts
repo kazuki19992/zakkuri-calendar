@@ -105,7 +105,7 @@ export function mapEventRow(row: EventRow): CalendarEvent {
     location: row.location,
     notes: row.notes,
     colorId: color !== null && color.ok ? color.value : null,
-    recurrenceRule: parseStoredRecurrenceRule(row.recurrence_rule_json),
+    recurrenceRule: null,
     createdTimeZoneId: row.created_time_zone_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -126,7 +126,12 @@ export function mapEventRow(row: EventRow): CalendarEvent {
   }
   const parsed = parseCalendarEvent(candidate);
   if (!parsed.ok) throw new CorruptDatabaseRowError('event', row.id);
-  return parsed.value;
+
+  const recurrenceRule = parseStoredRecurrenceRule(row.recurrence_rule_json);
+  if (recurrenceRule === null) return parsed.value;
+
+  const withRecurrence = parseCalendarEvent({ ...parsed.value, recurrenceRule });
+  return withRecurrence.ok ? withRecurrence.value : parsed.value;
 }
 
 export function mapReminderRow(row: ReminderRow): EventReminder {

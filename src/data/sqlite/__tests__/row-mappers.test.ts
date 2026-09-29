@@ -76,6 +76,18 @@ describe('row mappers', () => {
     }).recurrenceRule).toBeNull();
   });
 
+  it('開始日より前のuntilを持つ保存済み規則を繰り返しなしとして予定を読み込む', () => {
+    expect(mapEventRow({
+      ...eventRow,
+      recurrence_rule_json: '{"version":1,"frequency":"daily","interval":1,"weekdays":[],"end":{"type":"until","date":"2026-09-07"}}',
+    })).toMatchObject({
+      id: 'event-1',
+      title: '歯医者',
+      temporalType: 'exact',
+      recurrenceRule: null,
+    });
+  });
+
   it('falls back to no event color for an unknown persisted event color', () => {
     expect(mapEventRow({ ...eventRow, color_id: 'removed-color' }).colorId).toBeNull();
   });

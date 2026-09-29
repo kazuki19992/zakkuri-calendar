@@ -78,6 +78,8 @@ function createDependencies() {
     getDefaultExactDuration: jest.fn(),
     setDefaultExactDuration: jest.fn(),
     getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(90),
+    getCalendarVisible: jest.fn().mockResolvedValue(true),
+    setCalendarVisible: jest.fn().mockResolvedValue(undefined),
   };
   return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }
@@ -100,6 +102,11 @@ describe('カレンダー表示の状態調整', () => {
       anchorDate: '2026-09-08',
       selectedDate: '2026-09-08',
       visibleMonth: '2026-09-01',
+      calendarName: 'マイカレンダー',
+      calendarColorId: 'blue',
+      isCalendarVisible: true,
+      isCalendarVisibilityUpdating: false,
+      calendarVisibilityError: null,
     });
     expect(result.current.twoDayDays.map((day) => day.date)).toEqual([
       '2026-09-08',
@@ -117,7 +124,142 @@ describe('カレンダー表示の状態調整', () => {
       '2026-09-10',
     );
     expect(dependencies.settings.getUndeterminedFadeMinutes).toHaveBeenCalledTimes(1);
+    expect(dependencies.settings.getCalendarVisible).toHaveBeenCalledWith(calendar.id);
     expect(dependencies.temporalDefinitions.getById).toHaveBeenCalledWith(event.temporalDefinitionId);
+  });
+
+  it('マイカレンダー非表示では利用者予定だけを隠して祝日を残す', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getCalendarVisible.mockResolvedValue(false);
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.isCalendarVisible).toBe(false);
+    expect(result.current.twoDayDays[1]).toMatchObject({
+      holidayName: 'テスト祝日',
+      allDayItems: [expect.objectContaining({ kind: 'holiday', title: 'テスト祝日' })],
+      timelineItems: [],
+    });
+    expect(result.current.selectedAgendaItems).toEqual([]);
+  });
+
+  it('マイカレンダー表示設定の保存成功後に予定表示を更新する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => expect(await result.current.setCalendarVisible(false)).toBe(true));
+
+    expect(dependencies.settings.setCalendarVisible).toHaveBeenCalledWith(
+      calendar.id,
+      false,
+      '2026-09-08T03:00:00.000Z',
+    );
+    expect(result.current).toMatchObject({
+      isCalendarVisible: false,
+      isCalendarVisibilityUpdating: false,
+      calendarVisibilityError: null,
+    });
+    expect(result.current.twoDayDays[1].timelineItems).toEqual([]);
+  });
+
+  it('マイカレンダー表示設定の保存失敗時は現在表示を維持する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.setCalendarVisible.mockRejectedValue(new Error('database unavailable'));
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => expect(await result.current.setCalendarVisible(false)).toBe(false));
+
+    expect(result.current).toMatchObject({
+      isCalendarVisible: true,
+      isCalendarVisibilityUpdating: false,
+      calendarVisibilityError: 'カレンダー表示設定を保存できませんでした',
+    });
+    expect(result.current.twoDayDays[1].timelineItems).toHaveLength(1);
+  });
+
+  it('マイカレンダー表示設定の保存中は同期的に二重実行を防ぐ', async () => {
+    const dependencies = createDependencies();
+    const pending = createDeferred<void>();
+    dependencies.settings.setCalendarVisible.mockReturnValue(pending.promise);
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let first!: Promise<boolean>;
+    let second!: Promise<boolean>;
+    await act(async () => {
+      first = result.current.setCalendarVisible(false);
+      second = result.current.setCalendarVisible(false);
+      await Promise.resolve();
+    });
+
+    await expect(second).resolves.toBe(false);
+    expect(dependencies.settings.setCalendarVisible).toHaveBeenCalledTimes(1);
+    expect(result.current.isCalendarVisibilityUpdating).toBe(true);
+
+    await act(async () => pending.resolve(undefined));
+    await expect(first).resolves.toBe(true);
+    expect(result.current.isCalendarVisibilityUpdating).toBe(false);
+  });
+
+  it('期間移動の読込中に非表示へ切り替えても古い表示設定で上書きしない', async () => {
+    const dependencies = createDependencies();
+    const pendingVisibility = createDeferred<boolean>();
+    dependencies.settings.getCalendarVisible
+      .mockResolvedValueOnce(true)
+      .mockReturnValueOnce(pendingVisibility.promise);
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let transition!: Promise<boolean>;
+    await act(async () => {
+      transition = result.current.showNextPeriod();
+      await Promise.resolve();
+    });
+    await act(async () => expect(await result.current.setCalendarVisible(false)).toBe(true));
+    await act(async () => pendingVisibility.resolve(true));
+
+    await expect(transition).resolves.toBe(true);
+    expect(result.current.isCalendarVisible).toBe(false);
+    expect(result.current.twoDayDays.flatMap((day) => day.timelineItems)).toEqual([]);
+  });
+
+  it('日付ピッカーの読込中に非表示へ切り替えても古い表示設定で上書きしない', async () => {
+    const dependencies = createDependencies();
+    const pendingVisibility = createDeferred<boolean>();
+    dependencies.settings.getCalendarVisible
+      .mockResolvedValueOnce(true)
+      .mockReturnValueOnce(pendingVisibility.promise);
+    const { result } = await renderHook(() =>
+      useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    let pickerLoad!: Promise<boolean>;
+    await act(async () => {
+      pickerLoad = result.current.loadDatePickerMonth('2026-09-01');
+      await Promise.resolve();
+    });
+    await act(async () => expect(await result.current.setCalendarVisible(false)).toBe(true));
+    await act(async () => pendingVisibility.resolve(true));
+
+    await expect(pickerLoad).resolves.toBe(true);
+    expect(result.current.isCalendarVisible).toBe(false);
+    expect(result.current.datePickerDays.find((day) => day.date === event.anchorDate)).toMatchObject({
+      hasEvents: false,
+    });
   });
 
   it('2日表示は前後の予備列を含めた4日分のストリップも提供する', async () => {

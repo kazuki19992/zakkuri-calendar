@@ -14,6 +14,11 @@ function parseJson(value: string): unknown {
   }
 }
 
+function getCalendarVisibilityKey(calendarId: string): string {
+  if (calendarId.trim().length === 0) throw new Error('calendarId must not be empty');
+  return `calendar_visible:${calendarId}`;
+}
+
 export class SqliteSettingsRepository implements SettingsRepository {
   constructor(private readonly database: AppDatabase) {}
 
@@ -50,5 +55,28 @@ export class SqliteSettingsRepository implements SettingsRepository {
     if (!row) return DEFAULT_FADE_MINUTES;
     const value = parseJson(row.value_json);
     return Number.isInteger(value) && Number(value) > 0 ? Number(value) : DEFAULT_FADE_MINUTES;
+  }
+
+  async getCalendarVisible(calendarId: string): Promise<boolean> {
+    const row = await this.database.first<SettingRow>(
+      'SELECT value_json FROM app_settings WHERE key = $key',
+      { $key: getCalendarVisibilityKey(calendarId) },
+    );
+    if (!row) return true;
+    const value = parseJson(row.value_json);
+    return typeof value === 'boolean' ? value : true;
+  }
+
+  async setCalendarVisible(calendarId: string, visible: boolean, updatedAt: string): Promise<void> {
+    await this.database.run(
+      `INSERT INTO app_settings (key, value_json, updated_at)
+       VALUES ($key, $valueJson, $updatedAt)
+       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+      {
+        $key: getCalendarVisibilityKey(calendarId),
+        $valueJson: JSON.stringify(visible),
+        $updatedAt: updatedAt,
+      },
+    );
   }
 }

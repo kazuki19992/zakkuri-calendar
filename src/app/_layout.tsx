@@ -20,6 +20,12 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="events/new" options={{ presentation: 'modal' }} />
               <Stack.Screen name="events/[id]" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="settings" options={{
+                headerShown: true,
+                title: '設定',
+                gestureEnabled: true,
+                animation: 'slide_from_right',
+              }} />
             </Stack>
           </CalendarRefreshProvider>
         </AppDatabaseProvider>

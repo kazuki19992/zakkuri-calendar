@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/constants/event-colors';
+import { DEFAULT_CALENDAR_ID } from '@/domain/calendar/calendar';
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { HolidayProvider } from '@/domain/calendar/holiday';
 import {
@@ -72,6 +74,11 @@ export type CalendarViewState = Readonly<{
   periodError: string | null;
   isDatePickerLoading: boolean;
   datePickerError: string | null;
+  calendarName: string;
+  calendarColorId: EventColorId;
+  isCalendarVisible: boolean;
+  isCalendarVisibilityUpdating: boolean;
+  calendarVisibilityError: string | null;
   selectMode(mode: CalendarViewMode): Promise<boolean>;
   showPreviousPeriod(): Promise<boolean>;
   showNextPeriod(): Promise<boolean>;
@@ -79,10 +86,14 @@ export type CalendarViewState = Readonly<{
   showDate(date: string): Promise<boolean>;
   loadDatePickerMonth(month: string): Promise<boolean>;
   selectDate(date: string): Promise<boolean>;
+  setCalendarVisible(visible: boolean): Promise<boolean>;
   retry(): Promise<boolean>;
 }>;
 
 type CalendarSnapshot = Readonly<{
+  calendarId: string;
+  calendarName: string;
+  isCalendarVisible: boolean;
   events: readonly CalendarEvent[];
   holidayCoverage: readonly HolidayRangeCoverage[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
@@ -103,6 +114,8 @@ type InternalState = ViewTarget &
     snapshot: CalendarSnapshot;
     isPeriodLoading: boolean;
     periodError: string | null;
+    isCalendarVisibilityUpdating: boolean;
+    calendarVisibilityError: string | null;
   }>;
 
 type DatePickerState = Readonly<{
@@ -113,6 +126,9 @@ type DatePickerState = Readonly<{
 }>;
 
 const emptySnapshot: CalendarSnapshot = {
+  calendarId: DEFAULT_CALENDAR_ID,
+  calendarName: 'マイカレンダー',
+  isCalendarVisible: true,
   events: [],
   holidayCoverage: [],
   definitions: new Map(),
@@ -151,7 +167,11 @@ function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): reado
 async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Promise<CalendarSnapshot> {
   const calendar = await input.calendars.getDefault();
   const range = getTargetRange(target, input.weekStartsOn);
-  const events = await input.events.listByAnchorRange(calendar.id, range.from, range.through);
+  const [events, isCalendarVisible, undeterminedFadeMinutes] = await Promise.all([
+    input.events.listByAnchorRange(calendar.id, range.from, range.through),
+    input.settings.getCalendarVisible(calendar.id),
+    input.settings.getUndeterminedFadeMinutes(),
+  ]);
   const holidayCoverage = getHolidayMonths(target, input.weekStartsOn).map((month) => {
     const monthRange = getMonthRange(month);
     return {
@@ -166,12 +186,14 @@ async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Pr
         .map((event) => event.temporalDefinitionId),
     ),
   ];
-  const [definitions, undeterminedFadeMinutes] = await Promise.all([
-    Promise.all(fuzzyDefinitionIds.map((id) => input.temporalDefinitions.getById(id))),
-    input.settings.getUndeterminedFadeMinutes(),
-  ]);
+  const definitions = await Promise.all(
+    fuzzyDefinitionIds.map((id) => input.temporalDefinitions.getById(id)),
+  );
 
   return {
+    calendarId: calendar.id,
+    calendarName: calendar.name,
+    isCalendarVisible,
     events,
     holidayCoverage,
     definitions: new Map(
@@ -198,11 +220,16 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       snapshot: emptySnapshot,
       isPeriodLoading: false,
       periodError: null,
+      isCalendarVisibilityUpdating: false,
+      calendarVisibilityError: null,
     };
   });
   const stateRef = useRef(state);
   const requestIdRef = useRef(0);
   const datePickerRequestIdRef = useRef(0);
+  const calendarVisibilityBusyRef = useRef(false);
+  const calendarVisibilityVersionRef = useRef(0);
+  const latestCalendarVisibilityRef = useRef(emptySnapshot.isCalendarVisible);
   const mountedRef = useRef(true);
   const [datePickerState, setDatePickerState] = useState<DatePickerState>({
     month: state.visibleMonth,
@@ -228,8 +255,20 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     };
   }, []);
 
+  const resolveCalendarVisibility = useCallback(
+    (snapshot: CalendarSnapshot, requestedVersion: number): CalendarSnapshot => {
+      if (requestedVersion === calendarVisibilityVersionRef.current) {
+        latestCalendarVisibilityRef.current = snapshot.isCalendarVisible;
+        return snapshot;
+      }
+      return { ...snapshot, isCalendarVisible: latestCalendarVisibilityRef.current };
+    },
+    [],
+  );
+
   useEffect(() => {
     const requestId = ++requestIdRef.current;
+    const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
     const target = stateRef.current;
     if (target.status === 'error') {
       setState((current) => ({ ...current, status: 'loading', periodError: null }));
@@ -240,7 +279,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         setState((current) => ({
           ...current,
           status: 'ready',
-          snapshot,
+          snapshot: resolveCalendarVisibility(snapshot, calendarVisibilityVersion),
           isPeriodLoading: false,
           periodError: null,
         }));
@@ -262,10 +301,12 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     input.settings,
     input.temporalDefinitions,
     input.weekStartsOn,
+    resolveCalendarVisibility,
   ]);
 
   const transitionTo = useCallback(async (target: ViewTarget): Promise<boolean> => {
     const requestId = ++requestIdRef.current;
+    const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
     setState((current) => ({ ...current, isPeriodLoading: true, periodError: null }));
     try {
       const snapshot = await loadSnapshot(inputRef.current, target);
@@ -274,7 +315,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         ...current,
         ...target,
         status: 'ready',
-        snapshot,
+        snapshot: resolveCalendarVisibility(snapshot, calendarVisibilityVersion),
         isPeriodLoading: false,
         periodError: null,
       }));
@@ -288,7 +329,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       }));
       return false;
     }
-  }, []);
+  }, [resolveCalendarVisibility]);
 
   const selectMode = useCallback(
     async (mode: CalendarViewMode): Promise<boolean> => {
@@ -362,6 +403,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   );
   const loadDatePickerMonth = useCallback(async (month: string): Promise<boolean> => {
     const requestId = ++datePickerRequestIdRef.current;
+    const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
     setDatePickerState((current) => ({ ...current, isLoading: true, error: null }));
     const current = stateRef.current;
     const target: ViewTarget = {
@@ -372,7 +414,12 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     try {
       const snapshot = await loadSnapshot(inputRef.current, target);
       if (!mountedRef.current || requestId !== datePickerRequestIdRef.current) return false;
-      setDatePickerState({ month, snapshot, isLoading: false, error: null });
+      setDatePickerState({
+        month,
+        snapshot: resolveCalendarVisibility(snapshot, calendarVisibilityVersion),
+        isLoading: false,
+        error: null,
+      });
       return true;
     } catch {
       if (!mountedRef.current || requestId !== datePickerRequestIdRef.current) return false;
@@ -383,7 +430,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       }));
       return false;
     }
-  }, []);
+  }, [resolveCalendarVisibility]);
   const selectDate = useCallback(
     async (date: string): Promise<boolean> => {
       const current = stateRef.current;
@@ -401,17 +448,68 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     [transitionTo],
   );
 
+  const setCalendarVisible = useCallback(async (visible: boolean): Promise<boolean> => {
+    if (calendarVisibilityBusyRef.current) return false;
+    const current = stateRef.current;
+    if (current.snapshot.isCalendarVisible === visible) return true;
+    calendarVisibilityBusyRef.current = true;
+    setState((value) => ({
+      ...value,
+      isCalendarVisibilityUpdating: true,
+      calendarVisibilityError: null,
+    }));
+    try {
+      const now = (inputRef.current.now ?? getSystemTime)().toISOString();
+      await inputRef.current.settings.setCalendarVisible(current.snapshot.calendarId, visible, now);
+      if (!mountedRef.current) return false;
+      latestCalendarVisibilityRef.current = visible;
+      calendarVisibilityVersionRef.current += 1;
+      setState((value) => ({
+        ...value,
+        snapshot: { ...value.snapshot, isCalendarVisible: visible },
+        calendarVisibilityError: null,
+      }));
+      setDatePickerState((value) => ({
+        ...value,
+        snapshot: { ...value.snapshot, isCalendarVisible: visible },
+      }));
+      return true;
+    } catch {
+      if (!mountedRef.current) return false;
+      setState((value) => ({
+        ...value,
+        calendarVisibilityError: 'カレンダー表示設定を保存できませんでした',
+      }));
+      return false;
+    } finally {
+      calendarVisibilityBusyRef.current = false;
+      if (mountedRef.current) {
+        setState((value) => ({ ...value, isCalendarVisibilityUpdating: false }));
+      }
+    }
+  }, []);
+
+  const visibleEvents = useMemo(
+    () => state.snapshot.isCalendarVisible ? state.snapshot.events : [],
+    [state.snapshot.events, state.snapshot.isCalendarVisible],
+  );
+  const datePickerVisibleEvents = useMemo(
+    () => datePickerState.snapshot.isCalendarVisible ? datePickerState.snapshot.events : [],
+    [datePickerState.snapshot.events, datePickerState.snapshot.isCalendarVisible],
+  );
+
   const twoDayDays = useMemo(
     () =>
       createTwoDayViewModels({
         range: getTwoDayRange(state.anchorDate),
         today: state.today,
-        events: state.snapshot.events,
+        events: visibleEvents,
         definitions: state.snapshot.definitions,
         undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes,
         holidayCoverage: state.snapshot.holidayCoverage,
       }),
-    [state.anchorDate, state.snapshot, state.today],
+    [state.anchorDate, state.snapshot.definitions, state.snapshot.holidayCoverage,
+      state.snapshot.undeterminedFadeMinutes, state.today, visibleEvents],
   );
   const twoDayStrip = useMemo(
     () =>
@@ -419,12 +517,13 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         range: getTwoDayRange(state.anchorDate),
         bufferDays: TWO_DAY_SWIPE_BUFFER_DAYS,
         today: state.today,
-        events: state.snapshot.events,
+        events: visibleEvents,
         definitions: state.snapshot.definitions,
         undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes,
         holidayCoverage: state.snapshot.holidayCoverage,
       }),
-    [state.anchorDate, state.snapshot, state.today],
+    [state.anchorDate, state.snapshot.definitions, state.snapshot.holidayCoverage,
+      state.snapshot.undeterminedFadeMinutes, state.today, visibleEvents],
   );
   const monthDays = useMemo(
     () =>
@@ -432,10 +531,11 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         grid: getMonthGrid(state.visibleMonth, input.weekStartsOn),
         selectedDate: state.selectedDate,
         today: state.today,
-        events: state.snapshot.events,
+        events: visibleEvents,
         holidayCoverage: state.snapshot.holidayCoverage,
       }),
-    [input.weekStartsOn, state.selectedDate, state.snapshot, state.today, state.visibleMonth],
+    [input.weekStartsOn, state.selectedDate, state.snapshot.holidayCoverage, state.today,
+      state.visibleMonth, visibleEvents],
   );
   const datePickerDays = useMemo(
     () =>
@@ -443,21 +543,22 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         grid: getMonthGrid(datePickerState.month, input.weekStartsOn),
         selectedDate: state.selectedDate,
         today: state.today,
-        events: datePickerState.snapshot.events,
+        events: datePickerVisibleEvents,
         holidayCoverage: datePickerState.snapshot.holidayCoverage,
       }),
-    [datePickerState.month, datePickerState.snapshot, input.weekStartsOn, state.selectedDate, state.today],
+    [datePickerState.month, datePickerState.snapshot.holidayCoverage, datePickerVisibleEvents,
+      input.weekStartsOn, state.selectedDate, state.today],
   );
   const selectedAgendaItems = useMemo(
     () =>
       createAgendaItems(
-        state.snapshot.events.filter((event) => occursOnCalendarDate(event, state.selectedDate)),
+        visibleEvents.filter((event) => occursOnCalendarDate(event, state.selectedDate)),
         new Map(
           [...state.snapshot.definitions.values()]
             .map((definition) => [definition.id, definition.label] as const),
         ),
       ),
-    [state.selectedDate, state.snapshot],
+    [state.selectedDate, state.snapshot.definitions, visibleEvents],
   );
   const selectedDay =
     state.mode === 'month'
@@ -483,6 +584,11 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     periodError: state.periodError,
     isDatePickerLoading: datePickerState.isLoading,
     datePickerError: datePickerState.error,
+    calendarName: state.snapshot.calendarName,
+    calendarColorId: DEFAULT_EVENT_COLOR_ID,
+    isCalendarVisible: state.snapshot.isCalendarVisible,
+    isCalendarVisibilityUpdating: state.isCalendarVisibilityUpdating,
+    calendarVisibilityError: state.calendarVisibilityError,
     selectMode,
     showPreviousPeriod,
     showNextPeriod,
@@ -490,6 +596,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     showDate,
     loadDatePickerMonth,
     selectDate,
+    setCalendarVisible,
     retry,
   };
 }

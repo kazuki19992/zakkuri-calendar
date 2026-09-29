@@ -18,8 +18,12 @@ jest.mock('expo-router', () => {
   const { Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
   const Stack = ({ children }: { children: React.ReactNode }) =>
     React.createElement(View, { testID: 'router-stack' }, children);
-  function StackScreen({ name, options }: { name: string; options: { presentation?: string } }) {
-    return React.createElement(Text, { testID: `stack-screen.${name}` }, options.presentation);
+  function StackScreen({ name, options }: { name: string; options: Record<string, unknown> }) {
+    return React.createElement(
+      Text,
+      { testID: `stack-screen.${name}`, ...options },
+      String(options.presentation ?? 'screen'),
+    );
   }
   Stack.Screen = StackScreen;
   return {
@@ -75,6 +79,12 @@ describe('ルートレイアウト', () => {
     expect(stack.parent).toBe(calendarRefreshProvider);
     expect(screen.getByTestId('stack-screen.events/new')).toHaveTextContent('modal');
     expect(screen.getByTestId('stack-screen.events/[id]')).toHaveTextContent('modal');
+    expect(screen.getByTestId('stack-screen.settings').props).toMatchObject({
+      headerShown: true,
+      title: '設定',
+      gestureEnabled: true,
+      animation: 'slide_from_right',
+    });
   });
 
   it('すべての画面をflex 1のgesture handler root配下へ置く', async () => {

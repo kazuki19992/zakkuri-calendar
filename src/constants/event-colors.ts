@@ -12,21 +12,26 @@ export const DEFAULT_EVENT_COLOR_ID: EventColorId = 'blue';
 
 export const EVENT_COLOR_PALETTE: readonly Readonly<{
   id: EventColorId;
+  label: string;
   light: string;
   dark: string;
 }>[] = [
-  { id: 'blue', light: '#185ABC', dark: '#AECBFA' },
-  { id: 'teal', light: '#00695C', dark: '#80CBC4' },
-  { id: 'green', light: '#2E7D32', dark: '#81C995' },
-  { id: 'ochre', light: '#795548', dark: '#FDD663' },
-  { id: 'orange', light: '#A14200', dark: '#FFB74D' },
-  { id: 'red', light: '#B3261E', dark: '#F28B82' },
-  { id: 'purple', light: '#6A1B9A', dark: '#D7AEFB' },
-  { id: 'gray', light: '#5F6368', dark: '#BDC1C6' },
+  { id: 'blue', label: '青', light: '#185ABC', dark: '#AECBFA' },
+  { id: 'teal', label: '青緑', light: '#00695C', dark: '#80CBC4' },
+  { id: 'green', label: '緑', light: '#2E7D32', dark: '#81C995' },
+  { id: 'ochre', label: '黄土', light: '#795548', dark: '#FDD663' },
+  { id: 'orange', label: '橙', light: '#A14200', dark: '#FFB74D' },
+  { id: 'red', label: '赤', light: '#B3261E', dark: '#F28B82' },
+  { id: 'purple', label: '紫', light: '#6A1B9A', dark: '#D7AEFB' },
+  { id: 'gray', label: '灰', light: '#5F6368', dark: '#BDC1C6' },
 ];
 
 export function getEventColor(id: EventColorId, colorScheme: 'light' | 'dark'): string {
   return (EVENT_COLOR_PALETTE.find((color) => color.id === id) ?? EVENT_COLOR_PALETTE[0])[colorScheme];
+}
+
+export function getEventColorLabel(id: EventColorId): string {
+  return (EVENT_COLOR_PALETTE.find((color) => color.id === id) ?? EVENT_COLOR_PALETTE[0]).label;
 }
 
 function linearizeRgbChannel(value: number): number {

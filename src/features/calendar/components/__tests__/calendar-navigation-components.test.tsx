@@ -1,9 +1,9 @@
-import { render, userEvent } from '@testing-library/react-native';
+import { act, fireEvent, render, userEvent, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import type { MonthDayViewModel } from '../../month-view-model';
 import { CalendarDatePicker } from '../calendar-date-picker';
 import { CalendarTopBar } from '../calendar-top-bar';
-import { CalendarViewMenu } from '../calendar-view-menu';
+import { CalendarSideMenu } from '../calendar-side-menu';
 
 jest.mock('@/global.css', () => ({}));
 
@@ -19,6 +19,14 @@ const days: readonly MonthDayViewModel[] = Array.from({ length: 42 }, (_, index)
   holidayName: null,
   accessibilityLabel: `2026年9月${index + 1}日`,
 }));
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
 
 describe('カレンダーのトップナビゲーション', () => {
   it('メニュー、月名、今日の各操作を44pt以上で表示する', async () => {
@@ -52,22 +60,135 @@ describe('カレンダーのトップナビゲーション', () => {
     expect(onToday).toHaveBeenCalledTimes(1);
   });
 
-  it('表示メニューは実在する2日と月だけを表示して選択できる', async () => {
+  it('サイドメニューは80%幅で実在する表示、カレンダー、設定だけを示す', async () => {
     const user = userEvent.setup();
     const onSelectMode = jest.fn().mockResolvedValue(true);
     const onClose = jest.fn();
     const view = await render(
-      <CalendarViewMenu visible mode="twoDay" onSelectMode={onSelectMode} onClose={onClose} />,
+      <CalendarSideMenu
+        visible mode="twoDay" calendarName="マイカレンダー" calendarColorId="blue"
+        isCalendarVisible isCalendarVisibilityUpdating={false} calendarVisibilityError={null}
+        topInset={0} bottomInset={0}
+        reduceMotion onSelectMode={onSelectMode}
+        onSetCalendarVisible={jest.fn().mockResolvedValue(true)}
+        onOpenSettings={jest.fn()} onClose={onClose}
+      />,
     );
 
-    expect(view.getByText('表示')).toBeOnTheScreen();
+    expect(StyleSheet.flatten(view.getByTestId('calendar-side-menu.panel').props.style))
+      .toMatchObject({ width: '80%', maxWidth: 360 });
     expect(view.getByRole('menuitem', { name: '2日表示' }).props.accessibilityState)
       .toMatchObject({ selected: true });
     expect(view.getByRole('menuitem', { name: '月表示' })).toBeOnTheScreen();
+    expect(view.getByRole('switch', { name: 'マイカレンダーを表示' }).props.value).toBe(true);
+    expect(view.getByLabelText('マイカレンダーの色、青')).toBeOnTheScreen();
+    expect(view.getByRole('button', { name: '設定を開く' })).toBeOnTheScreen();
     expect(view.queryByText('3日')).toBeNull();
     await user.press(view.getByRole('menuitem', { name: '月表示' }));
     expect(onSelectMode).toHaveBeenCalledWith('month');
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('カレンダー表示の保存成功時は閉じ、失敗時はalertを残す', async () => {
+    const onSetCalendarVisible = jest.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const onClose = jest.fn();
+    const { rerender, getByRole } = await render(
+      <CalendarSideMenu
+        visible mode="twoDay" calendarName="マイカレンダー" calendarColorId="blue"
+        isCalendarVisible isCalendarVisibilityUpdating={false} calendarVisibilityError={null}
+        topInset={0} bottomInset={0}
+        reduceMotion onSelectMode={jest.fn().mockResolvedValue(true)}
+        onSetCalendarVisible={onSetCalendarVisible}
+        onOpenSettings={jest.fn()} onClose={onClose}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent(getByRole('switch', { name: 'マイカレンダーを表示' }), 'valueChange', false);
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(onSetCalendarVisible).toHaveBeenCalledWith(false));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+
+    await rerender(
+      <CalendarSideMenu
+        visible mode="twoDay" calendarName="マイカレンダー" calendarColorId="blue"
+        isCalendarVisible isCalendarVisibilityUpdating={false}
+        calendarVisibilityError="カレンダー表示設定を保存できませんでした"
+        topInset={0} bottomInset={0}
+        reduceMotion onSelectMode={jest.fn().mockResolvedValue(true)}
+        onSetCalendarVisible={onSetCalendarVisible}
+        onOpenSettings={jest.fn()} onClose={onClose}
+      />,
+    );
+    expect(getByRole('alert')).toHaveTextContent('カレンダー表示設定を保存できませんでした');
+  });
+
+  it('背景、OS戻る、設定選択から閉じられる', async () => {
+    const user = userEvent.setup();
+    const onClose = jest.fn();
+    const onOpenSettings = jest.fn();
+    const view = await render(
+      <CalendarSideMenu
+        visible mode="twoDay" calendarName="マイカレンダー" calendarColorId="blue"
+        isCalendarVisible isCalendarVisibilityUpdating={false} calendarVisibilityError={null}
+        topInset={0} bottomInset={0}
+        reduceMotion onSelectMode={jest.fn().mockResolvedValue(true)}
+        onSetCalendarVisible={jest.fn().mockResolvedValue(true)}
+        onOpenSettings={onOpenSettings} onClose={onClose}
+      />,
+    );
+
+    fireEvent.press(view.getByTestId('calendar-side-menu.backdrop'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    view.getByTestId('calendar-side-menu.backdrop').parent?.props.onRequestClose();
+    expect(onClose).toHaveBeenCalledTimes(2);
+    await user.press(view.getByRole('button', { name: '設定を開く' }));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(3);
+  });
+
+  it('閉じる前に開始した操作の完了で再表示後のメニューを閉じない', async () => {
+    const user = userEvent.setup();
+    const modeResult = createDeferred<boolean>();
+    const visibilityResult = createDeferred<boolean>();
+    const onSelectMode = jest.fn().mockReturnValue(modeResult.promise);
+    const onSetCalendarVisible = jest.fn().mockReturnValue(visibilityResult.promise);
+    const onClose = jest.fn();
+    const props = {
+      mode: 'twoDay' as const,
+      calendarName: 'マイカレンダー',
+      calendarColorId: 'blue' as const,
+      isCalendarVisible: true,
+      isCalendarVisibilityUpdating: false,
+      calendarVisibilityError: null,
+      topInset: 0,
+      bottomInset: 0,
+      reduceMotion: true,
+      onSelectMode,
+      onSetCalendarVisible,
+      onOpenSettings: jest.fn(),
+      onClose,
+    };
+    const view = await render(<CalendarSideMenu {...props} visible />);
+
+    await user.press(view.getByRole('menuitem', { name: '月表示' }));
+    await user.press(view.getByTestId('calendar-side-menu.backdrop'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      modeResult.resolve(true);
+      await modeResult.promise;
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    await user.press(view.getByRole('switch', { name: 'マイカレンダーを表示' }));
+    await user.press(view.getByTestId('calendar-side-menu.backdrop'));
+    expect(onClose).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      visibilityResult.resolve(true);
+      await visibilityResult.promise;
+    });
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('日付ピッカーは月移動と日付選択を提供する', async () => {

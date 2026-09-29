@@ -438,6 +438,6 @@ git add README.md docs/superpowers/specs/2026-09-07-zakkuri-calendar-mvp-design.
 git commit -m "docs(events): schema version 2の保存範囲を記録"
 ```
 
-- [ ] **Step 7: 独立コードレビュー後にpushしてPRを作成する**
+- [x] **Step 7: 独立コードレビュー後にpushしてPRを作成する**
 
 レビューではmigrationの非破壊性、aggregate transaction、row fallback、既存UIのmetadata保持、個人データ非露出を重点確認する。Critical/Importantを解消して全体検証を取り直した後、`codex/event-model-schema-v2`をpushし、`develop`向け通常PRを日本語で作成する。

@@ -45,6 +45,15 @@
 
 対象外の機能は、既存のドメインモデルを置き換えずに追加できる境界を用意する。ただし、未確定の機能本体や抽象化は先回りして実装しない。
 
+### 2.3 予定モデル schema version 2の実装段階
+
+予定の保存基盤は、MVPの画面範囲と段階を分けて扱う。
+
+- Stage 3（実装済み）: domainの予定metadata・繰り返し規則・通知集約、schema version 2への非破壊migration、予定と通知のtransaction保存、カレンダー既定色と最後に開いた予定編集タブのRepository境界を提供する。保存対象は複数日予定の終了日、場所、プレーンテキストメモ、予定色、繰り返し規則、複数通知である。既存の予定編集は、現在の画面にないmetadataと通知を保持する。
+- Stage 4（未実装）: 場所・メモ・色・通知・繰り返し規則の編集UI、繰り返し予定を個別の発生回へ展開する処理、保存した通知の端末スケジュールと発火を追加する。schemaへ通知行を保存できても、端末通知は発火しない。
+
+Stage 3の自動検証はdomain・SQLite・既存featureのコードと静的exportを対象とし、端末またはシミュレータ上のmigration smoke testや通知動作を確認済みとは扱わない。
+
 ## 3. 設計原則
 
 - React NativeとExpo SDK 57を使用する。
@@ -249,6 +258,7 @@ MVPでは値の編集UIを提供しない。具体的な色、濃度、重なり
 - `time_zone_id`: TEXT NOT NULL
 - `created_at`: TEXT NOT NULL
 - `updated_at`: TEXT NOT NULL
+- `color_id`: TEXT NOT NULL DEFAULT `blue`（schema version 2）
 
 MVPでは既定の個人カレンダーを1件seedする。将来の複数カレンダー機能は同じテーブルへ追加する。
 
@@ -291,6 +301,11 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 - `created_time_zone_id`: TEXT NOT NULL
 - `created_at`: TEXT NOT NULL
 - `updated_at`: TEXT NOT NULL
+- `end_date`: TEXT NULL（schema version 2。終日予定は既存の`anchor_date`から補完）
+- `location`: TEXT NULL（schema version 2）
+- `notes`: TEXT NULL（schema version 2）
+- `color_id`: TEXT NULL（schema version 2）
+- `recurrence_rule_json`: TEXT NULL（schema version 2。version 1の規則を保存）
 
 型ごとの必須項目はドメイン層で検証する。
 
@@ -300,6 +315,15 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 - `allDay`: 時刻と定義IDを持たない
 
 予定の削除はMVPでは物理削除とする。共有同期を導入する時点で同期要件に沿った削除表現をmigrationで追加する。
+
+### 9.3.1 `event_reminders`（schema version 2）
+
+- `id`: TEXT PRIMARY KEY
+- `event_id`: TEXT NOT NULL REFERENCES `events(id)` ON DELETE CASCADE
+- `minutes_before`: INTEGER NOT NULL
+- `sort_order`: INTEGER NOT NULL
+
+`event_id`と`minutes_before`の組み合わせは一意とし、通知は予定と同じtransactionで保存・更新・削除する。これは通知設定の保存だけを定義するもので、端末通知のスケジュールや発火はStage 4で実装する。
 
 ### 9.4 `app_settings`
 
@@ -311,6 +335,7 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 
 - `default_exact_duration`: `{ "type": "instant" }`
 - `undetermined_fade_minutes`: `120`
+- `last_event_editor_tab`: `fuzzy`または`exact`（schema version 2）
 
 読み出し時にキーごとの型検証を行い、不正値は安全な既定値へフォールバックして修復対象として扱う。
 

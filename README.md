@@ -1,6 +1,6 @@
 # ざっくりカレンダー
 
-曖昧な時間表現を扱える、Expo + React Native製のlocal-firstカレンダーです。現在はMVPのデータ基盤、時間軸付きの今日・明日2日ビュー、月ビュー、予定の作成・編集・削除を実装しています。
+曖昧な時間表現を扱える、Expo + React Native製のlocal-firstカレンダーです。現在はMVPのデータ基盤、時間軸付きの今日・明日2日ビュー、月ビュー、予定の作成・編集・削除を実装しています。予定モデルの保存基盤はschema version 2（Stage 3）まで実装済みです。
 
 ## 開発
 
@@ -53,10 +53,17 @@ MVPでは、アプリ起動時に今日と明日の2日ビューを横2列で表
 
 作成・編集フォームでは、タイトル、日付、種別（正確・終日・ざっくり）を選べます。正確な予定はネイティブピッカーで開始・終了時刻を指定します。終了時刻が開始より前の場合は翌日終了として保存され（例: `23:30`〜`00:30`）、翌日側の月表示・予定一覧にも表示されます。同じ時刻を開始・終了に指定することはできません。
 
+### 予定モデル schema version 2（Stage 3）
+
+SQLiteのschema version 2では、既存予定を失わずに、複数日予定の終了日、場所、プレーンテキストメモ、予定色、繰り返し規則、複数通知、カレンダー既定色、最後に開いた予定編集タブを保存できます。domainとRepositoryもこれらの値を検証・読み書きし、既存の予定編集では現在の画面にないmetadataと通知を保持します。
+
+ただし、これは保存基盤の実装であり、予定編集画面から場所・メモ・色・通知・繰り返し規則を編集するUI、繰り返し予定を個別の発生回へ展開して表示する処理、保存した通知を端末へスケジュールして発火する処理は未実装です。通知行がSQLiteへ保存されても、端末通知は発火しません。これらはStage 4の対象です。
+
 - 月グリッドは6週間固定、月曜始まり固定です。週の開始曜日を設定できる機能はIssue [#10](https://github.com/kazuki19992/zakkuri-calendar/issues/10)で追跡します。
 - 日本の祝日は端末内で判定し、1970年から2050年までを表示対象とします。この範囲外は祝日なしではなく「祝日情報未対応」として扱います。
 - 2日／月の最後に開いた表示を次回起動時に復元する設定はIssue [#16](https://github.com/kazuki19992/zakkuri-calendar/issues/16)で追跡します。時間表現の範囲、フェード比率、未定時間を変更する設定UIはv1以降の対象です。
 - 日内のざっくり予定、正確な予定、終日予定を作成・編集・削除できます。週・月単位の時間表現を選択するUIは後続タスクです。祝日を考慮した期間・業務日計算と祝日カレンダーの設定化も未実装で、Issue [#9](https://github.com/kazuki19992/zakkuri-calendar/issues/9)で追跡します。
+- 予定モデルの保存はschema version 2で、場所、メモ、色、通知、繰り返し規則まで対応しています。ただし、追加項目の編集UI、繰り返し発生回の展開、端末通知のスケジュール・発火はStage 4として未実装です。
 - 対象プラットフォームはiOSとAndroidです。Webの動作は保証しません。
 
 ## データ境界
@@ -67,4 +74,4 @@ MVPでは、アプリ起動時に今日と明日の2日ビューを横2列で表
 - UIはSQLやSQLite rowへ直接アクセスせず、Repository契約とfeature custom hookを経由します。
 - migration、row mapper、Repositoryでは、予定タイトルなどの個人データをエラーメッセージやログへ含めません。
 
-MVPの仕様は`docs/superpowers/specs/2026-09-07-zakkuri-calendar-mvp-design.md`、SQLite基盤の実装計画は`docs/superpowers/plans/2026-09-08-mvp-sqlite-foundation.md`を参照してください。
+MVPの仕様は`docs/superpowers/specs/2026-09-07-zakkuri-calendar-mvp-design.md`、SQLite基盤の実装計画は`docs/superpowers/plans/2026-09-08-mvp-sqlite-foundation.md`、予定モデル schema version 2の実装計画は`docs/superpowers/plans/2026-09-29-event-model-schema-v2.md`を参照してください。

@@ -6,6 +6,7 @@ import {
   type CalendarEvent,
   type EventDraft,
 } from '@/domain/calendar/event';
+import type { EventAggregate } from '@/domain/calendar/event-reminder';
 import { createFixedDurationFromTimes, toMinutesOfDay, toWallClockTime } from '@/domain/calendar/time';
 import type {
   CalendarRepository,
@@ -84,7 +85,7 @@ export function useEventEditor({
   const [endTime, setEndTimeValue] = useState(initial.endTime);
   const [definitions, setDefinitions] = useState<readonly TemporalDefinition[]>([]);
   const [selectedDefinitionId, setSelectedDefinitionId] = useState<string | null>(null);
-  const [existingEvent, setExistingEvent] = useState<CalendarEvent | null>(null);
+  const [existingAggregate, setExistingAggregate] = useState<EventAggregate | null>(null);
   const [calendarId, setCalendarId] = useState<string | null>(null);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
@@ -105,7 +106,7 @@ export function useEventEditor({
         ]);
         if (!active) return;
         if (eventId !== undefined && loadedEvent === null) throw new Error('event not found');
-        const targetCalendarId = loadedEvent?.calendarId ?? calendar.id;
+        const targetCalendarId = loadedEvent?.event.calendarId ?? calendar.id;
         const loadedDefinitions = await temporalDefinitions.listEnabled(targetCalendarId);
         if (!active) return;
         const dayDefinitions = loadedDefinitions.filter((definition) => definition.granularity === 'day');
@@ -113,15 +114,16 @@ export function useEventEditor({
         setDefinitions(dayDefinitions);
         setSelectedDefinitionId(dayDefinitions[0]?.id ?? null);
         if (loadedEvent !== null) {
-          setExistingEvent(loadedEvent);
-          setTitleValue(loadedEvent.title);
-          setAnchorDateValue(loadedEvent.anchorDate);
-          setTemporalTypeValue(loadedEvent.temporalType);
-          if (loadedEvent.temporalType === 'exact') {
-            setStartTimeValue(loadedEvent.startTime);
-            setEndTimeValue(endTimeForEvent(loadedEvent));
-          } else if (loadedEvent.temporalType === 'fuzzy') {
-            setSelectedDefinitionId(loadedEvent.temporalDefinitionId);
+          const existingEvent = loadedEvent.event;
+          setExistingAggregate(loadedEvent);
+          setTitleValue(existingEvent.title);
+          setAnchorDateValue(existingEvent.anchorDate);
+          setTemporalTypeValue(existingEvent.temporalType);
+          if (existingEvent.temporalType === 'exact') {
+            setStartTimeValue(existingEvent.startTime);
+            setEndTimeValue(endTimeForEvent(existingEvent));
+          } else if (existingEvent.temporalType === 'fuzzy') {
+            setSelectedDefinitionId(existingEvent.temporalDefinitionId);
           }
         }
         setStatus('ready');
@@ -147,11 +149,16 @@ export function useEventEditor({
   const save = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || status !== 'ready') return false;
     clearErrors();
+    const existingEvent = existingAggregate?.event;
     const base = {
       calendarId: existingEvent?.calendarId,
       title: title.trim(),
       anchorDate,
       createdTimeZoneId: existingEvent?.createdTimeZoneId ?? getTimeZoneId(),
+      location: existingEvent?.location ?? null,
+      notes: existingEvent?.notes ?? null,
+      colorId: existingEvent?.colorId ?? null,
+      recurrenceRule: existingEvent?.recurrenceRule ?? null,
     };
     let draft: EventDraft | null = null;
     if (temporalType === 'exact') {
@@ -159,7 +166,12 @@ export function useEventEditor({
       if (!duration.ok) { setEndTimeError(duration.error.message); return false; }
       draft = { ...base, calendarId: base.calendarId ?? '', temporalType, startTime, duration: duration.value };
     } else if (temporalType === 'allDay') {
-      draft = { ...base, calendarId: base.calendarId ?? '', temporalType };
+      draft = {
+        ...base,
+        calendarId: base.calendarId ?? '',
+        temporalType,
+        endDate: existingEvent?.temporalType === 'allDay' ? existingEvent.endDate : anchorDate,
+      };
     } else if (selectedDefinitionId !== null) {
       draft = { ...base, calendarId: base.calendarId ?? '', temporalType, temporalDefinitionId: selectedDefinitionId };
     } else {
@@ -171,7 +183,7 @@ export function useEventEditor({
     }
     draft = { ...draft, calendarId: existingEvent?.calendarId ?? calendarId } as EventDraft;
     const timestamp = now();
-    const event = existingEvent === null
+    const event = existingEvent === undefined
       ? createCalendarEvent({ id: createId(), draft, now: timestamp })
       : parseCalendarEvent({ ...draft, id: existingEvent.id, createdAt: existingEvent.createdAt, updatedAt: timestamp });
     if (!event.ok) {
@@ -182,24 +194,25 @@ export function useEventEditor({
     }
     operationRef.current = true; setIsSaving(true);
     try {
-      if (existingEvent === null) await events.create(event.value); else await events.update(event.value);
+      const aggregate = { event: event.value, reminders: existingAggregate?.reminders ?? [] };
+      if (existingEvent === undefined) await events.create(aggregate); else await events.update(aggregate);
       return true;
     } catch {
       setSaveError('保存できませんでした。もう一度お試しください。'); return false;
     } finally {
       operationRef.current = false; setIsSaving(false);
     }
-  }, [anchorDate, calendarId, clearErrors, createId, endTime, events, existingEvent, getTimeZoneId, now, selectedDefinitionId, startTime, status, temporalType, title]);
+  }, [anchorDate, calendarId, clearErrors, createId, endTime, events, existingAggregate, getTimeZoneId, now, selectedDefinitionId, startTime, status, temporalType, title]);
 
   const remove = useCallback(async (): Promise<boolean> => {
-    if (operationRef.current || existingEvent === null) return false;
+    if (operationRef.current || existingAggregate === null) return false;
     operationRef.current = true; setIsDeleting(true); setSaveError(null);
-    try { await events.delete(existingEvent.id); return true; }
+    try { await events.delete(existingAggregate.event.id); return true; }
     catch { setSaveError('削除できませんでした。もう一度お試しください。'); return false; }
     finally { operationRef.current = false; setIsDeleting(false); }
-  }, [events, existingEvent]);
+  }, [events, existingAggregate]);
 
-  return { status, mode: existingEvent === null ? 'create' : 'edit', title, anchorDate, temporalType, startTime, endTime,
+  return { status, mode: existingAggregate === null ? 'create' : 'edit', title, anchorDate, temporalType, startTime, endTime,
     definitions, selectedDefinitionId, titleError, dateError, endTimeError, saveError, isSaving, isDeleting,
     setTitle, setAnchorDate, setTemporalType, setStartTime, setEndTime, selectDefinition, retry, save, remove };
 }

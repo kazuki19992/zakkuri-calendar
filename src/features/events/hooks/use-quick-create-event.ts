@@ -131,6 +131,10 @@ export function useQuickCreateEvent({
       temporalType: 'fuzzy',
       temporalDefinitionId: selectedDefinitionId,
       createdTimeZoneId: getTimeZoneId(),
+      location: null,
+      notes: null,
+      colorId: null,
+      recurrenceRule: null,
     };
     const event = createCalendarEvent({ id: createId(), draft, now: now() });
     if (!event.ok) {
@@ -147,7 +151,7 @@ export function useQuickCreateEvent({
     savingRef.current = true;
     setIsSaving(true);
     try {
-      await events.create(event.value);
+      await events.create({ event: event.value, reminders: [] });
       return true;
     } catch {
       setSaveError('保存できませんでした。もう一度お試しください。');

@@ -12,6 +12,7 @@ const calendar: Calendar = {
   id: 'personal-default',
   name: 'マイカレンダー',
   timeZoneId: 'Asia/Tokyo',
+  colorId: 'blue',
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
@@ -66,6 +67,7 @@ function createRepositories(): RepositoryDoubles {
   return {
     calendars: {
       getDefault: jest.fn().mockResolvedValue(calendar),
+      setColor: jest.fn(),
     },
     events: {
       create: jest.fn().mockResolvedValue(undefined),
@@ -161,15 +163,22 @@ describe('ざっくり予定作成の状態調整', () => {
 
     expect(saved).toBe(true);
     expect(repositories.events.create).toHaveBeenCalledWith({
-      id: 'event-new',
-      calendarId: calendar.id,
-      title: '図書館へ行く',
-      anchorDate: '2026-09-10',
-      temporalType: 'fuzzy',
-      temporalDefinitionId: afternoon.id,
-      createdTimeZoneId: 'Asia/Tokyo',
-      createdAt: '2026-09-09T12:34:56.000Z',
-      updatedAt: '2026-09-09T12:34:56.000Z',
+      event: {
+        id: 'event-new',
+        calendarId: calendar.id,
+        title: '図書館へ行く',
+        anchorDate: '2026-09-10',
+        temporalType: 'fuzzy',
+        temporalDefinitionId: afternoon.id,
+        location: null,
+        notes: null,
+        colorId: null,
+        recurrenceRule: null,
+        createdTimeZoneId: 'Asia/Tokyo',
+        createdAt: '2026-09-09T12:34:56.000Z',
+        updatedAt: '2026-09-09T12:34:56.000Z',
+      },
+      reminders: [],
     });
   });
 

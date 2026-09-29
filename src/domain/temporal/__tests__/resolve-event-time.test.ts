@@ -7,6 +7,10 @@ const eventBase = {
   title: '予定',
   anchorDate: '2026-09-09',
   createdTimeZoneId: 'Asia/Tokyo',
+  location: null,
+  notes: null,
+  colorId: null,
+  recurrenceRule: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 } as const;
@@ -112,7 +116,9 @@ describe('予定の時間範囲解決', () => {
   });
 
   it('終日予定を時間軸外として解決する', () => {
-    const event: CalendarEvent = { ...eventBase, id: 'all-day', temporalType: 'allDay' };
+    const event: CalendarEvent = {
+      ...eventBase, id: 'all-day', temporalType: 'allDay', endDate: eventBase.anchorDate,
+    };
     expect(resolveEventTime({ event, definition: null, undeterminedFadeMinutes: 120 }))
       .toEqual({ kind: 'allDay' });
   });

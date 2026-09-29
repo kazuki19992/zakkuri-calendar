@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/constants/event-colors';
+import type { EventColorId } from '@/constants/event-colors';
 import { DEFAULT_CALENDAR_ID } from '@/domain/calendar/calendar';
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { HolidayProvider } from '@/domain/calendar/holiday';
@@ -93,6 +93,7 @@ export type CalendarViewState = Readonly<{
 type CalendarSnapshot = Readonly<{
   calendarId: string;
   calendarName: string;
+  calendarColorId: EventColorId;
   isCalendarVisible: boolean;
   events: readonly CalendarEvent[];
   holidayCoverage: readonly HolidayRangeCoverage[];
@@ -128,6 +129,7 @@ type DatePickerState = Readonly<{
 const emptySnapshot: CalendarSnapshot = {
   calendarId: DEFAULT_CALENDAR_ID,
   calendarName: 'マイカレンダー',
+  calendarColorId: 'blue',
   isCalendarVisible: true,
   events: [],
   holidayCoverage: [],
@@ -193,6 +195,7 @@ async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Pr
   return {
     calendarId: calendar.id,
     calendarName: calendar.name,
+    calendarColorId: calendar.colorId,
     isCalendarVisible,
     events,
     holidayCoverage,
@@ -585,7 +588,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     isDatePickerLoading: datePickerState.isLoading,
     datePickerError: datePickerState.error,
     calendarName: state.snapshot.calendarName,
-    calendarColorId: DEFAULT_EVENT_COLOR_ID,
+    calendarColorId: state.snapshot.calendarColorId,
     isCalendarVisible: state.snapshot.isCalendarVisible,
     isCalendarVisibilityUpdating: state.isCalendarVisibilityUpdating,
     calendarVisibilityError: state.calendarVisibilityError,

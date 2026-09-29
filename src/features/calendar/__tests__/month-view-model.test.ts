@@ -8,6 +8,10 @@ const baseEvent = {
   title: '敬老会',
   anchorDate: '2026-09-21',
   createdTimeZoneId: 'Asia/Tokyo',
+  location: null,
+  notes: null,
+  colorId: null,
+  recurrenceRule: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 } as const;
@@ -45,6 +49,7 @@ describe('月表示の表示用モデル', () => {
         {
           ...baseEvent,
           temporalType: 'allDay',
+          endDate: baseEvent.anchorDate,
         },
       ],
       holidayCoverage: [
@@ -131,7 +136,9 @@ describe('月表示の表示用モデル', () => {
   });
 
   it('終日予定は終日と表示する', () => {
-    const event: CalendarEvent = { ...baseEvent, temporalType: 'allDay' };
+    const event: CalendarEvent = {
+      ...baseEvent, temporalType: 'allDay', endDate: baseEvent.anchorDate,
+    };
 
     expect(createAgendaItems([event], new Map())).toEqual([
       {

@@ -300,6 +300,29 @@ describe('予定編集の状態調整', () => {
     ));
   });
 
+  it('入力開始後に初期種別が変わっても選択中の種別を保持する', async () => {
+    const repositories = createRepositories();
+    const { result, rerender } = await renderHook(
+      ({ initialTemporalType }: { initialTemporalType: 'fuzzy' | 'exact' }) => useEventEditor({
+        ...repositories,
+        initial: {
+          date: '2026-09-09',
+          startTime: '09:00',
+          endTime: '10:00',
+          temporalType: initialTemporalType,
+        },
+      }),
+      { initialProps: { initialTemporalType: 'fuzzy' as const } },
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => { result.current.setTemporalType('allDay'); });
+    await act(async () => rerender({ initialTemporalType: 'exact' }));
+
+    expect(result.current.temporalType).toBe('allDay');
+    expect(repositories.calendars.getDefault).toHaveBeenCalledTimes(1);
+  });
+
   it('新規予定を終日へ切り替えると基準日を終了日にする', async () => {
     const repositories = createRepositories();
     const { result } = await renderHook(() => useEventEditor({

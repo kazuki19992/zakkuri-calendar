@@ -95,10 +95,12 @@ export function useEventEditor({
   now = defaultNow,
   getTimeZoneId = defaultTimeZone,
 }: UseEventEditorInput): EventEditorState {
+  const [initialTemporalType] = useState(initial.temporalType);
+  const [initialEditorTab] = useState(initialTab);
   const [status, setStatus] = useState<EditorStatus>('loading');
   const [title, setTitleValue] = useState('');
   const [anchorDate, setAnchorDateValue] = useState(initial.date);
-  const [temporalType, setTemporalTypeValue] = useState<EditorTemporalType>(initial.temporalType);
+  const [temporalType, setTemporalTypeValue] = useState<EditorTemporalType>(initialTemporalType);
   const [startTime, setStartTimeValue] = useState(initial.startTime);
   const [endTime, setEndTimeValue] = useState(initial.endTime);
   const [definitions, setDefinitions] = useState<readonly TemporalDefinition[]>([]);
@@ -121,7 +123,7 @@ export function useEventEditor({
         const [calendar, loadedEvent, savedTab] = await Promise.all([
           calendars.getDefault(),
           eventId === undefined ? Promise.resolve(null) : events.getById(eventId),
-          eventId === undefined && initialTab === undefined
+          eventId === undefined && initialEditorTab === undefined
             ? settings.getLastEventEditorTab()
             : Promise.resolve(null),
         ]);
@@ -148,9 +150,9 @@ export function useEventEditor({
           }
         } else {
           setTemporalTypeValue(
-            initial.temporalType === 'allDay'
+            initialTemporalType === 'allDay'
               ? 'allDay'
-              : (initialTab ?? savedTab ?? initial.temporalType),
+              : (initialEditorTab ?? savedTab ?? initialTemporalType),
           );
         }
         setStatus('ready');
@@ -160,7 +162,7 @@ export function useEventEditor({
     };
     void load();
     return () => { active = false; };
-  }, [calendars, eventId, events, initial.temporalType, initialTab, loadRevision, settings, temporalDefinitions]);
+  }, [calendars, eventId, events, initialEditorTab, initialTemporalType, loadRevision, settings, temporalDefinitions]);
 
   const clearErrors = useCallback(() => {
     setTitleError(null); setDateError(null); setEndTimeError(null); setSaveError(null);

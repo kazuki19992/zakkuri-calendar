@@ -6,9 +6,10 @@ const base = {
   anchorDate: '2026-09-08',
   createdTimeZoneId: 'Asia/Tokyo',
 };
-const validExact = { ...base, temporalType: 'exact' as const, startTime: '14:30', duration: { type: 'fixed' as const, minutes: 30 as const } };
-const validAllDay = { ...base, temporalType: 'allDay' as const };
-const validFuzzy = { ...base, temporalType: 'fuzzy' as const, temporalDefinitionId: 'personal-default:morning' };
+const metadata = { location: null, notes: null, colorId: null, recurrenceRule: null };
+const validExact = { ...base, ...metadata, temporalType: 'exact' as const, startTime: '14:30', duration: { type: 'fixed' as const, minutes: 30 as const } };
+const validAllDay = { ...base, ...metadata, temporalType: 'allDay' as const, endDate: '2026-09-08' };
+const validFuzzy = { ...base, ...metadata, temporalType: 'fuzzy' as const, temporalDefinitionId: 'personal-default:morning' };
 
 describe('parseEventDraft', () => {
   it.each([validExact, validAllDay, validFuzzy])('accepts valid temporal variants', (draft) => {
@@ -48,6 +49,37 @@ describe('parseEventDraft', () => {
     const event = { ...validExact, duration: { type: 'fixed' as const, minutes: 135 } };
 
     expect(parseEventDraft(event)).toEqual({ ok: true, value: event });
+  });
+
+  it('終日予定は開始日を含む終了日までを受け付ける', () => {
+    const event = { ...validAllDay, endDate: '2026-10-03' };
+
+    expect(parseEventDraft(event)).toEqual({ ok: true, value: event });
+  });
+
+  it('開始日より前の終日終了日を拒否する', () => {
+    expect(parseEventDraft({ ...validAllDay, endDate: '2026-09-07' }).ok).toBe(false);
+  });
+
+  it('空白だけの場所とメモをnullへ正規化する', () => {
+    expect(parseEventDraft({ ...validFuzzy, location: '  ', notes: '\t' })).toEqual({
+      ok: true,
+      value: validFuzzy,
+    });
+  });
+
+  it('不明な色IDと予定開始日より前の繰り返し終了日を拒否する', () => {
+    expect(parseEventDraft({ ...validFuzzy, colorId: 'removed-color' }).ok).toBe(false);
+    expect(parseEventDraft({
+      ...validFuzzy,
+      recurrenceRule: {
+        version: 1,
+        frequency: 'daily',
+        interval: 1,
+        weekdays: [],
+        end: { type: 'until', date: '2026-09-07' },
+      },
+    }).ok).toBe(false);
   });
 });
 

@@ -1,4 +1,5 @@
 import {
+  createFixedDurationFromDateTimes,
   createFixedDurationFromTimes,
   toMinutesOfDay,
   toWallClockTime,
@@ -30,6 +31,20 @@ describe('予定時刻の変換', () => {
     ['不正な終了時刻', '09:30', '24:00'],
   ])('%sを受け付けない', (_, startTime, endTime) => {
     expect(createFixedDurationFromTimes(startTime, endTime)).toEqual({
+      ok: false,
+      error: { field: 'duration', message: '終了時刻を開始時刻と異なる時刻にしてください' },
+    });
+  });
+
+  it('暦日と壁時計時刻から24時間超の固定長を作る', () => {
+    expect(createFixedDurationFromDateTimes('2026-09-30', '23:30', '2026-10-02', '00:30')).toEqual({
+      ok: true,
+      value: { type: 'fixed', minutes: 1500 },
+    });
+  });
+
+  it('終了日時が開始日時以下なら拒否する', () => {
+    expect(createFixedDurationFromDateTimes('2026-10-02', '00:30', '2026-10-02', '00:30')).toEqual({
       ok: false,
       error: { field: 'duration', message: '終了時刻を開始時刻と異なる時刻にしてください' },
     });

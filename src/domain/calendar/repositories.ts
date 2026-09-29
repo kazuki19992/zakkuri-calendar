@@ -1,6 +1,7 @@
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import type { Calendar } from './calendar';
 import type { CalendarEvent, ExactDuration } from './event';
+import type { EventAggregate } from './event-reminder';
 
 export interface CalendarRepository {
   getDefault(): Promise<Calendar>;
@@ -13,10 +14,10 @@ export interface TemporalDefinitionRepository {
 }
 
 export interface EventRepository {
-  create(event: CalendarEvent): Promise<void>;
-  getById(id: string): Promise<CalendarEvent | null>;
+  create(event: EventAggregate): Promise<void>;
+  getById(id: string): Promise<EventAggregate | null>;
   listByAnchorRange(calendarId: string, from: string, through: string): Promise<CalendarEvent[]>;
-  update(event: CalendarEvent): Promise<void>;
+  update(event: EventAggregate): Promise<void>;
   delete(id: string): Promise<void>;
 }
 

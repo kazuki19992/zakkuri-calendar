@@ -3,7 +3,7 @@ import { createStandardTemporalDefinitions } from '@/domain/temporal/standard-de
 import type { AppDatabase } from './database';
 
 export const DATABASE_NAME = 'zakkuri-calendar.db';
-export const LATEST_SCHEMA_VERSION = 1;
+export const LATEST_SCHEMA_VERSION = 2;
 
 export type MigrationEnvironment = Readonly<{
   now: () => string;
@@ -70,6 +70,26 @@ CREATE INDEX IF NOT EXISTS temporal_definitions_enabled_idx
   ON temporal_definitions(calendar_id, is_enabled, sort_order);
 `;
 
+const SCHEMA_VERSION_2_SQL = `
+ALTER TABLE calendars ADD COLUMN color_id TEXT NOT NULL DEFAULT 'blue';
+ALTER TABLE events ADD COLUMN end_date TEXT;
+ALTER TABLE events ADD COLUMN location TEXT;
+ALTER TABLE events ADD COLUMN notes TEXT;
+ALTER TABLE events ADD COLUMN color_id TEXT;
+ALTER TABLE events ADD COLUMN recurrence_rule_json TEXT;
+UPDATE events SET end_date = anchor_date WHERE temporal_type = 'allDay' AND end_date IS NULL;
+CREATE TABLE event_reminders (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  minutes_before INTEGER NOT NULL CHECK (minutes_before >= 0),
+  sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+  UNIQUE (event_id, minutes_before)
+);
+CREATE INDEX event_reminders_event_order_idx ON event_reminders(event_id, sort_order, id);
+CREATE INDEX events_recurrence_anchor_idx ON events(calendar_id, anchor_date)
+  WHERE recurrence_rule_json IS NOT NULL;
+`;
+
 export async function migrateDatabase(
   database: AppDatabase,
   environment: MigrationEnvironment,
@@ -82,71 +102,84 @@ export async function migrateDatabase(
     const current = await transaction.first<{ version: number | null }>(
       'SELECT MAX(version) AS version FROM schema_migrations',
     );
-    if ((current?.version ?? 0) >= LATEST_SCHEMA_VERSION) return;
+    const currentVersion = current?.version ?? 0;
+    if (currentVersion >= LATEST_SCHEMA_VERSION) return;
 
-    const now = environment.now();
-    const calendar = createDefaultCalendar(environment.timeZoneId(), now);
-    const definitions = createStandardTemporalDefinitions(calendar.id, now);
+    if (currentVersion < 1) {
+      const now = environment.now();
+      const calendar = createDefaultCalendar(environment.timeZoneId(), now);
+      const definitions = createStandardTemporalDefinitions(calendar.id, now);
 
-    await transaction.exec(SCHEMA_VERSION_1_SQL);
-    await transaction.run(
-      `INSERT INTO calendars (id, name, time_zone_id, created_at, updated_at)
-       VALUES ($id, $name, $timeZoneId, $createdAt, $updatedAt)
-       ON CONFLICT DO NOTHING`,
-      {
-        $id: calendar.id,
-        $name: calendar.name,
-        $timeZoneId: calendar.timeZoneId,
-        $createdAt: calendar.createdAt,
-        $updatedAt: calendar.updatedAt,
-      },
-    );
-
-    for (const definition of definitions) {
+      await transaction.exec(SCHEMA_VERSION_1_SQL);
       await transaction.run(
-        `INSERT INTO temporal_definitions (
-          id, calendar_id, key, label, granularity, resolver_type, resolver_config_json,
-          fade_in_ratio, fade_out_ratio, is_system, is_enabled, sort_order, created_at, updated_at
-        ) VALUES (
-          $id, $calendarId, $key, $label, $granularity, $resolverType, $resolverConfigJson,
-          $fadeInRatio, $fadeOutRatio, $isSystem, $isEnabled, $sortOrder, $createdAt, $updatedAt
-        ) ON CONFLICT DO NOTHING`,
+        `INSERT INTO calendars (id, name, time_zone_id, created_at, updated_at)
+         VALUES ($id, $name, $timeZoneId, $createdAt, $updatedAt)
+         ON CONFLICT DO NOTHING`,
         {
-          $id: definition.id,
-          $calendarId: definition.calendarId,
-          $key: definition.key,
-          $label: definition.label,
-          $granularity: definition.granularity,
-          $resolverType: definition.resolverConfig.kind,
-          $resolverConfigJson: JSON.stringify(definition.resolverConfig),
-          $fadeInRatio: definition.fadeInRatio,
-          $fadeOutRatio: definition.fadeOutRatio,
-          $isSystem: definition.isSystem ? 1 : 0,
-          $isEnabled: definition.isEnabled ? 1 : 0,
-          $sortOrder: definition.sortOrder,
-          $createdAt: definition.createdAt,
-          $updatedAt: definition.updatedAt,
+          $id: calendar.id,
+          $name: calendar.name,
+          $timeZoneId: calendar.timeZoneId,
+          $createdAt: calendar.createdAt,
+          $updatedAt: calendar.updatedAt,
         },
       );
-    }
 
-    for (const [key, valueJson] of [
-      ['default_exact_duration', JSON.stringify({ type: 'instant' })],
-      ['undetermined_fade_minutes', JSON.stringify(120)],
-    ] as const) {
+      for (const definition of definitions) {
+        await transaction.run(
+          `INSERT INTO temporal_definitions (
+            id, calendar_id, key, label, granularity, resolver_type, resolver_config_json,
+            fade_in_ratio, fade_out_ratio, is_system, is_enabled, sort_order, created_at, updated_at
+          ) VALUES (
+            $id, $calendarId, $key, $label, $granularity, $resolverType, $resolverConfigJson,
+            $fadeInRatio, $fadeOutRatio, $isSystem, $isEnabled, $sortOrder, $createdAt, $updatedAt
+          ) ON CONFLICT DO NOTHING`,
+          {
+            $id: definition.id,
+            $calendarId: definition.calendarId,
+            $key: definition.key,
+            $label: definition.label,
+            $granularity: definition.granularity,
+            $resolverType: definition.resolverConfig.kind,
+            $resolverConfigJson: JSON.stringify(definition.resolverConfig),
+            $fadeInRatio: definition.fadeInRatio,
+            $fadeOutRatio: definition.fadeOutRatio,
+            $isSystem: definition.isSystem ? 1 : 0,
+            $isEnabled: definition.isEnabled ? 1 : 0,
+            $sortOrder: definition.sortOrder,
+            $createdAt: definition.createdAt,
+            $updatedAt: definition.updatedAt,
+          },
+        );
+      }
+
+      for (const [key, valueJson] of [
+        ['default_exact_duration', JSON.stringify({ type: 'instant' })],
+        ['undetermined_fade_minutes', JSON.stringify(120)],
+      ] as const) {
+        await transaction.run(
+          `INSERT INTO app_settings (key, value_json, updated_at)
+           VALUES ($key, $valueJson, $updatedAt)
+           ON CONFLICT DO NOTHING`,
+          { $key: key, $valueJson: valueJson, $updatedAt: now },
+        );
+      }
+
       await transaction.run(
-        `INSERT INTO app_settings (key, value_json, updated_at)
-         VALUES ($key, $valueJson, $updatedAt)
+        `INSERT INTO schema_migrations (version, applied_at)
+         VALUES ($version, $appliedAt)
          ON CONFLICT DO NOTHING`,
-        { $key: key, $valueJson: valueJson, $updatedAt: now },
+        { $version: 1, $appliedAt: now },
       );
     }
 
-    await transaction.run(
-      `INSERT INTO schema_migrations (version, applied_at)
-       VALUES ($version, $appliedAt)
-       ON CONFLICT DO NOTHING`,
-      { $version: LATEST_SCHEMA_VERSION, $appliedAt: now },
-    );
+    if (currentVersion < 2) {
+      await transaction.exec(SCHEMA_VERSION_2_SQL);
+      await transaction.run(
+        `INSERT INTO schema_migrations (version, applied_at)
+         VALUES ($version, $appliedAt)
+         ON CONFLICT DO NOTHING`,
+        { $version: 2, $appliedAt: environment.now() },
+      );
+    }
   });
 }

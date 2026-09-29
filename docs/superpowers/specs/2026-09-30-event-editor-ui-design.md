@@ -102,7 +102,7 @@ routeはRepository、初期route parameter、保存成功後のcalendar refresh�
 
 開始日を変更した場合は、現在の期間を保つよう終了日を同じcalendar day差だけ移動する。終日予定は包含日数を維持する。利用者が終了日または終了時刻を明示的に変更した場合は、その値を優先する。
 
-既存の`instant`と`undetermined`は、開始／終了日時が未変更なら元のduration種別を保持する。いずれかを変更した場合は`fixed`へ変換する。24時間を超える`fixed`も開始日時とdurationから終了日時へ展開し、未変更保存で短縮しない。
+既存の`instant`と`undetermined`は、終了日時が開始日時と同じ状態を保つ限り元のduration種別を保持する。開始日だけを移動した場合は終了日も追従させ、特殊durationを失わない。利用者が終了日時を開始より後へ変更して明示的な範囲を作った場合だけ`fixed`へ変換する。24時間を超える`fixed`も開始日時とdurationから終了日時へ展開し、未変更保存で短縮しない。
 
 ## 5. 日付と時刻
 
@@ -333,4 +333,3 @@ export成功は実機のlayout、keyboard、picker、gesture、VoiceOver／TalkB
 - 繰り返し規則は保存できるが、発生回表示が次PRであることを文書上明確にする。
 - schema migrationと新規native dependencyを追加しない。
 - 自動検証と両platform exportが成功し、実機未確認項目をPRへ記載する。
-

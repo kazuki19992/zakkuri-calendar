@@ -20,6 +20,11 @@ import type {
 import { toMinutesOfDay } from '@/domain/calendar/time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
+  resolveRelativeDateRange,
+  type RelativeDateResolution,
+  type ThisWeekDeadlineWeekday,
+} from '@/domain/temporal/relative-date-resolution';
+import {
   buildEventReminders,
   buildRecurrenceRule,
   getEditorExactDuration,
@@ -28,6 +33,7 @@ import {
   getReminderDrafts,
   moveEditorRangeStart,
   moveReminderDraft,
+  formatEditorDate,
   type RecurrenceDraft,
   type RecurrencePreset,
   type ReminderDraft,
@@ -42,6 +48,8 @@ export type EventEditorState = Readonly<{
   editorTab: EventEditorTab;
   isAllDay: boolean;
   isDateEditable: boolean;
+  isRecurrenceEditable: boolean;
+  relativeDatePreview: string | null;
   startDate: string;
   startTime: string;
   endDate: string;
@@ -154,6 +162,7 @@ export function useEventEditor({
   const [endTime, setEndTimeValue] = useState(initialValues.endTime);
   const [definitions, setDefinitions] = useState<readonly TemporalDefinition[]>([]);
   const [selectedDefinitionId, setSelectedDefinitionId] = useState<string | null>(null);
+  const [thisWeekDeadlineWeekday, setThisWeekDeadlineWeekday] = useState<ThisWeekDeadlineWeekday>(5);
   const [colorId, setColorIdValue] = useState<EventColorId | null>(null);
   const [location, setLocationValue] = useState('');
   const [notes, setNotesValue] = useState('');
@@ -175,12 +184,13 @@ export function useEventEditor({
     let active = true;
     const load = async (): Promise<void> => {
       try {
-        const [calendar, loadedAggregate, savedTab] = await Promise.all([
+        const [calendar, loadedAggregate, savedTab, deadlineWeekday] = await Promise.all([
           calendars.getDefault(),
           eventId === undefined ? Promise.resolve(null) : events.getById(eventId),
           eventId === undefined && initialEditorTab === undefined
             ? settings.getLastEventEditorTab()
             : Promise.resolve(null),
+          settings.getThisWeekDeadlineWeekday(),
         ]);
         if (!active) return;
         if (eventId !== undefined && loadedAggregate === null) throw new Error('event not found');
@@ -188,12 +198,16 @@ export function useEventEditor({
         const loadedDefinitions = await temporalDefinitions.listEnabled(targetCalendarId);
         if (!active) return;
 
-        const dayDefinitions = loadedDefinitions.filter((definition) => definition.granularity === 'day');
         setCalendarId(targetCalendarId);
         setCalendarName(calendar.name);
         setCalendarColorId(calendar.colorId);
-        setDefinitions(dayDefinitions);
-        setSelectedDefinitionId(dayDefinitions[0]?.id ?? null);
+        setDefinitions(loadedDefinitions);
+        setThisWeekDeadlineWeekday(deadlineWeekday);
+        setSelectedDefinitionId(
+          loadedDefinitions.find((definition) => definition.granularity === 'day')?.id
+            ?? loadedDefinitions[0]?.id
+            ?? null,
+        );
 
         if (loadedAggregate === null) {
           const validSavedTab = savedTab === 'exact' || savedTab === 'fuzzy' ? savedTab : null;
@@ -212,7 +226,8 @@ export function useEventEditor({
           if (event.temporalType === 'fuzzy') {
             setEditorTabValue('fuzzy');
             setAllDayValue(false);
-            setEndDateValue(event.anchorDate);
+            setStartDateValue(event.resolutionContext?.referenceDate ?? event.anchorDate);
+            setEndDateValue(event.endDate);
             setSelectedDefinitionId(event.temporalDefinitionId);
           } else if (event.temporalType === 'allDay') {
             setEditorTabValue('exact');
@@ -304,17 +319,46 @@ export function useEventEditor({
   }, []);
   const retry = useCallback(() => { setStatus('loading'); setLoadRevision((value) => value + 1); }, []);
 
+  const selectedDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
+  const isRelativeDefinition = editorTab === 'fuzzy' && selectedDefinition !== null &&
+    selectedDefinition.granularity !== 'day';
+  let relativeResolution: RelativeDateResolution | null = null;
+  if (isRelativeDefinition && selectedDefinition !== null) {
+    const existingEvent = existingAggregate?.event;
+    if (existingEvent?.temporalType === 'fuzzy' &&
+        existingEvent.temporalDefinitionId === selectedDefinition.id &&
+        existingEvent.resolutionContext !== null) {
+      relativeResolution = {
+        referenceDate: existingEvent.resolutionContext.referenceDate,
+        periodAnchorDate: existingEvent.resolutionContext.periodAnchorDate,
+        startDate: existingEvent.anchorDate,
+        endDate: existingEvent.endDate,
+        parameterSnapshot: existingEvent.resolutionContext.parameterSnapshot,
+      };
+    } else {
+      const resolution = resolveRelativeDateRange(startDate, selectedDefinition, thisWeekDeadlineWeekday);
+      if (resolution.ok) relativeResolution = resolution.value;
+    }
+  }
+  const relativeDatePreview = relativeResolution === null
+    ? null
+    : `${formatEditorDate(relativeResolution.startDate)}〜${formatEditorDate(relativeResolution.endDate)}`;
+
   const save = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || status !== 'ready') return false;
     clearErrors();
     const existingEvent = existingAggregate?.event;
-    const recurrence = buildRecurrenceRule(recurrenceDraft, startDate);
+    const targetDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
+    const isRelative = editorTab === 'fuzzy' && targetDefinition !== null && targetDefinition.granularity !== 'day';
+    const recurrence = isRelative
+      ? { ok: true as const, value: null }
+      : buildRecurrenceRule(recurrenceDraft, startDate);
     if (!recurrence.ok) { setRecurrenceError(recurrence.error.message); return false; }
 
     const base = {
       calendarId: existingEvent?.calendarId ?? calendarId ?? '',
       title: title.trim(),
-      anchorDate: startDate,
+      anchorDate: isRelative ? relativeResolution?.startDate ?? startDate : startDate,
       createdTimeZoneId: existingEvent?.createdTimeZoneId ?? getTimeZoneId(),
       location: optionalText(location),
       notes: optionalText(notes),
@@ -324,9 +368,16 @@ export function useEventEditor({
     let draft: EventDraft;
     if (editorTab === 'fuzzy') {
       if (selectedDefinitionId === null) { setSaveError('時間帯を選択してください。'); return false; }
+      if (isRelative && relativeResolution === null) { setDateError('相対日付の期間を確認してください'); return false; }
       draft = {
         ...base, temporalType: 'fuzzy', temporalDefinitionId: selectedDefinitionId,
-        endDate: startDate, resolutionContext: null,
+        endDate: relativeResolution?.endDate ?? startDate,
+        resolutionContext: relativeResolution === null ? null : {
+          version: 1,
+          referenceDate: relativeResolution.referenceDate,
+          periodAnchorDate: relativeResolution.periodAnchorDate,
+          parameterSnapshot: relativeResolution.parameterSnapshot,
+        },
       };
     } else if (isAllDay) {
       draft = { ...base, temporalType: 'allDay', endDate };
@@ -378,7 +429,7 @@ export function useEventEditor({
     }
   }, [calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
     getTimeZoneId, isAllDay, location, newEventId, notes, now, recurrenceDraft, reminders,
-    selectedDefinitionId, startDate, startTime, status, title]);
+    definitions, relativeResolution, selectedDefinitionId, startDate, startTime, status, title]);
 
   const remove = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || existingAggregate === null) return false;
@@ -403,7 +454,9 @@ export function useEventEditor({
     title,
     editorTab,
     isAllDay,
-    isDateEditable: true,
+    isDateEditable: !isRelativeDefinition,
+    isRecurrenceEditable: !isRelativeDefinition,
+    relativeDatePreview,
     startDate,
     startTime,
     endDate,

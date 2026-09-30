@@ -10,6 +10,7 @@ jest.mock('@expo/ui/community/datetime-picker', () => {
 
 const state: EventEditorState = {
   status: 'ready', mode: 'create', title: '', editorTab: 'exact', isAllDay: false, isDateEditable: true,
+  isRecurrenceEditable: true, relativeDatePreview: null,
   startDate: '2026-09-25', startTime: '09:30', endDate: '2026-09-26', endTime: '11:45',
   definitions: [], selectedDefinitionId: null, calendarName: 'マイカレンダー', calendarColorId: 'blue',
   colorId: null, location: '', notes: '',
@@ -39,5 +40,19 @@ describe('予定編集フォーム', () => {
   it('編集時はシリーズ全体の削除操作を表示する', async () => {
     const view = await render(<EventEditorScreen state={{ ...state, mode: 'edit', title: '定例', recurrenceDraft: { ...state.recurrenceDraft, preset: 'weekly' } }} onSave={jest.fn()} onDelete={jest.fn()} onCancel={jest.fn()} />);
     expect(view.getByLabelText('繰り返し予定を削除')).toBeOnTheScreen();
+  });
+
+  it('相対日付の解決期間と繰り返し不可理由を表示する', async () => {
+    const view = await render(<EventEditorScreen state={{
+      ...state,
+      editorTab: 'fuzzy',
+      isDateEditable: false,
+      isRecurrenceEditable: false,
+      relativeDatePreview: '10月5日（月）〜10月7日（水）',
+    }} onSave={jest.fn()} onDelete={jest.fn()} onCancel={jest.fn()} />);
+
+    expect(view.getByText('10月5日（月）〜10月7日（水）')).toBeOnTheScreen();
+    expect(view.getByText('複数日のざっくり予定では現在利用できません')).toBeOnTheScreen();
+    expect(view.getByLabelText('日付 9月25日（金）').props.accessibilityState.disabled).toBe(true);
   });
 });

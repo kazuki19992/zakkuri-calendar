@@ -103,6 +103,7 @@ describe('カレンダー表示の状態調整', () => {
       ...event,
       id: 'series-1',
       anchorDate: '2026-09-01',
+      endDate: '2026-09-01',
       recurrenceRule: {
         version: 1,
         frequency: 'daily',

@@ -2,6 +2,7 @@ import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { MonthGridDate } from '@/domain/calendar/month';
 import {
   getHolidayInfo,
+  isResolvedRelativeEvent,
   occursOnCalendarDate,
   type HolidayRangeCoverage,
   type HolidaySupport,
@@ -21,6 +22,8 @@ export type MonthDayViewModel = Readonly<{
   isToday: boolean;
   isSelected: boolean;
   hasEvents: boolean;
+  hasFixedEvents?: boolean;
+  hasFuzzyRangeEvents?: boolean;
   holidaySupport: HolidaySupport;
   holidayName: string | null;
   accessibilityLabel: string;
@@ -38,6 +41,7 @@ function createAccessibilityLabel(
   isToday: boolean,
   isSelected: boolean,
   hasEvents: boolean,
+  hasFuzzyRangeEvents: boolean,
 ): string {
   const labels = [formatJapaneseDate(date)];
   if (holidayName !== null) labels.push(holidayName);
@@ -45,6 +49,7 @@ function createAccessibilityLabel(
   if (isToday) labels.push('今日');
   if (isSelected) labels.push('選択中');
   if (hasEvents) labels.push('予定あり');
+  if (hasFuzzyRangeEvents) labels.push('相対予定あり');
   return labels.join('、');
 }
 
@@ -58,8 +63,13 @@ export function createMonthDayViewModels(input: Readonly<{
   return input.grid.map((gridDate) => {
     const isToday = gridDate.date === input.today;
     const isSelected = gridDate.date === input.selectedDate;
-    const hasEvents = input.occurrences.some((occurrence) =>
+    const occurrencesForDate = input.occurrences.filter((occurrence) =>
       occursOnCalendarDate(occurrence, gridDate.date));
+    const hasFuzzyRangeEvents = occurrencesForDate.some((occurrence) =>
+      isResolvedRelativeEvent(occurrence.event));
+    const hasFixedEvents = occurrencesForDate.some((occurrence) =>
+      !isResolvedRelativeEvent(occurrence.event));
+    const hasEvents = occurrencesForDate.length > 0;
     const holiday = getHolidayInfo(gridDate.date, input.holidayCoverage);
 
     return {
@@ -67,6 +77,7 @@ export function createMonthDayViewModels(input: Readonly<{
       isToday,
       isSelected,
       hasEvents,
+      ...(hasFuzzyRangeEvents ? { hasFixedEvents, hasFuzzyRangeEvents } : {}),
       holidaySupport: holiday.support,
       holidayName: holiday.name,
       accessibilityLabel: createAccessibilityLabel(
@@ -76,6 +87,7 @@ export function createMonthDayViewModels(input: Readonly<{
         isToday,
         isSelected,
         hasEvents,
+        hasFuzzyRangeEvents,
       ),
     };
   });

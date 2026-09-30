@@ -51,7 +51,9 @@ function asOccurrence(event: CalendarEvent): EventOccurrence {
     key: event.id,
     eventId: event.id,
     occurrenceStartDate: event.anchorDate,
-    occurrenceThroughDate: event.temporalType === 'allDay' ? event.endDate : event.anchorDate,
+    occurrenceThroughDate: event.temporalType === 'allDay' || event.temporalType === 'fuzzy'
+      ? event.endDate
+      : event.anchorDate,
     isRecurring: false,
     event,
   };
@@ -184,6 +186,52 @@ describe('2日表示の表示用モデル', () => {
       },
     ]);
     expect(result[0].timelineItems).toEqual([]);
+  });
+
+  it('解決済みの相対予定を期間の位置が分かる終日項目として表示する', () => {
+    const event: CalendarEvent = {
+      ...baseEvent,
+      id: 'relative-range',
+      title: '資料を仕上げる',
+      anchorDate: '2026-09-30',
+      temporalType: 'fuzzy',
+      temporalDefinitionId: 'personal-default:this_week',
+      endDate: '2026-10-02',
+      resolutionContext: {
+        version: 1,
+        referenceDate: '2026-09-30',
+        periodAnchorDate: '2026-09-30',
+        parameterSnapshot: { thisWeekDeadlineWeekday: 5 },
+      },
+    };
+
+    const result = createTwoDayViewModels({
+      range: { from: '2026-09-30', through: '2026-10-01' }, today: '2026-09-30',
+      occurrences: asOccurrences([event]),
+      definitions: new Map([['personal-default:this_week', {
+        ...afternoon,
+        id: 'personal-default:this_week',
+        key: 'this_week',
+        label: '今週中',
+        granularity: 'week',
+        resolverConfig: { kind: 'weekRemainder', selectionWeekOffset: 0 },
+      }]]),
+      undeterminedFadeMinutes: 120,
+      holidayCoverage,
+    });
+
+    expect(result[0].allDayItems[0]).toMatchObject({
+      kind: 'fuzzyRange',
+      rangePosition: 'start',
+      temporalLabel: '今週中・9月30日〜10月2日',
+      accessibilityLabel: expect.stringContaining('相対予定、期間の開始'),
+    });
+    expect(result[1].allDayItems[1]).toMatchObject({
+      kind: 'fuzzyRange',
+      rangePosition: 'middle',
+      temporalLabel: '今週中・9月30日〜10月2日',
+      accessibilityLabel: expect.stringContaining('相対予定、期間の途中'),
+    });
   });
 
   it('祝日と利用者の終日予定を分け、祝日を先頭の読み取り専用項目にする', () => {

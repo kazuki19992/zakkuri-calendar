@@ -38,7 +38,18 @@ export function SelectedDayAgenda({
         <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text>
       ) : (
         items.map((item) => (
-          <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={item.accessibilityLabel} onPress={() => onEditEvent?.(item.eventId)} style={styles.item}>
+          <Pressable
+            key={item.id}
+            testID={item.kind === 'fuzzyRange' ? `selected-day-agenda.fuzzy-range.${item.id}` : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={item.accessibilityLabel}
+            onPress={() => onEditEvent?.(item.eventId)}
+            style={[
+              styles.item,
+              item.kind === 'fuzzyRange' && { borderColor: theme.calendarAccent },
+              item.kind === 'fuzzyRange' && styles.fuzzyRangeItem,
+            ]}
+          >
             <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
             <Text style={[styles.itemMeta, { color: theme.textSecondary }]}>{item.temporalLabel}</Text>
           </Pressable>
@@ -55,6 +66,7 @@ const styles = StyleSheet.create({
   support: { fontSize: 12, marginTop: 2 },
   empty: { fontSize: 13, marginTop: 8 },
   item: { minHeight: 44, flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  fuzzyRangeItem: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 4, paddingHorizontal: 6, marginVertical: 2 },
   itemTitle: { flex: 1, fontSize: 14, fontWeight: '500' },
   itemMeta: { fontSize: 12 },
 });

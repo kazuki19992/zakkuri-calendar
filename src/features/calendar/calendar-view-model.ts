@@ -11,12 +11,27 @@ export type HolidayRangeCoverage = Readonly<{
 }>;
 
 export type AgendaItemViewModel = Readonly<{
+  kind?: 'fuzzyRange';
   id: string;
   eventId: string;
   title: string;
   temporalLabel: string;
+  rangeLabel?: string;
   accessibilityLabel: string;
 }>;
+
+export function isResolvedRelativeEvent(event: CalendarEvent): boolean {
+  return event.temporalType === 'fuzzy' && event.resolutionContext !== null;
+}
+
+function formatShortDate(date: string): string {
+  const [, month, day] = date.split('-').map(Number);
+  return `${month}月${day}日`;
+}
+
+function formatOccurrenceRange(occurrence: EventOccurrence): string {
+  return `${formatShortDate(occurrence.occurrenceStartDate)}〜${formatShortDate(occurrence.occurrenceThroughDate)}`;
+}
 
 /** 発生回が占有する包含期間内の日付を、月表示・予定一覧に含める。 */
 export function occursOnCalendarDate(occurrence: EventOccurrence, date: string): boolean {
@@ -56,15 +71,21 @@ export function createAgendaItems(
 ): readonly AgendaItemViewModel[] {
   return occurrences.map((occurrence) => {
     const event = occurrence.event;
-    const temporalLabel = getTemporalLabel(event, definitionLabels);
+    const definitionLabel = getTemporalLabel(event, definitionLabels);
+    const isFuzzyRange = isResolvedRelativeEvent(event);
+    const rangeLabel = isFuzzyRange ? formatOccurrenceRange(occurrence) : null;
+    const temporalLabel = rangeLabel === null ? definitionLabel : `${definitionLabel}・${rangeLabel}`;
     return {
+      ...(isFuzzyRange ? { kind: 'fuzzyRange' as const } : {}),
       id: occurrence.key,
       eventId: occurrence.eventId,
       title: event.title,
       temporalLabel,
+      ...(rangeLabel === null ? {} : { rangeLabel }),
       accessibilityLabel: [
         event.title,
         temporalLabel,
+        isFuzzyRange ? '相対予定' : null,
         occurrence.isRecurring ? '繰り返し予定' : null,
       ].filter((label): label is string => label !== null).join('、'),
     };

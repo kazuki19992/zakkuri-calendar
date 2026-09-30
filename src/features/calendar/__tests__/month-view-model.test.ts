@@ -26,7 +26,9 @@ const gridDate: MonthGridDate = {
 
 function asOccurrence(
   event: CalendarEvent,
-  throughDate = event.temporalType === 'allDay' ? event.endDate : event.anchorDate,
+  throughDate = event.temporalType === 'allDay' || event.temporalType === 'fuzzy'
+    ? event.endDate
+    : event.anchorDate,
 ): EventOccurrence {
   return {
     key: event.id,
@@ -220,6 +222,47 @@ describe('月表示の表示用モデル', () => {
           accessibilityLabel: '敬老会、午後',
         },
       ]);
+  });
+
+  it('相対予定は対象期間を帯として識別できる表示モデルにする', () => {
+    const event: CalendarEvent = {
+      ...baseEvent,
+      anchorDate: '2026-09-21',
+      temporalType: 'fuzzy',
+      temporalDefinitionId: 'personal-default:this_week',
+      endDate: '2026-09-25',
+      resolutionContext: {
+        version: 1,
+        referenceDate: '2026-09-21',
+        periodAnchorDate: '2026-09-21',
+        parameterSnapshot: { thisWeekDeadlineWeekday: 5 },
+      },
+    };
+    const occurrence = asOccurrence(event);
+
+    const days = createMonthDayViewModels({
+      grid: [gridDate],
+      selectedDate: gridDate.date,
+      today: gridDate.date,
+      occurrences: [occurrence],
+      holidayCoverage: [],
+    });
+
+    expect(days[0]).toMatchObject({
+      hasEvents: true,
+      hasFixedEvents: false,
+      hasFuzzyRangeEvents: true,
+      accessibilityLabel: expect.stringContaining('相対予定あり'),
+    });
+    expect(createAgendaItems(
+      [occurrence],
+      new Map([['personal-default:this_week', '今週中']]),
+    )).toEqual([expect.objectContaining({
+      kind: 'fuzzyRange',
+      rangeLabel: '9月21日〜9月25日',
+      temporalLabel: '今週中・9月21日〜9月25日',
+      accessibilityLabel: expect.stringContaining('相対予定'),
+    })]);
   });
 
   it('定義が見つからないざっくり予定はざっくりへフォールバックする', () => {

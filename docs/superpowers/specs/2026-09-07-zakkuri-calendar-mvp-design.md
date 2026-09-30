@@ -45,13 +45,14 @@
 
 対象外の機能は、既存のドメインモデルを置き換えずに追加できる境界を用意する。ただし、未確定の機能本体や抽象化は先回りして実装しない。
 
-### 2.3 予定モデル schema version 2の実装段階
+### 2.3 予定モデル schema version 3の実装段階
 
 予定の保存基盤は、MVPの画面範囲と段階を分けて扱う。
 
 - Stage 3（実装済み）: domainの予定metadata・繰り返し規則・通知集約、schema version 2への非破壊migration、予定と通知のtransaction保存、カレンダー既定色と最後に開いた予定編集タブのRepository境界を提供する。保存対象は複数日予定の終了日、場所、プレーンテキストメモ、予定色、繰り返し規則、複数通知である。
 - Stage 4前半（実装済み）: ざっくり／きっちりの2タブ、複数日、場所、メモ、色、複数通知、繰り返し規則の編集UIを提供し、予定集約へ保存・再編集する。
-- Stage 4後半（未実装）: 繰り返し予定を個別の発生回へ展開し、2日／月ビューへ表示する。
+- Stage 4後半（実装済み）: 繰り返し予定を個別の発生回へ展開し、2日／月ビューへ表示する。
+- 相対日付（実装済み）: 週・月単位のざっくり予定を作成時に期間へ解決し、schema version 3へ解決済み期間とversion付きcontextを保存する。「今週中」は設定した金・土・日曜日までとし、設定変更は保存済み予定へ遡及しない。
 - 端末通知（未実装）: 保存した通知の権限要求、予約、解除、発火を追加する。schemaへ通知行を保存できても、現時点では端末通知は発火しない。
 
 自動検証はdomain・SQLite・featureのコードと静的exportを対象とし、端末またはシミュレータ上の見た目、ピッカー操作、通知動作を確認済みとは扱わない。
@@ -127,7 +128,7 @@ Expo RouterのStackを使用する。
 - カレンダー既定色または予定固有色
 - 場所、複数通知、プレーンテキストメモ
 
-日付は`9月25日（金）`形式で表示し、内部値は`yyyy-MM-dd`を維持する。保存後はメイン画面の対象期間へ即時反映する。保存が失敗した場合は成功状態へ遷移しない。繰り返し規則は保存・再編集できるが、発生回表示は後続タスクとする。通知設定は保存するが端末通知は発火しない。
+日付は`9月25日（金）`形式で表示し、内部値は`yyyy-MM-dd`を維持する。保存後はメイン画面の対象期間へ即時反映する。保存が失敗した場合は成功状態へ遷移しない。相対日付を選んだ場合は解決期間をプレビューし、日付入力と繰り返しを無効にする。通知設定は保存するが端末通知は発火しない。
 
 ### 5.4 設定
 
@@ -141,6 +142,8 @@ Expo RouterのStackを使用する。
 - 未定
 
 予定ごとにデフォルトとは異なる長さを選べる。「未定」の減衰時間はDBに保持するが、MVPでは編集UIを提供しない。
+
+「今週中」の締切曜日は金曜日（既定値）・土曜日・日曜日から選べる。変更後の値は新しく解決する予定だけに使い、保存済み予定の期間は更新しない。
 
 ## 6. ドメインモデル
 
@@ -166,16 +169,16 @@ Expo RouterのStackを使用する。
 標準時間表現もコード定数ではなく、SQLiteの`temporal_definitions`へseedする。
 
 - 予定は定義IDを参照する。
-- 定義変更は、その定義を参照する既存予定にも反映する。
+- 日内定義の変更は、その定義を参照する既存予定にも反映する。週・月の相対予定は保存済み期間を維持する。
 - 削除は物理削除せず無効化し、新しい予定の選択肢から外す。
 - 無効化後も既存予定のラベルと期間は解決できる。
 - 定義はカレンダーに所属させ、将来カレンダーごとに異なる定義を持てるようにする。
 
 ### 6.3 相対表現
 
-「来週前半」「月末」などは、作成時に対象期間のanchorを確定して予定へ保存する。
+「今週中」「来週前半」「月末」などは、作成時に対象期間を確定して予定へ保存する。
 
-例として、ある日に「来週前半」を選択すると、翌週月曜日が`anchorDate`になる。時間経過によって予定が次の週へ移動することはない。一方、定義を月曜日〜水曜日から月曜日〜木曜日へ変更した場合は、同じanchor週の中で既存予定の範囲も更新される。
+例として、ある日に「来週前半」を選択すると、翌週月曜日から水曜日までを`anchorDate`と`endDate`へ保存する。時間経過、設定変更、標準定義の変更によって保存済み予定が別の期間へ移動することはない。再現と将来migrationのため、基準日・period anchor・設定snapshotをversion付きcontextとして併記する。
 
 週の開始は月曜日とする。
 
@@ -288,7 +291,7 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 - 週: 選択時の週offset、週内の開始曜日と終了曜日。
 - 月: 選択時の月offset、月初基準または月末基準の開始日と終了日。
 
-イベント作成時には選択offsetを使ってanchorを確定し、既存イベントの表示時には保存済みanchorと定義内の範囲だけを使う。
+イベント作成時には選択offsetと設定値を使って期間を確定し、既存イベントの表示時には保存済み期間を使う。複数日相対予定の繰り返しはMVPでは保存しない。「月初を毎月」のような意味的な繰り返しは、将来専用モデルを追加する後続範囲とする。
 
 ### 9.3 `events`
 
@@ -304,17 +307,18 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 - `created_time_zone_id`: TEXT NOT NULL
 - `created_at`: TEXT NOT NULL
 - `updated_at`: TEXT NOT NULL
-- `end_date`: TEXT NULL（schema version 2。終日予定は既存の`anchor_date`から補完）
+- `end_date`: TEXT NULL（schema version 2。schema version 3ではfuzzyも必須とし、既存fuzzyは`anchor_date`から補完）
 - `location`: TEXT NULL（schema version 2）
 - `notes`: TEXT NULL（schema version 2）
 - `color_id`: TEXT NULL（schema version 2）
 - `recurrence_rule_json`: TEXT NULL（schema version 2。version 1の規則を保存）
+- `fuzzy_resolution_context_json`: TEXT NULL（schema version 3。相対fuzzyだけがversion付き解決contextを保存）
 
 型ごとの必須項目はドメイン層で検証する。
 
 - `exact`: `start_time`と`duration_type`が必須
 - `fixed`: `duration_minutes`が必須
-- `fuzzy`: `temporal_definition_id`が必須
+- `fuzzy`: `temporal_definition_id`と`end_date`が必須。日内fuzzyはcontextを持たず、相対fuzzyはcontextを持つ
 - `allDay`: 時刻と定義IDを持たない
 
 予定の削除はMVPでは物理削除とする。共有同期を導入する時点で同期要件に沿った削除表現をmigrationで追加する。
@@ -339,12 +343,13 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 - `default_exact_duration`: `{ "type": "instant" }`
 - `undetermined_fade_minutes`: `120`
 - `last_event_editor_tab`: `fuzzy`または`exact`（schema version 2）
+- `this_week_deadline_weekday`: `5`、`6`、`7`のいずれか（schema version 3、既定値は金曜日の`5`）
 
 読み出し時にキーごとの型検証を行い、不正値は安全な既定値へフォールバックして修復対象として扱う。
 
 ### 9.5 migration
 
-migration履歴をテーブルで管理し、各migrationをトランザクション内で一度だけ実行する。標準定義と既定カレンダーのseedは再実行しても重複しない。
+migration履歴をテーブルで管理し、各migrationをトランザクション内で一度だけ実行する。schema version 3はfuzzyの期間を補完し、全カレンダーへ`this_week`標準定義を追加する。標準定義と既定カレンダーのseedは再実行しても重複しない。
 
 ## 10. データフロー
 
@@ -399,7 +404,7 @@ Presentational Component
 - 月曜日始まりの週解決
 - 月末、年末、閏年
 - anchorの固定
-- 定義変更の既存予定への反映
+- 設定変更後も保存済み相対予定の期間が変わらないこと
 - フェード値の範囲と合計制約
 - exact、allDay、fuzzyの型別検証
 
@@ -409,6 +414,7 @@ Presentational Component
 - 既定カレンダーと標準定義のseed
 - 予定の作成、取得、更新、削除
 - 無効化された定義を参照する既存予定
+- 相対予定の解決contextと期間のround-trip、期間交差検索
 - 不正なrowと設定値の扱い
 
 ### 13.3 hooks

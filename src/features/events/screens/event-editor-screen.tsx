@@ -2,24 +2,73 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollVie
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
 import { DeleteEventButton } from '../components/delete-event-button';
+import { EventColorPicker } from '../components/event-color-picker';
 import { EventDateTimeFields } from '../components/event-date-time-fields';
-import { EventTypePicker } from '../components/event-type-picker';
+import { EventEditorHeader } from '../components/event-editor-header';
+import { EventEditorTabs } from '../components/event-editor-tabs';
+import { EventMetadataFields } from '../components/event-metadata-fields';
+import { EventReminderEditor } from '../components/event-reminder-editor';
+import { RecurrenceEditor } from '../components/recurrence-editor';
 import { TemporalDefinitionPicker } from '../components/temporal-definition-picker';
 import type { EventEditorState } from '../hooks/use-event-editor';
 
-export function EventEditorScreen({ state, onSave, onDelete, onCancel }: Readonly<{ state: EventEditorState; onSave(): void; onDelete(): void; onCancel(): void }>) {
-  const theme = useTheme(); const busy = state.isSaving || state.isDeleting;
-  return <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
-    <View style={[styles.header, { borderBottomColor: theme.calendarBorder }]}><Pressable accessibilityRole="button" accessibilityLabel="キャンセル" disabled={busy} onPress={onCancel} style={styles.headerButton}><Text style={{ color: theme.calendarAccent }}>キャンセル</Text></Pressable><Text style={[styles.title, { color: theme.text }]}>{state.mode === 'edit' ? '予定を編集' : '予定を追加'}</Text><Pressable accessibilityRole="button" accessibilityLabel="保存" disabled={busy || state.status !== 'ready'} onPress={onSave} style={styles.headerButton}><Text style={{ color: theme.calendarAccent }}>{busy ? '保存中' : '保存'}</Text></Pressable></View>
-    {state.status === 'loading' ? <View style={styles.center}><ActivityIndicator /></View> : state.status === 'error' ? <View style={styles.center}><Text style={{ color: theme.text }}>予定を読み込めませんでした</Text><Pressable accessibilityRole="button" accessibilityLabel="再試行" onPress={state.retry} style={styles.headerButton}><Text style={{ color: theme.calendarAccent }}>再試行</Text></Pressable></View> : <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-      <Text style={[styles.label, { color: theme.text }]}>タイトル</Text><TextInput accessibilityLabel="タイトル" value={state.title} onChangeText={state.setTitle} editable={!busy} style={[styles.input, { color: theme.text, borderColor: theme.calendarBorder }]} />
-      {state.titleError ? <Text style={{ color: theme.calendarHoliday }}>{state.titleError}</Text> : null}
-      <Text style={[styles.label, { color: theme.text }]}>種類</Text><EventTypePicker value={state.temporalType} disabled={busy} onChange={state.setTemporalType} />
-      <EventDateTimeFields date={state.anchorDate} startTime={state.startTime} endTime={state.endTime} disabled={busy} showTimes={state.temporalType === 'exact'} onDateChange={state.setAnchorDate} onStartTimeChange={state.setStartTime} onEndTimeChange={state.setEndTime} />
-      {state.temporalType === 'fuzzy' ? <TemporalDefinitionPicker definitions={state.definitions} selectedId={state.selectedDefinitionId} disabled={busy} onSelect={state.selectDefinition} /> : null}
-      {state.endTimeError ? <Text style={{ color: theme.calendarHoliday }}>{state.endTimeError}</Text> : null}{state.saveError ? <Text style={{ color: theme.calendarHoliday }}>{state.saveError}</Text> : null}
-      {state.mode === 'edit' ? <DeleteEventButton title={state.title} disabled={busy} onDelete={onDelete} /> : null}
-    </ScrollView>}
-  </KeyboardAvoidingView></SafeAreaView>;
+export function EventEditorScreen({ state, onSave, onDelete, onCancel }: Readonly<{
+  state: EventEditorState;
+  onSave(): void;
+  onDelete(): void;
+  onCancel(): void;
+}>) {
+  const theme = useTheme();
+  const busy = state.isSaving || state.isDeleting;
+  const section = (title: string, child: React.ReactNode) => (
+    <View style={[styles.section, { borderBottomColor: theme.calendarBorder }]}>
+      <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>{title}</Text>
+      {child}
+    </View>
+  );
+  return (
+    <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
+        <EventEditorHeader mode={state.mode} busy={busy} ready={state.status === 'ready'} onCancel={onCancel} onSave={onSave} />
+        {state.status === 'loading' ? <View style={styles.center}><ActivityIndicator /></View> : null}
+        {state.status === 'error' ? <View style={styles.center}>
+          <Text style={{ color: theme.text }}>予定を読み込めませんでした</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="再試行" onPress={state.retry} style={styles.retry}><Text style={{ color: theme.calendarAccent }}>再試行</Text></Pressable>
+        </View> : null}
+        {state.status === 'ready' ? <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+          <TextInput accessibilityLabel="タイトル" placeholder="タイトルを追加" placeholderTextColor={theme.textSecondary} value={state.title} onChangeText={state.setTitle} editable={!busy} style={[styles.titleInput, { color: theme.text, borderBottomColor: theme.calendarBorder }]} />
+          {state.titleError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.titleError}</Text> : null}
+          <EventEditorTabs value={state.editorTab} disabled={busy} onChange={state.setEditorTab} />
+          {section('日時', <>
+            <EventDateTimeFields editorTab={state.editorTab} isAllDay={state.isAllDay} isDateEditable={state.isDateEditable} startDate={state.startDate} startTime={state.startTime} endDate={state.endDate} endTime={state.endTime} disabled={busy} onAllDayChange={state.setAllDay} onStartDateChange={state.setStartDate} onStartTimeChange={state.setStartTime} onEndDateChange={state.setEndDate} onEndTimeChange={state.setEndTime} />
+            {state.editorTab === 'fuzzy' ? <TemporalDefinitionPicker definitions={state.definitions} selectedId={state.selectedDefinitionId} disabled={busy} onSelect={state.selectDefinition} /> : null}
+            {state.dateError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.dateError}</Text> : null}
+            {state.endTimeError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.endTimeError}</Text> : null}
+          </>)}
+          {section('繰り返し', <RecurrenceEditor draft={state.recurrenceDraft} disabled={busy} error={state.recurrenceError} onPresetChange={state.setRecurrencePreset} onFrequencyChange={state.setRecurrenceFrequency} onIntervalChange={state.setRecurrenceIntervalText} onWeekdayToggle={state.toggleRecurrenceWeekday} onEndTypeChange={state.setRecurrenceEndType} onUntilDateChange={state.setRecurrenceUntilDate} onCountChange={state.setRecurrenceCountText} />)}
+          {section('カレンダーと色', <View style={styles.group}>
+            <View style={styles.readonlyRow}><Text style={{ color: theme.textSecondary }}>カレンダー</Text><Text style={{ color: theme.text }}>{state.calendarName}</Text></View>
+            <EventColorPicker calendarColorId={state.calendarColorId} value={state.colorId} disabled={busy} onChange={state.setColorId} />
+          </View>)}
+          {section('場所', <EventMetadataFields field="location" location={state.location} notes={state.notes} disabled={busy} onLocationChange={state.setLocation} onNotesChange={state.setNotes} />)}
+          {section('通知', <EventReminderEditor reminders={state.reminders} disabled={busy} error={state.reminderError} onAdd={state.addReminder} onRemove={state.removeReminder} onMove={state.moveReminder} />)}
+          {section('メモ', <EventMetadataFields field="notes" location={state.location} notes={state.notes} disabled={busy} onLocationChange={state.setLocation} onNotesChange={state.setNotes} />)}
+          {state.saveError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.saveError}</Text> : null}
+          {state.mode === 'edit' ? <DeleteEventButton title={state.title} disabled={busy} isRecurring={state.recurrenceDraft.preset !== 'none'} onDelete={onDelete} /> : null}
+        </ScrollView> : null}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
-const styles = StyleSheet.create({ screen: { flex: 1 }, header: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 8 }, headerButton: { justifyContent: 'center', minHeight: 44, minWidth: 80 }, title: { fontSize: 17, fontWeight: '700' }, center: { alignItems: 'center', flex: 1, justifyContent: 'center' }, form: { gap: 8, padding: 16, paddingBottom: 48 }, label: { fontSize: 15, fontWeight: '700', marginTop: 12 }, input: { borderRadius: 8, borderWidth: 1, fontSize: 17, minHeight: 48, paddingHorizontal: 12 } });
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  center: { alignItems: 'center', flex: 1, justifyContent: 'center' },
+  retry: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 80 },
+  form: { padding: 16, paddingBottom: 48 },
+  titleInput: { borderBottomWidth: StyleSheet.hairlineWidth, fontSize: 22, minHeight: 56, paddingHorizontal: 4 },
+  section: { borderBottomWidth: StyleSheet.hairlineWidth, gap: 10, paddingBottom: 18, paddingTop: 18 },
+  sectionTitle: { fontSize: 13 },
+  group: { gap: 12 },
+  readonlyRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 44 },
+});

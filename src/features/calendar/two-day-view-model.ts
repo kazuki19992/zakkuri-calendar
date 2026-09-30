@@ -1,4 +1,4 @@
-import type { CalendarEvent } from '@/domain/calendar/event';
+import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/constants/event-colors';
 import { offsetCalendarDate, type TwoDayRange } from '@/domain/calendar/month';
 import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
@@ -7,6 +7,7 @@ import { getDay, parse } from 'date-fns';
 import {
   createAgendaItems,
   getHolidayInfo,
+  occursOnCalendarDate,
   type HolidayRangeCoverage,
   type HolidaySupport,
 } from './calendar-view-model';
@@ -46,7 +47,7 @@ function createDayViewModel(
   date: string,
   input: Readonly<{
     today: string;
-    events: readonly CalendarEvent[];
+    occurrences: readonly EventOccurrence[];
     definitions: ReadonlyMap<string, TemporalDefinition>;
     undeterminedFadeMinutes: number;
     holidayCoverage: readonly HolidayRangeCoverage[];
@@ -59,9 +60,11 @@ function createDayViewModel(
   const definitionLabels = new Map(
     [...input.definitions.values()].map((definition) => [definition.id, definition.label] as const),
   );
-  const eventsForDate = input.events.filter((event) => event.anchorDate === date);
+  const occurrencesForDate = input.occurrences.filter((occurrence) =>
+    occursOnCalendarDate(occurrence, date));
   const eventAllDayItems = createAgendaItems(
-    eventsForDate.filter((event) => {
+    occurrencesForDate.filter((occurrence) => {
+      const event = occurrence.event;
       const definition = event.temporalType === 'fuzzy'
         ? input.definitions.get(event.temporalDefinitionId) ?? null
         : null;
@@ -75,7 +78,7 @@ function createDayViewModel(
   ).map((item): TwoDayAllDayItemViewModel => ({
     ...item,
     kind: 'event',
-    eventId: item.id,
+    eventId: item.eventId,
     colorId: DEFAULT_EVENT_COLOR_ID,
     isInteractive: true,
   }));
@@ -92,7 +95,7 @@ function createDayViewModel(
   const allDayItems = [...holidayItems, ...eventAllDayItems];
   const timelineItems = createDayTimelineItems({
     date,
-    events: input.events,
+    occurrences: input.occurrences,
     definitions: input.definitions,
     undeterminedFadeMinutes: input.undeterminedFadeMinutes,
   });
@@ -119,7 +122,7 @@ function createDayViewModel(
 export function createTwoDayViewModels(input: Readonly<{
   range: TwoDayRange;
   today: string;
-  events: readonly CalendarEvent[];
+  occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
   holidayCoverage: readonly HolidayRangeCoverage[];
@@ -155,7 +158,7 @@ export function createTwoDayStripViewModels(input: Readonly<{
   range: TwoDayRange;
   bufferDays: number;
   today: string;
-  events: readonly CalendarEvent[];
+  occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
   holidayCoverage: readonly HolidayRangeCoverage[];

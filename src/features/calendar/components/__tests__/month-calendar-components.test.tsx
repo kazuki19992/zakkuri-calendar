@@ -5,6 +5,7 @@ import type { MonthDayViewModel } from '../../month-view-model';
 import { CalendarLoadState } from '../calendar-load-state';
 import { MonthDayCell } from '../month-day-cell';
 import { MonthGrid } from '../month-grid';
+import { SelectedDayAgenda } from '../selected-day-agenda';
 
 jest.mock('@/global.css', () => ({}));
 
@@ -33,6 +34,30 @@ function createDays(): readonly MonthDayViewModel[] {
 }
 
 describe('独自月カレンダー表示', () => {
+  it('選択日の発生回をタップすると表示keyではなく元シリーズIDを渡す', async () => {
+    const onEditEvent = jest.fn();
+    const user = userEvent.setup();
+    const view = await render(
+      <SelectedDayAgenda
+        selectedDate="2026-09-21"
+        holidayName={null}
+        holidaySupport="available"
+        items={[{
+          id: 'series-1:recurrence:2026-09-21',
+          eventId: 'series-1',
+          title: '通院',
+          temporalLabel: '10:00',
+          accessibilityLabel: '通院、10:00、繰り返し予定',
+        }]}
+        onEditEvent={onEditEvent}
+      />,
+    );
+
+    await user.press(view.getByRole('button', { name: '通院、10:00、繰り返し予定' }));
+
+    expect(onEditEvent).toHaveBeenCalledWith('series-1');
+  });
+
   it('月曜日から日曜日の見出しと7列6行の日付を表示して選択できる', async () => {
     const onSelectDate = jest.fn();
     const user = userEvent.setup();

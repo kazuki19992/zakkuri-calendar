@@ -48,7 +48,7 @@ export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
       accessibilityLabel={item.accessibilityLabel}
       style={[styles.position, { top, height, width, left }]}
       onTouchEnd={(event) => event.stopPropagation()}
-      onPress={() => onPress?.(item.id)}
+      onPress={() => onPress?.(item.eventId)}
     >
       <View testID={`timeline-event.${item.id}.card`} style={styles.card}>
         <LinearGradient

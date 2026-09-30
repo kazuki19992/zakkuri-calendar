@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { PixelRatio } from 'react-native';
 import type { CalendarEvent } from '@/domain/calendar/event';
+import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 
@@ -87,6 +88,7 @@ export function resolveTextAnchor(peakOffset: number): TimelineTextAnchor {
 
 export type TimelineItemViewModel = Readonly<{
   id: string;
+  eventId: string;
   title: string;
   temporalLabel: string;
   accessibilityLabel: string;
@@ -199,12 +201,13 @@ function assignOverlapLanes(items: MutableTimelineItem[]): void {
 
 export function createDayTimelineItems(input: Readonly<{
   date: string;
-  events: readonly CalendarEvent[];
+  occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
 }>): readonly TimelineItemViewModel[] {
   const items: MutableTimelineItem[] = [];
-  for (const event of input.events) {
+  for (const occurrence of input.occurrences) {
+    const event = occurrence.event;
     const definition = event.temporalType === 'fuzzy'
       ? input.definitions.get(event.temporalDefinitionId) ?? null
       : null;
@@ -215,7 +218,10 @@ export function createDayTimelineItems(input: Readonly<{
     });
     if (resolved.kind !== 'timed') continue;
 
-    const dayOffset = differenceInCalendarDays(parseISO(input.date), parseISO(event.anchorDate));
+    const dayOffset = differenceInCalendarDays(
+      parseISO(input.date),
+      parseISO(occurrence.occurrenceStartDate),
+    );
     const dayStart = dayOffset * MINUTES_PER_DAY;
     const dayEnd = dayStart + MINUTES_PER_DAY;
     const isInstantInDay = resolved.isInstant &&
@@ -237,10 +243,16 @@ export function createDayTimelineItems(input: Readonly<{
     ].filter((label): label is string => label !== null);
 
     items.push({
-      id: event.id,
+      id: occurrence.key,
+      eventId: occurrence.eventId,
       title: event.title,
       temporalLabel,
-      accessibilityLabel: [event.title, temporalLabel, ...continuationLabels].join('、'),
+      accessibilityLabel: [
+        event.title,
+        temporalLabel,
+        ...continuationLabels,
+        occurrence.isRecurring ? '繰り返し予定' : null,
+      ].filter((label): label is string => label !== null).join('、'),
       startMinute,
       endMinute,
       top: startMinute * PIXELS_PER_MINUTE,

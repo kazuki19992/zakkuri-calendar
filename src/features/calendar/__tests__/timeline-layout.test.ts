@@ -1,5 +1,6 @@
 import { PixelRatio } from 'react-native';
 import type { CalendarEvent } from '@/domain/calendar/event';
+import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   HOUR_HEIGHT,
@@ -49,6 +50,21 @@ function fuzzy(
   };
 }
 
+function asOccurrence(event: CalendarEvent): EventOccurrence {
+  return {
+    key: event.id,
+    eventId: event.id,
+    occurrenceStartDate: event.anchorDate,
+    occurrenceThroughDate: event.anchorDate,
+    isRecurring: false,
+    event,
+  };
+}
+
+function asOccurrences(events: readonly CalendarEvent[]): readonly EventOccurrence[] {
+  return events.map(asOccurrence);
+}
+
 function definition(
   id: string,
   startMinute: number,
@@ -74,10 +90,36 @@ function definition(
 }
 
 describe('日別タイムライン配置', () => {
+  it('発生開始日を起点に日跨ぎを配置し表示keyと元シリーズIDを分離する', () => {
+    const event = exact('series-1', '23:30', { type: 'fixed', minutes: 60 }, '2026-09-08');
+    const occurrence: EventOccurrence = {
+      key: 'series-1:recurrence:2026-09-15',
+      eventId: 'series-1',
+      occurrenceStartDate: '2026-09-15',
+      occurrenceThroughDate: '2026-09-16',
+      isRecurring: true,
+      event,
+    };
+
+    const [item] = createDayTimelineItems({
+      date: '2026-09-16',
+      occurrences: [occurrence],
+      definitions: new Map(),
+      undeterminedFadeMinutes: 120,
+    });
+
+    expect(item).toMatchObject({
+      id: occurrence.key,
+      eventId: 'series-1',
+      continuesFromPreviousDay: true,
+      accessibilityLabel: expect.stringContaining('繰り返し予定'),
+    });
+  });
+
   it('14時30分の30分予定を時間軸上の位置と高さへ変換する', () => {
     const [item] = createDayTimelineItems({
       date: '2026-09-09',
-      events: [exact('会議', '14:30', { type: 'fixed', minutes: 30 })],
+      occurrences: asOccurrences([exact('会議', '14:30', { type: 'fixed', minutes: 30 })]),
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
     });
@@ -96,7 +138,7 @@ describe('日別タイムライン配置', () => {
   it('瞬間予定は最小表示高を持ち、時刻の位置を保持する', () => {
     const [item] = createDayTimelineItems({
       date: '2026-09-09',
-      events: [exact('薬', '08:00', { type: 'instant' })],
+      occurrences: asOccurrences([exact('薬', '08:00', { type: 'instant' })]),
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
     });
@@ -113,7 +155,11 @@ describe('日別タイムライン配置', () => {
   it('日跨ぎ予定を前半と後半へ分けて元範囲のグラデーションを保つ', () => {
     const lateNight = definition('深夜', 1320, 1560, 0.25, 0.25);
     const event = fuzzy('読書', lateNight);
-    const input = { events: [event], definitions: new Map([[lateNight.id, lateNight]]), undeterminedFadeMinutes: 120 };
+    const input = {
+      occurrences: asOccurrences([event]),
+      definitions: new Map([[lateNight.id, lateNight]]),
+      undeterminedFadeMinutes: 120,
+    };
 
     const [first] = createDayTimelineItems({ ...input, date: '2026-09-09' });
     const [second] = createDayTimelineItems({ ...input, date: '2026-09-10' });
@@ -152,7 +198,7 @@ describe('日別タイムライン配置', () => {
     const target = definition('対象', 600, 720, fadeInRatio, fadeOutRatio);
     const [item] = createDayTimelineItems({
       date: '2026-09-09',
-      events: [fuzzy('対象予定', target)],
+      occurrences: asOccurrences([fuzzy('対象予定', target)]),
       definitions: new Map([[target.id, target]]),
       undeterminedFadeMinutes: 120,
     });
@@ -163,11 +209,11 @@ describe('日別タイムライン配置', () => {
   it('重なる予定へ決定的な横レーンを割り当てる', () => {
     const items = createDayTimelineItems({
       date: '2026-09-09',
-      events: [
+      occurrences: asOccurrences([
         exact('後発', '10:15', { type: 'fixed', minutes: 30 }),
         exact('先発', '10:00', { type: 'fixed', minutes: 60 }),
         exact('別枠', '11:00', { type: 'fixed', minutes: 30 }),
-      ],
+      ]),
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
     });
@@ -191,7 +237,10 @@ describe('日別タイムライン配置', () => {
     } as const satisfies CalendarEvent;
     expect(createDayTimelineItems({
       date: '2026-09-10',
-      events: [exact('前日朝', '08:00', { type: 'fixed', minutes: 30 }), unresolved],
+      occurrences: asOccurrences([
+        exact('前日朝', '08:00', { type: 'fixed', minutes: 30 }),
+        unresolved,
+      ]),
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
     })).toEqual([]);

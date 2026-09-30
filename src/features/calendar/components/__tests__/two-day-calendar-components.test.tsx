@@ -20,7 +20,7 @@ jest.mock('expo-linear-gradient', () => {
 });
 
 const timelineItem = {
-  id: 'event-1', title: '歯医者', temporalLabel: '14:30・30分',
+  id: 'event-1', eventId: 'event-1', title: '歯医者', temporalLabel: '14:30・30分',
   accessibilityLabel: '歯医者、14:30・30分', startMinute: 870, endMinute: 900,
   top: 812, height: 36, overlapIndex: 0, overlapCount: 1,
   opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
@@ -136,13 +136,24 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
   });
 
-  it('タイムライン上の予定をタップすると編集対象のIDを渡す', async () => {
+  it('タイムライン上の発生回をタップすると表示keyではなく元シリーズIDを渡す', async () => {
     const onEditEvent = jest.fn();
-    const view = await renderTwoDayView({ onEditEvent });
+    const recurringItem = {
+      ...timelineItem,
+      id: 'series-1:recurrence:2026-09-08',
+      eventId: 'series-1',
+      accessibilityLabel: '歯医者、14:30・30分、繰り返し予定',
+    };
+    const view = await renderTwoDayView({
+      onEditEvent,
+      strip: [prevBuffer, { ...day1, timelineItems: [recurringItem] }, day2, nextBuffer],
+    });
 
-    fireEvent.press(view.getByLabelText('歯医者、14:30・30分'));
+    fireEvent.press(view.getByLabelText('歯医者、14:30・30分、繰り返し予定'));
 
-    expect(onEditEvent).toHaveBeenCalledWith('event-1');
+    expect(onEditEvent).toHaveBeenCalledWith('series-1');
+    expect(view.getByTestId('timeline-event.series-1:recurrence:2026-09-08'))
+      .toBeOnTheScreen();
   });
 
   it('2日ビューの終日予定をタップすると編集対象のIDを渡す', async () => {

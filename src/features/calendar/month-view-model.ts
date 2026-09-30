@@ -41,7 +41,7 @@ function createAccessibilityLabel(
   isToday: boolean,
   isSelected: boolean,
   hasEvents: boolean,
-  hasFuzzyRangeEvents: boolean,
+  relativeEventLabels: readonly string[],
 ): string {
   const labels = [formatJapaneseDate(date)];
   if (holidayName !== null) labels.push(holidayName);
@@ -49,7 +49,7 @@ function createAccessibilityLabel(
   if (isToday) labels.push('今日');
   if (isSelected) labels.push('選択中');
   if (hasEvents) labels.push('予定あり');
-  if (hasFuzzyRangeEvents) labels.push('相対予定あり');
+  labels.push(...relativeEventLabels);
   return labels.join('、');
 }
 
@@ -59,6 +59,7 @@ export function createMonthDayViewModels(input: Readonly<{
   today: string;
   occurrences: readonly EventOccurrence[];
   holidayCoverage: readonly HolidayRangeCoverage[];
+  definitionLabels?: ReadonlyMap<string, string>;
 }>): readonly MonthDayViewModel[] {
   return input.grid.map((gridDate) => {
     const isToday = gridDate.date === input.today;
@@ -70,6 +71,13 @@ export function createMonthDayViewModels(input: Readonly<{
     const hasFixedEvents = occurrencesForDate.some((occurrence) =>
       !isResolvedRelativeEvent(occurrence.event));
     const hasEvents = occurrencesForDate.length > 0;
+    const relativeEventCounts = new Map<string, number>();
+    for (const occurrence of occurrencesForDate) {
+      if (!isResolvedRelativeEvent(occurrence.event) || occurrence.event.temporalType !== 'fuzzy') continue;
+      const label = input.definitionLabels?.get(occurrence.event.temporalDefinitionId) ?? 'ざっくり予定';
+      relativeEventCounts.set(label, (relativeEventCounts.get(label) ?? 0) + 1);
+    }
+    const relativeEventLabels = [...relativeEventCounts].map(([label, count]) => `${label}${count}件`);
     const holiday = getHolidayInfo(gridDate.date, input.holidayCoverage);
 
     return {
@@ -87,7 +95,7 @@ export function createMonthDayViewModels(input: Readonly<{
         isToday,
         isSelected,
         hasEvents,
-        hasFuzzyRangeEvents,
+        relativeEventLabels,
       ),
     };
   });

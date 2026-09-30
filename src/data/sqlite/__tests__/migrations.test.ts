@@ -112,6 +112,11 @@ describe('migrateDatabase', () => {
 
     await migrateDatabase(database.database, environment);
 
+    const schemaSql = database.exec.mock.calls.map(([sql]) => sql).join('\n');
+    expect(schemaSql).toContain('CREATE TABLE temporal_definitions_v3');
+    expect(schemaSql).toContain("resolver_type IN ('timeOfDay', 'week', 'weekRemainder', 'monthDays', 'monthLastDays')");
+    expect(schemaSql).toContain('INSERT INTO temporal_definitions_v3');
+    expect(schemaSql).toContain('ALTER TABLE temporal_definitions_v3 RENAME TO temporal_definitions');
     expect(database.exec).toHaveBeenCalledWith(expect.stringContaining('fuzzy_resolution_context_json'));
     expect(database.exec).toHaveBeenCalledWith(expect.stringContaining("temporal_type = 'fuzzy'"));
     expect(database.run).toHaveBeenCalledWith(expect.stringContaining('temporal_definitions'),

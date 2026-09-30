@@ -195,7 +195,15 @@ export function useEventEditor({
         if (!active) return;
         if (eventId !== undefined && loadedAggregate === null) throw new Error('event not found');
         const targetCalendarId = loadedAggregate?.event.calendarId ?? calendar.id;
-        const loadedDefinitions = await temporalDefinitions.listEnabled(targetCalendarId);
+        let loadedDefinitions = await temporalDefinitions.listEnabled(targetCalendarId);
+        const existingDefinitionId = loadedAggregate?.event.temporalType === 'fuzzy'
+          ? loadedAggregate.event.temporalDefinitionId
+          : null;
+        if (existingDefinitionId !== null &&
+            !loadedDefinitions.some((definition) => definition.id === existingDefinitionId)) {
+          const existingDefinition = await temporalDefinitions.getById(existingDefinitionId);
+          if (existingDefinition !== null) loadedDefinitions = [...loadedDefinitions, existingDefinition];
+        }
         if (!active) return;
 
         setCalendarId(targetCalendarId);
@@ -320,22 +328,28 @@ export function useEventEditor({
   const retry = useCallback(() => { setStatus('loading'); setLoadRevision((value) => value + 1); }, []);
 
   const selectedDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
-  const isRelativeDefinition = editorTab === 'fuzzy' && selectedDefinition !== null &&
-    selectedDefinition.granularity !== 'day';
+  const existingRelativeEvent = existingAggregate?.event.temporalType === 'fuzzy' &&
+    existingAggregate.event.temporalDefinitionId === selectedDefinitionId &&
+    existingAggregate.event.resolutionContext !== null
+    ? existingAggregate.event
+    : null;
+  const isRelativeDefinition = editorTab === 'fuzzy' && (
+    (selectedDefinition !== null && selectedDefinition.granularity !== 'day') ||
+    existingRelativeEvent !== null
+  );
   let relativeResolution: RelativeDateResolution | null = null;
-  if (isRelativeDefinition && selectedDefinition !== null) {
-    const existingEvent = existingAggregate?.event;
-    if (existingEvent?.temporalType === 'fuzzy' &&
-        existingEvent.temporalDefinitionId === selectedDefinition.id &&
-        existingEvent.resolutionContext !== null) {
+  if (isRelativeDefinition) {
+    const existingEvent = existingRelativeEvent;
+    if (existingEvent !== null && existingEvent.resolutionContext !== null) {
+      const context = existingEvent.resolutionContext;
       relativeResolution = {
-        referenceDate: existingEvent.resolutionContext.referenceDate,
-        periodAnchorDate: existingEvent.resolutionContext.periodAnchorDate,
+        referenceDate: context.referenceDate,
+        periodAnchorDate: context.periodAnchorDate,
         startDate: existingEvent.anchorDate,
         endDate: existingEvent.endDate,
-        parameterSnapshot: existingEvent.resolutionContext.parameterSnapshot,
+        parameterSnapshot: context.parameterSnapshot,
       };
-    } else {
+    } else if (selectedDefinition !== null) {
       const resolution = resolveRelativeDateRange(startDate, selectedDefinition, thisWeekDeadlineWeekday);
       if (resolution.ok) relativeResolution = resolution.value;
     }
@@ -349,7 +363,12 @@ export function useEventEditor({
     clearErrors();
     const existingEvent = existingAggregate?.event;
     const targetDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
-    const isRelative = editorTab === 'fuzzy' && targetDefinition !== null && targetDefinition.granularity !== 'day';
+    const isExistingRelative = existingEvent?.temporalType === 'fuzzy' &&
+      existingEvent.temporalDefinitionId === selectedDefinitionId &&
+      existingEvent.resolutionContext !== null;
+    const isRelative = editorTab === 'fuzzy' && (
+      (targetDefinition !== null && targetDefinition.granularity !== 'day') || isExistingRelative
+    );
     const recurrence = isRelative
       ? { ok: true as const, value: null }
       : buildRecurrenceRule(recurrenceDraft, startDate);

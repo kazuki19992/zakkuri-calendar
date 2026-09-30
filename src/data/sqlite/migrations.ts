@@ -91,6 +91,29 @@ CREATE INDEX events_recurrence_anchor_idx ON events(calendar_id, anchor_date)
 `;
 
 const SCHEMA_VERSION_3_SQL = `
+CREATE TABLE temporal_definitions_v3 (
+  id TEXT PRIMARY KEY,
+  calendar_id TEXT NOT NULL REFERENCES calendars(id),
+  key TEXT NOT NULL,
+  label TEXT NOT NULL,
+  granularity TEXT NOT NULL CHECK (granularity IN ('day', 'week', 'month')),
+  resolver_type TEXT NOT NULL CHECK (resolver_type IN ('timeOfDay', 'week', 'weekRemainder', 'monthDays', 'monthLastDays')),
+  resolver_config_json TEXT NOT NULL,
+  fade_in_ratio REAL NOT NULL CHECK (fade_in_ratio >= 0 AND fade_in_ratio <= 1),
+  fade_out_ratio REAL NOT NULL CHECK (fade_out_ratio >= 0 AND fade_out_ratio <= 1),
+  is_system INTEGER NOT NULL CHECK (is_system IN (0, 1)),
+  is_enabled INTEGER NOT NULL CHECK (is_enabled IN (0, 1)),
+  sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (fade_in_ratio + fade_out_ratio <= 1),
+  UNIQUE (calendar_id, key)
+);
+INSERT INTO temporal_definitions_v3 SELECT * FROM temporal_definitions;
+DROP TABLE temporal_definitions;
+ALTER TABLE temporal_definitions_v3 RENAME TO temporal_definitions;
+CREATE INDEX temporal_definitions_enabled_idx
+  ON temporal_definitions(calendar_id, is_enabled, sort_order);
 ALTER TABLE events ADD COLUMN fuzzy_resolution_context_json TEXT;
 UPDATE events SET end_date = anchor_date WHERE temporal_type = 'fuzzy' AND end_date IS NULL;
 `;
@@ -101,8 +124,12 @@ export async function migrateDatabase(
 ): Promise<void> {
   await database.exec('PRAGMA journal_mode = WAL;');
   await database.exec('PRAGMA foreign_keys = ON;');
+  // 親テーブルのCHECK制約を再構築する間だけ無効化し、同一transaction内で
+  // 同名テーブルへ戻す。通常利用へ制約OFFの接続を漏らさないようfinallyで復元する。
+  await database.exec('PRAGMA foreign_keys = OFF;');
 
-  await database.exclusiveTransaction(async (transaction) => {
+  try {
+    await database.exclusiveTransaction(async (transaction) => {
     await transaction.exec(MIGRATION_TABLE_SQL);
     const current = await transaction.first<{ version: number | null }>(
       'SELECT MAX(version) AS version FROM schema_migrations',
@@ -221,5 +248,8 @@ export async function migrateDatabase(
         { $version: 3, $appliedAt: now },
       );
     }
-  });
+    });
+  } finally {
+    await database.exec('PRAGMA foreign_keys = ON;');
+  }
 }

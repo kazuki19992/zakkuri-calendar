@@ -130,6 +130,9 @@ export function parseEventDraft(input: unknown): Result<EventDraft, EventValidat
     }
     const resolutionContext = parseFuzzyResolutionContext(input.resolutionContext);
     if (resolutionContext === undefined) return fail('resolutionContext', 'invalid fuzzy resolution context');
+    if (resolutionContext !== null && base.recurrenceRule !== null) {
+      return fail('recurrenceRule', 'resolved relative events cannot recur');
+    }
     return { ok: true, value: {
       ...base,
       temporalType: 'fuzzy',

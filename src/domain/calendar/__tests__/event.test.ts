@@ -49,6 +49,31 @@ describe('parseEventDraft', () => {
     expect(parseEventDraft(draft)).toEqual({ ok: true, value: draft });
   });
 
+  it('解決済みの相対予定へ繰り返し規則を保存しない', () => {
+    const result = parseEventDraft({
+      ...validFuzzy,
+      endDate: '2026-09-11',
+      resolutionContext: {
+        version: 1,
+        referenceDate: '2026-09-08',
+        periodAnchorDate: '2026-09-07',
+        parameterSnapshot: {},
+      },
+      recurrenceRule: {
+        version: 1,
+        frequency: 'monthly',
+        interval: 1,
+        weekdays: [],
+        end: { type: 'never' },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { field: 'recurrenceRule', message: 'resolved relative events cannot recur' },
+    });
+  });
+
   it.each([
     { endDate: '2026-09-07' },
     { resolutionContext: { version: 2, referenceDate: '2026-09-08', periodAnchorDate: '2026-09-07', parameterSnapshot: {} } },

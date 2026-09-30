@@ -52,6 +52,44 @@ describe('予定編集の主要状態', () => {
       }),
     }));
   });
+
+  it('保存済み相対定義を取得できなくても期間と解決条件を維持する', async () => {
+    const repositories = createRepositories();
+    const relativeEvent: CalendarEvent = {
+      ...exactEvent,
+      temporalType: 'fuzzy',
+      temporalDefinitionId: nextWeek.id,
+      anchorDate: '2026-10-05',
+      endDate: '2026-10-07',
+      resolutionContext: {
+        version: 1,
+        referenceDate: '2026-09-30',
+        periodAnchorDate: '2026-10-05',
+        parameterSnapshot: {},
+      },
+      recurrenceRule: null,
+    };
+    repositories.events.getById.mockResolvedValue({ event: relativeEvent, reminders: [] });
+    repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning]);
+    repositories.temporalDefinitions.getById.mockResolvedValue(null);
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      initial: { ...initial, date: '2026-09-30' },
+      eventId: relativeEvent.id,
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.relativeDatePreview).toBe('10月5日（月）〜10月7日（水）');
+    await act(async () => { await result.current.save(); });
+
+    expect(repositories.events.update).toHaveBeenCalledWith(expect.objectContaining({
+      event: expect.objectContaining({
+        anchorDate: '2026-10-05',
+        endDate: '2026-10-07',
+        resolutionContext: relativeEvent.resolutionContext,
+      }),
+    }));
+  });
   it('保存済みタブを復元しタブ往復でも入力値を保持する', async () => {
     const repositories = createRepositories(); repositories.settings.getLastEventEditorTab.mockResolvedValue('exact');
     const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));

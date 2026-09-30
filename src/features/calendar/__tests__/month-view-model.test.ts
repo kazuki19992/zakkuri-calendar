@@ -246,13 +246,14 @@ describe('月表示の表示用モデル', () => {
       today: gridDate.date,
       occurrences: [occurrence],
       holidayCoverage: [],
+      definitionLabels: new Map([['personal-default:this_week', '今週中']]),
     });
 
     expect(days[0]).toMatchObject({
       hasEvents: true,
       hasFixedEvents: false,
       hasFuzzyRangeEvents: true,
-      accessibilityLabel: expect.stringContaining('相対予定あり'),
+      accessibilityLabel: expect.stringContaining('今週中1件'),
     });
     expect(createAgendaItems(
       [occurrence],

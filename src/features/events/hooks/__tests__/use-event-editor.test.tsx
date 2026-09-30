@@ -46,6 +46,18 @@ describe('予定編集の主要状態', () => {
     expect(repositories.settings.getLastEventEditorTab).not.toHaveBeenCalled();
   });
 
+  it('保存済みタブが不正なら初期予定種別へフォールバックする', async () => {
+    const repositories = createRepositories();
+    repositories.settings.getLastEventEditorTab.mockResolvedValue('invalid' as never);
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      initial: { ...initial, temporalType: 'exact' },
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.editorTab).toBe('exact');
+  });
+
   it('既存の終日予定はきっちりタブと複数日の終日入力へ展開する', async () => {
     const repositories = createRepositories();
     repositories.events.getById.mockResolvedValue({ event: { ...exactEvent, temporalType: 'allDay', anchorDate: '2026-09-09', endDate: '2026-09-11' }, reminders: [] });

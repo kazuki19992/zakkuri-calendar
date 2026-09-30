@@ -196,7 +196,7 @@ export function useEventEditor({
         setSelectedDefinitionId(dayDefinitions[0]?.id ?? null);
 
         if (loadedAggregate === null) {
-          const validSavedTab = savedTab === 'exact' || savedTab === 'fuzzy' ? savedTab : 'fuzzy';
+          const validSavedTab = savedTab === 'exact' || savedTab === 'fuzzy' ? savedTab : null;
           const fallbackTab = initialValues.temporalType === 'fuzzy' ? 'fuzzy' : 'exact';
           setEditorTabValue(initialEditorTab ?? validSavedTab ?? fallbackTab);
         } else {

@@ -13,6 +13,8 @@
 
 本設計は`2026-09-25-calendar-event-editor-expansion-design.md`の第4段階後半に当たる。前半の予定編集UIはPR #30で実装済みである。
 
+実装の追跡先はIssue #31とする。
+
 ## 2. 対象範囲
 
 ### 2.1 対象

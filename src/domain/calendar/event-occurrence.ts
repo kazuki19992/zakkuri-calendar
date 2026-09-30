@@ -147,19 +147,23 @@ function expandWeekly(
   const searchWeek = startOfWeek(parseCalendarDate(searchFrom), { weekStartsOn: 1 });
   const weekDifference = differenceInCalendarWeeks(searchWeek, anchorWeek, { weekStartsOn: 1 });
   const firstWeekOrdinal = Math.max(0, Math.ceil(weekDifference / rule.interval));
-  const anchorWeekday = getDay(anchorDate);
-  const firstWeekCount = rule.weekdays.filter((weekday) => weekday >= anchorWeekday).length;
+  const weekdayOffsets = rule.weekdays
+    .map(weekdayOffsetFromMonday)
+    .sort((left, right) => left - right);
+  const anchorWeekdayOffset = weekdayOffsetFromMonday(getDay(anchorDate));
+  const firstWeekCount = weekdayOffsets
+    .filter((weekdayOffset) => weekdayOffset >= anchorWeekdayOffset).length;
   let occurrenceIndex = firstWeekOrdinal === 0
     ? 0
-    : firstWeekCount + (firstWeekOrdinal - 1) * rule.weekdays.length;
+    : firstWeekCount + (firstWeekOrdinal - 1) * weekdayOffsets.length;
   const occurrences: EventOccurrence[] = [];
 
   for (let weekOrdinal = firstWeekOrdinal; ; weekOrdinal += 1) {
     const week = addWeeks(anchorWeek, weekOrdinal * rule.interval);
     if (toCalendarDate(week) > through) break;
 
-    for (const weekday of rule.weekdays) {
-      const date = toCalendarDate(addDays(week, weekdayOffsetFromMonday(weekday)));
+    for (const weekdayOffset of weekdayOffsets) {
+      const date = toCalendarDate(addDays(week, weekdayOffset));
       if (date < event.anchorDate) continue;
       if (isPastEnd(rule, date, occurrenceIndex)) return occurrences;
       if (date > through) return occurrences;

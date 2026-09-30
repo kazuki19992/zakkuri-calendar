@@ -138,6 +138,19 @@ describe('予定の発生回展開', () => {
     expect(expandOk(event, '2026-09-01', '2026-09-30')).toEqual([]);
   });
 
+  it('日曜anchorでは月曜開始週内の前日をcountへ含めない', () => {
+    const event = recurring({ ...exactEvent, anchorDate: '2026-09-13' }, {
+      version: 1,
+      frequency: 'weekly',
+      interval: 2,
+      weekdays: [0, 1],
+      end: { type: 'count', count: 3 },
+    });
+
+    expect(dates(expandOk(event, '2026-09-20', '2026-09-30')))
+      .toEqual(['2026-09-21', '2026-09-27']);
+  });
+
   it('平日規則は土日を除外する', () => {
     const event = recurring({ ...exactEvent, anchorDate: '2026-09-11' }, {
       version: 1,

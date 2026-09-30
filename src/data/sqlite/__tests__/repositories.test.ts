@@ -24,6 +24,7 @@ const eventRow: EventRow = {
   created_time_zone_id: 'Asia/Tokyo', created_at: now, updated_at: now,
   end_date: null, location: '東京', notes: '診察券を持参', color_id: 'teal',
   recurrence_rule_json: '{"version":1,"frequency":"weekly","interval":1,"weekdays":[1],"end":{"type":"never"}}',
+  fuzzy_resolution_context_json: null,
 };
 const exactEvent: CalendarEvent = {
   id: 'event-1', calendarId: 'personal-default', title: '歯医者', temporalType: 'exact', anchorDate: '2026-09-08',
@@ -78,10 +79,10 @@ describe('SQLite repositories', () => {
     db.all.mockResolvedValue([eventRow]);
     const events = new SqliteEventRepository(db.database);
     await expect(events.listByAnchorRange('personal-default', '2026-09-01', '2026-09-30')).resolves.toHaveLength(1);
-    expect(db.all).toHaveBeenCalledWith(expect.stringContaining('anchor_date >= $from'), {
+    expect(db.all).toHaveBeenCalledWith(expect.stringContaining('COALESCE(end_date, anchor_date) >= $from'), {
       $calendarId: 'personal-default', $from: '2026-09-01', $through: '2026-09-30',
     });
-    expect(db.all.mock.calls[0][0]).toContain('anchor_date >= $from AND anchor_date <= $through');
+    expect(db.all.mock.calls[0][0]).toContain('anchor_date <= $through');
     expect(db.all.mock.calls[0][0]).toContain('recurrence_rule_json IS NOT NULL AND anchor_date <= $through');
     expect(db.all.mock.calls[0][0]).toContain('ORDER BY anchor_date, start_time, created_at, id');
   });
@@ -199,6 +200,23 @@ describe('SQLite repositories', () => {
       $key: 'last_event_editor_tab', $valueJson: '"exact"', $updatedAt: now,
     });
     await expect(settings.setLastEventEditorTab('allDay' as never, now)).rejects.toThrow('Invalid event editor tab');
+  });
+
+  it.each([null, { value_json: '4' }, { value_json: '"5"' }, { value_json: 'broken' }])(
+    '今週中の締切曜日が欠損または不正なら金曜日へfallbackする', async (row) => {
+      const db = createDatabaseDouble();
+      db.first.mockResolvedValue(row);
+      await expect(new SqliteSettingsRepository(db.database).getThisWeekDeadlineWeekday()).resolves.toBe(5);
+    },
+  );
+
+  it.each([5, 6, 7] as const)('今週中の締切曜日%dを保存する', async (weekday) => {
+    const db = createDatabaseDouble();
+    const settings = new SqliteSettingsRepository(db.database);
+    await settings.setThisWeekDeadlineWeekday(weekday, now);
+    expect(db.run).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(key) DO UPDATE'), {
+      $key: 'this_week_deadline_weekday', $valueJson: String(weekday), $updatedAt: now,
+    });
   });
 
   it.each([

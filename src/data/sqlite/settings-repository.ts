@@ -1,11 +1,13 @@
 import { parseExactDuration, type EventEditorTab, type ExactDuration } from '@/domain/calendar/event';
 import type { SettingsRepository } from '@/domain/calendar/repositories';
 import type { AppDatabase } from './database';
+import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
 
 type SettingRow = Readonly<{ value_json: string }>;
 const DEFAULT_DURATION: ExactDuration = { type: 'instant' };
 const DEFAULT_FADE_MINUTES = 120;
 const DEFAULT_EVENT_EDITOR_TAB: EventEditorTab = 'fuzzy';
+const DEFAULT_THIS_WEEK_DEADLINE: ThisWeekDeadlineWeekday = 5;
 
 function parseJson(value: string): unknown {
   try {
@@ -105,6 +107,25 @@ export class SqliteSettingsRepository implements SettingsRepository {
         $valueJson: JSON.stringify(tab),
         $updatedAt: updatedAt,
       },
+    );
+  }
+
+  async getThisWeekDeadlineWeekday(): Promise<ThisWeekDeadlineWeekday> {
+    const row = await this.database.first<SettingRow>(
+      'SELECT value_json FROM app_settings WHERE key = $key',
+      { $key: 'this_week_deadline_weekday' },
+    );
+    const value = row ? parseJson(row.value_json) : undefined;
+    return value === 5 || value === 6 || value === 7 ? value : DEFAULT_THIS_WEEK_DEADLINE;
+  }
+
+  async setThisWeekDeadlineWeekday(value: ThisWeekDeadlineWeekday, updatedAt: string): Promise<void> {
+    if (value !== 5 && value !== 6 && value !== 7) throw new Error('Invalid this-week deadline weekday');
+    await this.database.run(
+      `INSERT INTO app_settings (key, value_json, updated_at)
+       VALUES ($key, $valueJson, $updatedAt)
+       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+      { $key: 'this_week_deadline_weekday', $valueJson: JSON.stringify(value), $updatedAt: updatedAt },
     );
   }
 }

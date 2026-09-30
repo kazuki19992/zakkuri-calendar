@@ -27,6 +27,7 @@ export type EventRow = Readonly<{
   duration_minutes: number | null; created_time_zone_id: string; created_at: string; updated_at: string;
   end_date: string | null; location: string | null; notes: string | null; color_id: string | null;
   recurrence_rule_json: string | null;
+  fuzzy_resolution_context_json: string | null;
 }>;
 
 export type ReminderRow = Readonly<{
@@ -119,7 +120,20 @@ export function mapEventRow(row: EventRow): CalendarEvent {
         : null;
     candidate = { ...base, startTime: row.start_time, duration };
   } else if (row.temporal_type === 'fuzzy') {
-    candidate = { ...base, temporalDefinitionId: row.temporal_definition_id };
+    let resolutionContext: unknown = null;
+    if (row.fuzzy_resolution_context_json !== null) {
+      try {
+        resolutionContext = JSON.parse(row.fuzzy_resolution_context_json) as unknown;
+      } catch {
+        throw new CorruptDatabaseRowError('event', row.id);
+      }
+    }
+    candidate = {
+      ...base,
+      temporalDefinitionId: row.temporal_definition_id,
+      endDate: row.end_date,
+      resolutionContext,
+    };
   }
   if (row.temporal_type === 'allDay') {
     candidate = { ...base, temporalType: 'allDay', endDate: row.end_date };

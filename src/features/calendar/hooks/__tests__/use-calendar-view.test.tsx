@@ -90,6 +90,8 @@ function createDependencies() {
     setCalendarVisible: jest.fn().mockResolvedValue(undefined),
     getLastEventEditorTab: jest.fn(),
     setLastEventEditorTab: jest.fn(),
+    getThisWeekDeadlineWeekday: jest.fn(),
+    setThisWeekDeadlineWeekday: jest.fn(),
   };
   return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }

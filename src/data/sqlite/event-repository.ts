@@ -19,12 +19,17 @@ function eventParameters(event: CalendarEvent): AppDatabaseParameters {
   let durationType: string | null = null;
   let durationMinutes: number | null = null;
   let endDate: string | null = null;
+  let fuzzyResolutionContextJson: string | null = null;
   if (event.temporalType === 'exact') {
     startTime = event.startTime;
     durationType = event.duration.type;
     durationMinutes = event.duration.type === 'fixed' ? event.duration.minutes : null;
   } else if (event.temporalType === 'fuzzy') {
     temporalDefinitionId = event.temporalDefinitionId;
+    endDate = event.endDate;
+    fuzzyResolutionContextJson = event.resolutionContext === null
+      ? null
+      : JSON.stringify(event.resolutionContext);
   } else {
     endDate = event.endDate;
   }
@@ -39,6 +44,7 @@ function eventParameters(event: CalendarEvent): AppDatabaseParameters {
     $durationType: durationType,
     $durationMinutes: durationMinutes,
     $endDate: endDate,
+    $fuzzyResolutionContextJson: fuzzyResolutionContextJson,
     $location: event.location,
     $notes: event.notes,
     $colorId: event.colorId,
@@ -69,11 +75,11 @@ function normalizeAggregate(aggregate: EventAggregate): NormalizedEventAggregate
 const INSERT_EVENT_SQL = `INSERT INTO events (
   id, calendar_id, title, temporal_type, anchor_date, temporal_definition_id,
   start_time, duration_type, duration_minutes, end_date, location, notes, color_id,
-  recurrence_rule_json, created_time_zone_id, created_at, updated_at
+  recurrence_rule_json, fuzzy_resolution_context_json, created_time_zone_id, created_at, updated_at
 ) VALUES (
   $id, $calendarId, $title, $temporalType, $anchorDate, $temporalDefinitionId,
   $startTime, $durationType, $durationMinutes, $endDate, $location, $notes, $colorId,
-  $recurrenceRuleJson, $createdTimeZoneId, $createdAt, $updatedAt
+  $recurrenceRuleJson, $fuzzyResolutionContextJson, $createdTimeZoneId, $createdAt, $updatedAt
 )`;
 
 const INSERT_REMINDER_SQL = `INSERT INTO event_reminders (
@@ -111,7 +117,7 @@ export class SqliteEventRepository implements EventRepository {
     const rows = await this.database.all<EventRow>(
       `SELECT * FROM events
        WHERE calendar_id = $calendarId AND (
-         (anchor_date >= $from AND anchor_date <= $through)
+         (anchor_date <= $through AND COALESCE(end_date, anchor_date) >= $from)
          OR (recurrence_rule_json IS NOT NULL AND anchor_date <= $through)
        )
        ORDER BY anchor_date, start_time, created_at, id`,
@@ -129,7 +135,9 @@ export class SqliteEventRepository implements EventRepository {
           anchor_date = $anchorDate, temporal_definition_id = $temporalDefinitionId,
           start_time = $startTime, duration_type = $durationType, duration_minutes = $durationMinutes,
           end_date = $endDate, location = $location, notes = $notes, color_id = $colorId,
-          recurrence_rule_json = $recurrenceRuleJson, created_time_zone_id = $createdTimeZoneId,
+          recurrence_rule_json = $recurrenceRuleJson,
+          fuzzy_resolution_context_json = $fuzzyResolutionContextJson,
+          created_time_zone_id = $createdTimeZoneId,
           updated_at = $updatedAt
          WHERE id = $id`,
         eventParameters(normalized.event),

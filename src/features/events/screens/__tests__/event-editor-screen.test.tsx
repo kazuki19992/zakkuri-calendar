@@ -38,6 +38,6 @@ describe('予定編集フォーム', () => {
 
   it('編集時はシリーズ全体の削除操作を表示する', async () => {
     const view = await render(<EventEditorScreen state={{ ...state, mode: 'edit', title: '定例', recurrenceDraft: { ...state.recurrenceDraft, preset: 'weekly' } }} onSave={jest.fn()} onDelete={jest.fn()} onCancel={jest.fn()} />);
-    expect(view.getByLabelText('予定を削除')).toBeOnTheScreen();
+    expect(view.getByLabelText('繰り返し予定を削除')).toBeOnTheScreen();
   });
 });

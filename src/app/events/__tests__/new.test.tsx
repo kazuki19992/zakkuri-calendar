@@ -114,6 +114,22 @@ describe('予定作成ルート', () => {
     }));
   });
 
+  it('明示された終日作成はきっちりタブを開く', async () => {
+    const repositories = { calendars: {}, events: {}, settings: {}, temporalDefinitions: {} };
+    jest.mocked(useLocalSearchParams).mockReturnValue({ date: '2026-09-21', temporalType: 'allDay' });
+    jest.mocked(useRouter).mockReturnValue({ back: jest.fn() } as unknown as ReturnType<typeof useRouter>);
+    jest.mocked(useRepositories).mockReturnValue(repositories as ReturnType<typeof useRepositories>);
+    jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged: jest.fn() });
+    jest.mocked(useEventEditor).mockReturnValue({ isSaving: false, isDeleting: false, save: jest.fn() } as unknown as EventEditorState);
+
+    await render(<NewEventRoute />);
+
+    expect(useEventEditor).toHaveBeenCalledWith(expect.objectContaining({
+      initial: expect.objectContaining({ temporalType: 'allDay' }),
+      initialTab: 'exact',
+    }));
+  });
+
   it('保存失敗時は作成画面を閉じない', async () => {
     const user = userEvent.setup();
     const back = jest.fn();

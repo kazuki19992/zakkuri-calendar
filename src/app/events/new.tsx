@@ -26,7 +26,9 @@ export default function NewEventRoute() {
       endTime: params.endTime ?? toWallClockTime((startMinutes + 60) % (24 * 60)) ?? '10:00',
       temporalType: params.temporalType ?? 'fuzzy',
     },
-    initialTab: params.temporalType === 'exact' ? 'exact' : undefined,
+    initialTab: params.temporalType === 'exact' || params.temporalType === 'allDay'
+      ? 'exact'
+      : undefined,
   });
 
   const save = useCallback(async (): Promise<void> => {

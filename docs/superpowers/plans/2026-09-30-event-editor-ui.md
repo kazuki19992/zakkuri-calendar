@@ -10,6 +10,17 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-30-event-editor-ui-design.md`
 
+## 実装結果（2026-09-30）
+
+- [x] Task 1: 日時、繰り返し、通知の純粋変換を追加した。
+- [x] Task 2: 2タブ、終日、複数日の編集状態を追加した。
+- [x] Task 3: 場所、メモ、色、繰り返し、複数通知を予定集約へ接続した。
+- [x] Task 4: 左右均等ヘッダー、日本語日付、日時入力を再構成した。
+- [x] Task 5: 繰り返し、色、場所、通知、メモのUIを追加した。
+- [x] Task 6: route回帰、文書、全体テスト、iOS／Android exportを確認した。
+
+元のチェックリストはTDDの実施順序と検証commandを残すため、計画時の表記のまま保持する。
+
 ## Global Constraints
 
 - `src/app`はroute parameter、Repository注入、成功時のrefreshと`router.back()`だけを担当する。
@@ -539,4 +550,3 @@ git commit -m "docs(events): 予定編集UIの実装範囲を記録"
 - [ ] **Step 9: 独立レビュー後にpushしてPRを作成する**
 
 Critical／Important指摘を解消し、修正後の全体検証を取り直す。`codex/event-editor-ui`をpushし、`develop`向け通常PRを日本語で作成する。PR本文へ目的、設計判断、検証、export、未実装境界、実機未確認項目を記載する。
-

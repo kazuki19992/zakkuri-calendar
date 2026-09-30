@@ -72,6 +72,25 @@ function normalizeAggregate(aggregate: EventAggregate): NormalizedEventAggregate
   return { event: event.value, reminders: reminders.value };
 }
 
+async function assertFuzzyDefinitionConsistency(
+  database: AppDatabase,
+  event: CalendarEvent,
+): Promise<void> {
+  if (event.temporalType !== 'fuzzy') return;
+  const definition = await database.first<{ granularity: string }>(
+    'SELECT granularity FROM temporal_definitions WHERE id = $id',
+    { $id: event.temporalDefinitionId },
+  );
+  if (definition === null) throw new Error('Invalid fuzzy definition consistency');
+  const isRelative = definition.granularity === 'week' || definition.granularity === 'month';
+  const isDay = definition.granularity === 'day';
+  if ((!isRelative && !isDay) ||
+      (isRelative && (event.resolutionContext === null || event.recurrenceRule !== null)) ||
+      (isDay && event.resolutionContext !== null)) {
+    throw new Error('Invalid fuzzy definition consistency');
+  }
+}
+
 const INSERT_EVENT_SQL = `INSERT INTO events (
   id, calendar_id, title, temporal_type, anchor_date, temporal_definition_id,
   start_time, duration_type, duration_minutes, end_date, location, notes, color_id,
@@ -94,6 +113,7 @@ export class SqliteEventRepository implements EventRepository {
   async create(aggregate: EventAggregate): Promise<void> {
     const normalized = normalizeAggregate(aggregate);
     await this.database.exclusiveTransaction(async (transaction) => {
+      await assertFuzzyDefinitionConsistency(transaction, normalized.event);
       await transaction.run(INSERT_EVENT_SQL, eventParameters(normalized.event));
       for (const reminder of normalized.reminders) {
         await transaction.run(INSERT_REMINDER_SQL, reminderParameters(reminder));
@@ -129,6 +149,7 @@ export class SqliteEventRepository implements EventRepository {
   async update(aggregate: EventAggregate): Promise<void> {
     const normalized = normalizeAggregate(aggregate);
     await this.database.exclusiveTransaction(async (transaction) => {
+      await assertFuzzyDefinitionConsistency(transaction, normalized.event);
       const result = await transaction.run(
         `UPDATE events SET
           calendar_id = $calendarId, title = $title, temporal_type = $temporalType,

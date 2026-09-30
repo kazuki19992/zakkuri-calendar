@@ -115,6 +115,26 @@ describe('SQLite repositories', () => {
     expect(db.transactionRun).not.toHaveBeenCalled();
   });
 
+  it('週月定義のざっくり予定は解決context必須かつ繰り返し不可として保存する', async () => {
+    const db = createTransactionDatabaseDouble();
+    db.first.mockResolvedValue({ granularity: 'week' });
+    const events = new SqliteEventRepository(db.database);
+    const fuzzyEvent: CalendarEvent = {
+      ...exactEvent,
+      temporalType: 'fuzzy',
+      temporalDefinitionId: 'personal-default:next_week',
+      endDate: exactEvent.anchorDate,
+      resolutionContext: null,
+    };
+
+    await expect(events.create({ event: fuzzyEvent, reminders: [] }))
+      .rejects.toThrow('Invalid fuzzy definition consistency');
+    expect(db.first).toHaveBeenCalledWith(expect.stringContaining('FROM temporal_definitions'), {
+      $id: fuzzyEvent.temporalDefinitionId,
+    });
+    expect(db.transactionRun).not.toHaveBeenCalled();
+  });
+
   it('予定と通知を取得して集約として返す', async () => {
     const db = createDatabaseDouble();
     db.first.mockResolvedValue(eventRow);

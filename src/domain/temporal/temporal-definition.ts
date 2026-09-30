@@ -15,6 +15,11 @@ export type WeekResolver = Readonly<{
   endWeekday: 1 | 2 | 3 | 4 | 5 | 6 | 7;
 }>;
 
+export type WeekRemainderResolver = Readonly<{
+  kind: 'weekRemainder';
+  selectionWeekOffset: 0;
+}>;
+
 export type MonthDaysResolver = Readonly<{
   kind: 'monthDays';
   selectionMonthOffset: 0 | 1;
@@ -31,6 +36,7 @@ export type MonthLastDaysResolver = Readonly<{
 export type TemporalResolverConfig =
   | TimeOfDayResolver
   | WeekResolver
+  | WeekRemainderResolver
   | MonthDaysResolver
   | MonthLastDaysResolver;
 
@@ -107,6 +113,13 @@ function parseResolver(
         endWeekday: value.endWeekday as WeekResolver['endWeekday'],
       },
     };
+  }
+
+  if (value.kind === 'weekRemainder') {
+    if (granularity !== 'week' || value.selectionWeekOffset !== 0) {
+      return fail('resolverConfig', 'invalid weekRemainder resolver');
+    }
+    return { ok: true, value: { kind: 'weekRemainder', selectionWeekOffset: 0 } };
   }
 
   if (value.kind === 'monthDays') {

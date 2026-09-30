@@ -23,6 +23,7 @@ describe('parseTemporalDefinition', () => {
 
   it.each([
     { granularity: 'week', resolverConfig: { kind: 'week', selectionWeekOffset: 1, startWeekday: 1, endWeekday: 7 } },
+    { granularity: 'week', resolverConfig: { kind: 'weekRemainder', selectionWeekOffset: 0 } },
     { granularity: 'month', resolverConfig: { kind: 'monthDays', selectionMonthOffset: 0, startDay: 1, endDay: 'last' } },
     { granularity: 'month', resolverConfig: { kind: 'monthLastDays', selectionMonthOffset: 1, count: 5 } },
   ])('accepts a valid $granularity resolver', (fields) => {
@@ -59,6 +60,7 @@ describe('parseTemporalDefinition', () => {
 
   it.each([
     { resolverConfig: { kind: 'week' } },
+    { granularity: 'week', resolverConfig: { kind: 'weekRemainder', selectionWeekOffset: 1 } },
     { resolverConfig: { kind: 'timeOfDay', startMinute: 1.5, endMinute: 20 } },
     { resolverConfig: { kind: 'monthDays', selectionMonthOffset: 0, startDay: 0, endDay: 4 } },
     { resolverConfig: { kind: 'monthLastDays', selectionMonthOffset: 0, count: 0 } },

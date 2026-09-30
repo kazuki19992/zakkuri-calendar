@@ -2,11 +2,19 @@ import type { Result } from '@/domain/shared/result';
 import { parseEventColorId, type EventColorId } from './event-color';
 import { isCalendarDate } from './month';
 import { parseRecurrenceRule, type RecurrenceRuleV1 } from './recurrence';
+import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
 
 export type ExactDuration =
   | Readonly<{ type: 'instant' }>
   | Readonly<{ type: 'fixed'; minutes: number }>
   | Readonly<{ type: 'undetermined' }>;
+
+export type FuzzyResolutionContextV1 = Readonly<{
+  version: 1;
+  referenceDate: string;
+  periodAnchorDate: string;
+  parameterSnapshot: Readonly<{ thisWeekDeadlineWeekday?: ThisWeekDeadlineWeekday }>;
+}>;
 
 type EventDraftBase = Readonly<{
   calendarId: string;
@@ -22,7 +30,12 @@ type EventDraftBase = Readonly<{
 export type EventDraft =
   | (EventDraftBase & Readonly<{ temporalType: 'exact'; startTime: string; duration: ExactDuration }>)
   | (EventDraftBase & Readonly<{ temporalType: 'allDay'; endDate: string }>)
-  | (EventDraftBase & Readonly<{ temporalType: 'fuzzy'; temporalDefinitionId: string }>);
+  | (EventDraftBase & Readonly<{
+    temporalType: 'fuzzy';
+    temporalDefinitionId: string;
+    endDate: string;
+    resolutionContext: FuzzyResolutionContextV1 | null;
+  }>);
 
 export type CalendarEvent = EventDraft &
   Readonly<{ id: string; createdAt: string; updatedAt: string }>;
@@ -42,6 +55,20 @@ const isNonBlank = (value: unknown): value is string =>
 
 function isWallClockTime(value: unknown): value is string {
   return typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function parseFuzzyResolutionContext(value: unknown): FuzzyResolutionContextV1 | null | undefined {
+  if (value === null) return null;
+  if (!isRecord(value) || value.version !== 1 || !isCalendarDate(value.referenceDate) ||
+      !isCalendarDate(value.periodAnchorDate) || !isRecord(value.parameterSnapshot)) return undefined;
+  const deadline = value.parameterSnapshot.thisWeekDeadlineWeekday;
+  if (deadline !== undefined && deadline !== 5 && deadline !== 6 && deadline !== 7) return undefined;
+  return {
+    version: 1,
+    referenceDate: value.referenceDate,
+    periodAnchorDate: value.periodAnchorDate,
+    parameterSnapshot: deadline === undefined ? {} : { thisWeekDeadlineWeekday: deadline },
+  };
 }
 
 export function parseExactDuration(value: unknown): Result<ExactDuration, EventValidationError> {
@@ -98,7 +125,18 @@ export function parseEventDraft(input: unknown): Result<EventDraft, EventValidat
     if (!isNonBlank(input.temporalDefinitionId)) {
       return fail('temporalDefinitionId', 'fuzzy events require a temporal definition');
     }
-    return { ok: true, value: { ...base, temporalType: 'fuzzy', temporalDefinitionId: input.temporalDefinitionId } };
+    if (!isCalendarDate(input.endDate) || input.endDate < input.anchorDate) {
+      return fail('endDate', 'fuzzy end date must not be before anchor date');
+    }
+    const resolutionContext = parseFuzzyResolutionContext(input.resolutionContext);
+    if (resolutionContext === undefined) return fail('resolutionContext', 'invalid fuzzy resolution context');
+    return { ok: true, value: {
+      ...base,
+      temporalType: 'fuzzy',
+      temporalDefinitionId: input.temporalDefinitionId,
+      endDate: input.endDate,
+      resolutionContext,
+    } };
   }
   if (input.temporalType === 'exact') {
     if (!isWallClockTime(input.startTime)) return fail('startTime', 'invalid wall-clock time');

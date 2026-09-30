@@ -62,7 +62,7 @@ function addCalendarDays(value: string, days: number): string {
 }
 
 function getOccurrenceSpanDays(event: CalendarEvent): number {
-  if (event.temporalType === 'allDay') {
+  if (event.temporalType === 'allDay' || event.temporalType === 'fuzzy') {
     return differenceInCalendarDays(
       parseCalendarDate(event.endDate),
       parseCalendarDate(event.anchorDate),

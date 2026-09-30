@@ -47,6 +47,8 @@ function fuzzy(
     anchorDate,
     temporalType: 'fuzzy',
     temporalDefinitionId: definition.id,
+    endDate: anchorDate,
+    resolutionContext: null,
   };
 }
 
@@ -234,6 +236,8 @@ describe('日別タイムライン配置', () => {
       anchorDate: '2026-09-09',
       temporalType: 'fuzzy',
       temporalDefinitionId: 'missing',
+      endDate: '2026-09-09',
+      resolutionContext: null,
     } as const satisfies CalendarEvent;
     expect(createDayTimelineItems({
       date: '2026-09-10',

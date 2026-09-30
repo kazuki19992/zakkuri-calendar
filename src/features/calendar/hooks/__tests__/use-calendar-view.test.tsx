@@ -26,6 +26,8 @@ const event: CalendarEvent = {
   anchorDate: '2026-09-09',
   temporalType: 'fuzzy',
   temporalDefinitionId: 'personal-default:afternoon',
+  endDate: '2026-09-09',
+  resolutionContext: null,
   location: null,
   notes: null,
   colorId: null,

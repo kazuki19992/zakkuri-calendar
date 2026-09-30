@@ -203,6 +203,8 @@ describe('月表示の表示用モデル', () => {
       ...baseEvent,
       temporalType: 'fuzzy',
       temporalDefinitionId: 'personal-default:afternoon',
+      endDate: baseEvent.anchorDate,
+      resolutionContext: null,
     };
 
     expect(createAgendaItems(
@@ -225,6 +227,8 @@ describe('月表示の表示用モデル', () => {
       ...baseEvent,
       temporalType: 'fuzzy',
       temporalDefinitionId: 'personal-default:missing',
+      endDate: baseEvent.anchorDate,
+      resolutionContext: null,
     };
 
     expect(createAgendaItems([asOccurrence(event)], new Map())).toEqual([

@@ -324,7 +324,10 @@ export function useEventEditor({
     let draft: EventDraft;
     if (editorTab === 'fuzzy') {
       if (selectedDefinitionId === null) { setSaveError('時間帯を選択してください。'); return false; }
-      draft = { ...base, temporalType: 'fuzzy', temporalDefinitionId: selectedDefinitionId };
+      draft = {
+        ...base, temporalType: 'fuzzy', temporalDefinitionId: selectedDefinitionId,
+        endDate: startDate, resolutionContext: null,
+      };
     } else if (isAllDay) {
       draft = { ...base, temporalType: 'allDay', endDate };
     } else {

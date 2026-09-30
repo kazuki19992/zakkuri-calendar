@@ -122,6 +122,8 @@ describe('2日表示の表示用モデル', () => {
         anchorDate: '2026-10-01',
         temporalType: 'fuzzy',
         temporalDefinitionId: afternoon.id,
+        endDate: '2026-10-01',
+        resolutionContext: null,
       },
     ];
 
@@ -162,6 +164,7 @@ describe('2日表示の表示用モデル', () => {
       {
         ...baseEvent, id: 'missing', title: '未解決', anchorDate: '2026-09-30',
         temporalType: 'fuzzy', temporalDefinitionId: 'missing-definition',
+        endDate: '2026-09-30', resolutionContext: null,
       },
     ];
     const result = createTwoDayViewModels({
@@ -219,6 +222,7 @@ describe('2日表示の表示用モデル', () => {
     const event: CalendarEvent = {
       ...baseEvent, id: 'late', title: '読書', anchorDate: '2026-09-30',
       temporalType: 'fuzzy', temporalDefinitionId: lateNight.id,
+      endDate: '2026-09-30', resolutionContext: null,
     };
     const result = createTwoDayViewModels({
       range: { from: '2026-09-30', through: '2026-10-01' }, today: '2026-09-30',

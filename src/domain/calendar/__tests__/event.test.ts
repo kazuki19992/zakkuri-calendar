@@ -14,7 +14,8 @@ const base = {
 const metadata = { location: null, notes: null, colorId: null, recurrenceRule: null };
 const validExact = { ...base, ...metadata, temporalType: 'exact' as const, startTime: '14:30', duration: { type: 'fixed' as const, minutes: 30 as const } };
 const validAllDay = { ...base, ...metadata, temporalType: 'allDay' as const, endDate: '2026-09-08' };
-const validFuzzy = { ...base, ...metadata, temporalType: 'fuzzy' as const, temporalDefinitionId: 'personal-default:morning' };
+const validFuzzy = { ...base, ...metadata, temporalType: 'fuzzy' as const,
+  temporalDefinitionId: 'personal-default:morning', endDate: base.anchorDate, resolutionContext: null };
 
 describe('parseEventDraft', () => {
   it.each([validExact, validAllDay, validFuzzy])('accepts valid temporal variants', (draft) => {
@@ -36,6 +37,25 @@ describe('parseEventDraft', () => {
 
   it('requires a temporal definition for fuzzy events', () => {
     expect(parseEventDraft({ ...validFuzzy, temporalDefinitionId: null }).ok).toBe(false);
+  });
+
+  it('複数日ざっくり予定の解決条件を受け付ける', () => {
+    const draft = { ...validFuzzy, endDate: '2026-09-11', resolutionContext: {
+      version: 1 as const,
+      referenceDate: '2026-09-08',
+      periodAnchorDate: '2026-09-07',
+      parameterSnapshot: { thisWeekDeadlineWeekday: 5 as const },
+    } };
+    expect(parseEventDraft(draft)).toEqual({ ok: true, value: draft });
+  });
+
+  it.each([
+    { endDate: '2026-09-07' },
+    { resolutionContext: { version: 2, referenceDate: '2026-09-08', periodAnchorDate: '2026-09-07', parameterSnapshot: {} } },
+    { resolutionContext: { version: 1, referenceDate: '2026-02-30', periodAnchorDate: '2026-09-07', parameterSnapshot: {} } },
+    { resolutionContext: { version: 1, referenceDate: '2026-09-08', periodAnchorDate: '2026-09-07', parameterSnapshot: { thisWeekDeadlineWeekday: 4 } } },
+  ])('不正なざっくり期間を拒否する', (fields) => {
+    expect(parseEventDraft({ ...validFuzzy, ...fields }).ok).toBe(false);
   });
 
   it.each(['2026-02-30', '08/09/2026', ''])('rejects an invalid anchor date', (anchorDate) => {

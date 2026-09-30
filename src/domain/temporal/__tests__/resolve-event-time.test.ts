@@ -107,6 +107,8 @@ describe('予定の時間範囲解決', () => {
       id: 'fuzzy',
       temporalType: 'fuzzy',
       temporalDefinitionId: definition.id,
+      endDate: eventBase.anchorDate,
+      resolutionContext: null,
     };
 
     expect(resolveEventTime({ event, definition, undeterminedFadeMinutes: 120 })).toEqual({
@@ -129,6 +131,8 @@ describe('予定の時間範囲解決', () => {
       id: 'fuzzy',
       temporalType: 'fuzzy',
       temporalDefinitionId: definitionBase.id,
+      endDate: eventBase.anchorDate,
+      resolutionContext: null,
     };
     const weekDefinition: TemporalDefinition = {
       ...definitionBase,

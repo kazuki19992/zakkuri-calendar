@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
+import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   createTwoDayStripDates,
@@ -45,7 +46,64 @@ const holidayCoverage = [
   },
 ] as const;
 
+function asOccurrence(event: CalendarEvent): EventOccurrence {
+  return {
+    key: event.id,
+    eventId: event.id,
+    occurrenceStartDate: event.anchorDate,
+    occurrenceThroughDate: event.temporalType === 'allDay' ? event.endDate : event.anchorDate,
+    isRecurring: false,
+    event,
+  };
+}
+
+function asOccurrences(events: readonly CalendarEvent[]): readonly EventOccurrence[] {
+  return events.map(asOccurrence);
+}
+
 describe('2日表示の表示用モデル', () => {
+  it('同じシリーズの発生回を異なるkeyと同じ元予定IDで表示する', () => {
+    const event: CalendarEvent = {
+      ...baseEvent,
+      id: 'series-1',
+      title: '朝会',
+      anchorDate: '2026-09-01',
+      temporalType: 'exact',
+      startTime: '09:00',
+      duration: { type: 'fixed', minutes: 30 },
+    };
+    const occurrences: readonly EventOccurrence[] = ['2026-09-30', '2026-10-01'].map((date) => ({
+      key: `series-1:recurrence:${date}`,
+      eventId: 'series-1',
+      occurrenceStartDate: date,
+      occurrenceThroughDate: date,
+      isRecurring: true,
+      event,
+    }));
+
+    const result = createTwoDayViewModels({
+      range: { from: '2026-09-30', through: '2026-10-01' },
+      today: '2026-09-30',
+      occurrences,
+      definitions: new Map(),
+      undeterminedFadeMinutes: 120,
+      holidayCoverage,
+    });
+
+    expect(result.flatMap((day) => day.timelineItems)).toMatchObject([
+      {
+        id: 'series-1:recurrence:2026-09-30',
+        eventId: 'series-1',
+        accessibilityLabel: expect.stringContaining('繰り返し予定'),
+      },
+      {
+        id: 'series-1:recurrence:2026-10-01',
+        eventId: 'series-1',
+        accessibilityLabel: expect.stringContaining('繰り返し予定'),
+      },
+    ]);
+  });
+
   it('月境界を越える2日を順番にし、予定を時間軸へ配置する', () => {
     const events: readonly CalendarEvent[] = [
       {
@@ -70,7 +128,7 @@ describe('2日表示の表示用モデル', () => {
     const result = createTwoDayViewModels({
       range: { from: '2026-09-30', through: '2026-10-01' },
       today: '2026-09-30',
-      events,
+      occurrences: asOccurrences(events),
       definitions: new Map([[afternoon.id, afternoon]]),
       undeterminedFadeMinutes: 120,
       holidayCoverage,
@@ -107,7 +165,8 @@ describe('2日表示の表示用モデル', () => {
       },
     ];
     const result = createTwoDayViewModels({
-      range: { from: '2026-09-30', through: '2026-10-01' }, today: '2026-09-30', events,
+      range: { from: '2026-09-30', through: '2026-10-01' }, today: '2026-09-30',
+      occurrences: asOccurrences(events),
       definitions: new Map(), undeterminedFadeMinutes: 120, holidayCoverage,
     });
 
@@ -128,10 +187,10 @@ describe('2日表示の表示用モデル', () => {
     const result = createTwoDayViewModels({
       range: { from: '2026-10-01', through: '2026-10-02' },
       today: '2026-09-30',
-      events: [{
+      occurrences: asOccurrences([{
         ...baseEvent, id: 'all-day', title: '休暇', anchorDate: '2026-10-01',
         temporalType: 'allDay', endDate: '2026-10-01',
-      }],
+      }]),
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
       holidayCoverage,
@@ -163,7 +222,7 @@ describe('2日表示の表示用モデル', () => {
     };
     const result = createTwoDayViewModels({
       range: { from: '2026-09-30', through: '2026-10-01' }, today: '2026-09-30',
-      events: [event], definitions: new Map([[lateNight.id, lateNight]]),
+      occurrences: asOccurrences([event]), definitions: new Map([[lateNight.id, lateNight]]),
       undeterminedFadeMinutes: 120, holidayCoverage,
     });
 
@@ -174,7 +233,7 @@ describe('2日表示の表示用モデル', () => {
   it('年境界を越え、祝日未対応と予定なしを読み上げへ反映する', () => {
     const result = createTwoDayViewModels({
       range: { from: '2026-12-31', through: '2027-01-01' }, today: '2026-09-30',
-      events: [], definitions: new Map(), undeterminedFadeMinutes: 120,
+      occurrences: [], definitions: new Map(), undeterminedFadeMinutes: 120,
       holidayCoverage: [
         { from: '2026-12-01', through: '2026-12-31', result: { status: 'unsupported' } },
         { from: '2027-01-01', through: '2027-01-31', result: { status: 'unsupported' } },
@@ -222,7 +281,7 @@ describe('2日ビューのスワイプ用予備列', () => {
       range: { from: '2026-09-30', through: '2026-10-01' },
       bufferDays: 1,
       today: '2026-09-30',
-      events,
+      occurrences: asOccurrences(events),
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
       holidayCoverage,

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EventColorId } from '@/constants/event-colors';
 import { DEFAULT_CALENDAR_ID } from '@/domain/calendar/calendar';
-import type { CalendarEvent } from '@/domain/calendar/event';
+import {
+  expandEventOccurrences,
+  type EventOccurrence,
+} from '@/domain/calendar/event-occurrence';
 import type { HolidayProvider } from '@/domain/calendar/holiday';
 import {
   getMonthGrid,
@@ -95,7 +98,7 @@ type CalendarSnapshot = Readonly<{
   calendarName: string;
   calendarColorId: EventColorId;
   isCalendarVisible: boolean;
-  events: readonly CalendarEvent[];
+  occurrences: readonly EventOccurrence[];
   holidayCoverage: readonly HolidayRangeCoverage[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
@@ -131,7 +134,7 @@ const emptySnapshot: CalendarSnapshot = {
   calendarName: 'マイカレンダー',
   calendarColorId: 'blue',
   isCalendarVisible: true,
-  events: [],
+  occurrences: [],
   holidayCoverage: [],
   definitions: new Map(),
   undeterminedFadeMinutes: 120,
@@ -181,9 +184,13 @@ async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Pr
       result: input.holidayProvider.list(monthRange.from, monthRange.through),
     };
   });
+  const expanded = expandEventOccurrences({ events, from: range.from, through: range.through });
+  if (!expanded.ok) throw new Error('event occurrence expansion failed');
+  const occurrences = expanded.value;
   const fuzzyDefinitionIds = [
     ...new Set(
-      events
+      occurrences
+        .map((occurrence) => occurrence.event)
         .filter((event) => event.temporalType === 'fuzzy')
         .map((event) => event.temporalDefinitionId),
     ),
@@ -197,7 +204,7 @@ async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Pr
     calendarName: calendar.name,
     calendarColorId: calendar.colorId,
     isCalendarVisible,
-    events,
+    occurrences,
     holidayCoverage,
     definitions: new Map(
       definitions.flatMap((definition) =>
@@ -492,13 +499,13 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     }
   }, []);
 
-  const visibleEvents = useMemo(
-    () => state.snapshot.isCalendarVisible ? state.snapshot.events : [],
-    [state.snapshot.events, state.snapshot.isCalendarVisible],
+  const visibleOccurrences = useMemo(
+    () => state.snapshot.isCalendarVisible ? state.snapshot.occurrences : [],
+    [state.snapshot.occurrences, state.snapshot.isCalendarVisible],
   );
-  const datePickerVisibleEvents = useMemo(
-    () => datePickerState.snapshot.isCalendarVisible ? datePickerState.snapshot.events : [],
-    [datePickerState.snapshot.events, datePickerState.snapshot.isCalendarVisible],
+  const datePickerVisibleOccurrences = useMemo(
+    () => datePickerState.snapshot.isCalendarVisible ? datePickerState.snapshot.occurrences : [],
+    [datePickerState.snapshot.occurrences, datePickerState.snapshot.isCalendarVisible],
   );
 
   const twoDayDays = useMemo(
@@ -506,13 +513,13 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       createTwoDayViewModels({
         range: getTwoDayRange(state.anchorDate),
         today: state.today,
-        events: visibleEvents,
+        occurrences: visibleOccurrences,
         definitions: state.snapshot.definitions,
         undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes,
         holidayCoverage: state.snapshot.holidayCoverage,
       }),
     [state.anchorDate, state.snapshot.definitions, state.snapshot.holidayCoverage,
-      state.snapshot.undeterminedFadeMinutes, state.today, visibleEvents],
+      state.snapshot.undeterminedFadeMinutes, state.today, visibleOccurrences],
   );
   const twoDayStrip = useMemo(
     () =>
@@ -520,13 +527,13 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         range: getTwoDayRange(state.anchorDate),
         bufferDays: TWO_DAY_SWIPE_BUFFER_DAYS,
         today: state.today,
-        events: visibleEvents,
+        occurrences: visibleOccurrences,
         definitions: state.snapshot.definitions,
         undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes,
         holidayCoverage: state.snapshot.holidayCoverage,
       }),
     [state.anchorDate, state.snapshot.definitions, state.snapshot.holidayCoverage,
-      state.snapshot.undeterminedFadeMinutes, state.today, visibleEvents],
+      state.snapshot.undeterminedFadeMinutes, state.today, visibleOccurrences],
   );
   const monthDays = useMemo(
     () =>
@@ -534,11 +541,11 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         grid: getMonthGrid(state.visibleMonth, input.weekStartsOn),
         selectedDate: state.selectedDate,
         today: state.today,
-        events: visibleEvents,
+        occurrences: visibleOccurrences,
         holidayCoverage: state.snapshot.holidayCoverage,
       }),
     [input.weekStartsOn, state.selectedDate, state.snapshot.holidayCoverage, state.today,
-      state.visibleMonth, visibleEvents],
+      state.visibleMonth, visibleOccurrences],
   );
   const datePickerDays = useMemo(
     () =>
@@ -546,22 +553,23 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         grid: getMonthGrid(datePickerState.month, input.weekStartsOn),
         selectedDate: state.selectedDate,
         today: state.today,
-        events: datePickerVisibleEvents,
+        occurrences: datePickerVisibleOccurrences,
         holidayCoverage: datePickerState.snapshot.holidayCoverage,
       }),
-    [datePickerState.month, datePickerState.snapshot.holidayCoverage, datePickerVisibleEvents,
+    [datePickerState.month, datePickerState.snapshot.holidayCoverage, datePickerVisibleOccurrences,
       input.weekStartsOn, state.selectedDate, state.today],
   );
   const selectedAgendaItems = useMemo(
     () =>
       createAgendaItems(
-        visibleEvents.filter((event) => occursOnCalendarDate(event, state.selectedDate)),
+        visibleOccurrences.filter((occurrence) =>
+          occursOnCalendarDate(occurrence, state.selectedDate)),
         new Map(
           [...state.snapshot.definitions.values()]
             .map((definition) => [definition.id, definition.label] as const),
         ),
       ),
-    [state.selectedDate, state.snapshot.definitions, visibleEvents],
+    [state.selectedDate, state.snapshot.definitions, visibleOccurrences],
   );
   const selectedDay =
     state.mode === 'month'

@@ -1,7 +1,6 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
+import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { HolidayRangeResult } from '@/domain/calendar/holiday';
-import { offsetCalendarDate } from '@/domain/calendar/month';
-import { toMinutesOfDay } from '@/domain/calendar/time';
 
 export type HolidaySupport = 'available' | 'unsupported';
 
@@ -13,18 +12,15 @@ export type HolidayRangeCoverage = Readonly<{
 
 export type AgendaItemViewModel = Readonly<{
   id: string;
+  eventId: string;
   title: string;
   temporalLabel: string;
   accessibilityLabel: string;
 }>;
 
-/** 正確な予定が日付をまたぐ場合は、翌日の月表示・予定一覧にも含める。 */
-export function occursOnCalendarDate(event: CalendarEvent, date: string): boolean {
-  if (event.anchorDate === date) return true;
-  if (event.temporalType !== 'exact' || event.duration.type !== 'fixed') return false;
-  const startMinutes = toMinutesOfDay(event.startTime);
-  return startMinutes !== null && startMinutes + event.duration.minutes > 24 * 60
-    && offsetCalendarDate(event.anchorDate, 1) === date;
+/** 発生回が占有する包含期間内の日付を、月表示・予定一覧に含める。 */
+export function occursOnCalendarDate(occurrence: EventOccurrence, date: string): boolean {
+  return occurrence.occurrenceStartDate <= date && date <= occurrence.occurrenceThroughDate;
 }
 
 export function getHolidayInfo(
@@ -55,16 +51,22 @@ function getTemporalLabel(
 }
 
 export function createAgendaItems(
-  events: readonly CalendarEvent[],
+  occurrences: readonly EventOccurrence[],
   definitionLabels: ReadonlyMap<string, string>,
 ): readonly AgendaItemViewModel[] {
-  return events.map((event) => {
+  return occurrences.map((occurrence) => {
+    const event = occurrence.event;
     const temporalLabel = getTemporalLabel(event, definitionLabels);
     return {
-      id: event.id,
+      id: occurrence.key,
+      eventId: occurrence.eventId,
       title: event.title,
       temporalLabel,
-      accessibilityLabel: `${event.title}、${temporalLabel}`,
+      accessibilityLabel: [
+        event.title,
+        temporalLabel,
+        occurrence.isRecurring ? '繰り返し予定' : null,
+      ].filter((label): label is string => label !== null).join('、'),
     };
   });
 }

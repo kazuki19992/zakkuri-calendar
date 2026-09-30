@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
+import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { MonthGridDate } from '@/domain/calendar/month';
 import { createAgendaItems, createMonthDayViewModels } from '../month-view-model';
 
@@ -23,13 +24,60 @@ const gridDate: MonthGridDate = {
   isCurrentMonth: true,
 };
 
+function asOccurrence(
+  event: CalendarEvent,
+  throughDate = event.temporalType === 'allDay' ? event.endDate : event.anchorDate,
+): EventOccurrence {
+  return {
+    key: event.id,
+    eventId: event.id,
+    occurrenceStartDate: event.anchorDate,
+    occurrenceThroughDate: throughDate,
+    isRecurring: false,
+    event,
+  };
+}
+
 describe('月表示の表示用モデル', () => {
+  it('繰り返し発生回の継続日へ予定点を出し元シリーズIDをagendaへ渡す', () => {
+    const event: CalendarEvent = {
+      ...baseEvent,
+      temporalType: 'allDay',
+      endDate: '2026-09-23',
+    };
+    const occurrence: EventOccurrence = {
+      key: 'event-1:recurrence:2026-09-21',
+      eventId: 'event-1',
+      occurrenceStartDate: '2026-09-21',
+      occurrenceThroughDate: '2026-09-23',
+      isRecurring: true,
+      event,
+    };
+
+    const days = createMonthDayViewModels({
+      grid: [{ ...gridDate, date: '2026-09-23', dayNumber: 23 }],
+      selectedDate: '2026-09-23',
+      today: '2026-09-21',
+      occurrences: [occurrence],
+      holidayCoverage: [],
+    });
+
+    expect(days[0]).toMatchObject({ hasEvents: true });
+    expect(createAgendaItems([occurrence], new Map())).toEqual([{
+      id: occurrence.key,
+      eventId: 'event-1',
+      title: '敬老会',
+      temporalLabel: '終日',
+      accessibilityLabel: '敬老会、終日、繰り返し予定',
+    }]);
+  });
+
   it('祝日だけの日は祝日名を示すが予定ありの点には数えない', () => {
     const result = createMonthDayViewModels({
       grid: [gridDate],
       selectedDate: '2026-09-20',
       today: '2026-09-20',
-      events: [],
+      occurrences: [],
       holidayCoverage: [{
         from: '2026-09-01', through: '2026-09-30',
         result: { status: 'available', holidays: [{ date: '2026-09-21', name: '敬老の日' }] },
@@ -45,13 +93,11 @@ describe('月表示の表示用モデル', () => {
       grid: [gridDate],
       selectedDate: '2026-09-21',
       today: '2026-09-21',
-      events: [
-        {
+      occurrences: [asOccurrence({
           ...baseEvent,
           temporalType: 'allDay',
           endDate: baseEvent.anchorDate,
-        },
-      ],
+        })],
       holidayCoverage: [
         {
           from: '2026-09-01',
@@ -82,7 +128,7 @@ describe('月表示の表示用モデル', () => {
       grid: [gridDate],
       selectedDate: '2026-09-20',
       today: '2026-09-20',
-      events: [],
+      occurrences: [],
       holidayCoverage: [
         {
           from: '2026-09-01',
@@ -107,9 +153,10 @@ describe('月表示の表示用モデル', () => {
       duration: { type: 'fixed', minutes: 30 },
     };
 
-    expect(createAgendaItems([event], new Map())).toEqual([
+    expect(createAgendaItems([asOccurrence(event)], new Map())).toEqual([
       {
         id: 'event-1',
+        eventId: 'event-1',
         title: '敬老会',
         temporalLabel: '14:30',
         accessibilityLabel: '敬老会、14:30',
@@ -122,13 +169,13 @@ describe('月表示の表示用モデル', () => {
       grid: [{ ...gridDate, date: '2026-09-22', dayNumber: 22 }],
       selectedDate: '2026-09-22',
       today: '2026-09-21',
-      events: [{
+      occurrences: [asOccurrence({
         ...baseEvent,
         anchorDate: '2026-09-21',
         temporalType: 'exact',
         startTime: '23:30',
         duration: { type: 'fixed', minutes: 60 },
-      }],
+      }, '2026-09-22')],
       holidayCoverage: [],
     });
 
@@ -140,9 +187,10 @@ describe('月表示の表示用モデル', () => {
       ...baseEvent, temporalType: 'allDay', endDate: baseEvent.anchorDate,
     };
 
-    expect(createAgendaItems([event], new Map())).toEqual([
+    expect(createAgendaItems([asOccurrence(event)], new Map())).toEqual([
       {
         id: 'event-1',
+        eventId: 'event-1',
         title: '敬老会',
         temporalLabel: '終日',
         accessibilityLabel: '敬老会、終日',
@@ -157,10 +205,14 @@ describe('月表示の表示用モデル', () => {
       temporalDefinitionId: 'personal-default:afternoon',
     };
 
-    expect(createAgendaItems([event], new Map([['personal-default:afternoon', '午後']])))
+    expect(createAgendaItems(
+      [asOccurrence(event)],
+      new Map([['personal-default:afternoon', '午後']]),
+    ))
       .toEqual([
         {
           id: 'event-1',
+          eventId: 'event-1',
           title: '敬老会',
           temporalLabel: '午後',
           accessibilityLabel: '敬老会、午後',
@@ -175,9 +227,10 @@ describe('月表示の表示用モデル', () => {
       temporalDefinitionId: 'personal-default:missing',
     };
 
-    expect(createAgendaItems([event], new Map())).toEqual([
+    expect(createAgendaItems([asOccurrence(event)], new Map())).toEqual([
       {
         id: 'event-1',
+        eventId: 'event-1',
         title: '敬老会',
         temporalLabel: 'ざっくり',
         accessibilityLabel: '敬老会、ざっくり',

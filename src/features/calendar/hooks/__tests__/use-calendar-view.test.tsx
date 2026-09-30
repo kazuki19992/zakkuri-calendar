@@ -93,6 +93,43 @@ function createDependencies() {
 }
 
 describe('カレンダー表示の状態調整', () => {
+  it('範囲より前に始まったシリーズを2日・月・選択日へ同じ発生回として表示する', async () => {
+    const dependencies = createDependencies();
+    const recurringEvent: CalendarEvent = {
+      ...event,
+      id: 'series-1',
+      anchorDate: '2026-09-01',
+      recurrenceRule: {
+        version: 1,
+        frequency: 'daily',
+        interval: 2,
+        weekdays: [],
+        end: { type: 'never' },
+      },
+    };
+    dependencies.events.listByAnchorRange.mockResolvedValue([recurringEvent]);
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies,
+      weekStartsOn: 1,
+      now: () => new Date(2026, 8, 8, 12),
+    }));
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.twoDayDays[1].timelineItems[0]).toMatchObject({
+      id: 'series-1:recurrence:2026-09-09',
+      eventId: 'series-1',
+    });
+    expect(result.current.monthDays.find((day) => day.date === '2026-09-09'))
+      .toMatchObject({ hasEvents: true });
+
+    await act(async () => expect(await result.current.selectDate('2026-09-09')).toBe(true));
+    expect(result.current.selectedAgendaItems[0]).toMatchObject({
+      id: 'series-1:recurrence:2026-09-09',
+      eventId: 'series-1',
+    });
+  });
+
   it('今日と明日の2日表示を初期値にして予定・祝日・時間表現を取得する', async () => {
     const dependencies = createDependencies();
     const { result } = await renderHook(() =>

@@ -1,4 +1,4 @@
-import type { CalendarEvent } from '@/domain/calendar/event';
+import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { MonthGridDate } from '@/domain/calendar/month';
 import {
   getHolidayInfo,
@@ -52,13 +52,14 @@ export function createMonthDayViewModels(input: Readonly<{
   grid: readonly MonthGridDate[];
   selectedDate: string;
   today: string;
-  events: readonly CalendarEvent[];
+  occurrences: readonly EventOccurrence[];
   holidayCoverage: readonly HolidayRangeCoverage[];
 }>): readonly MonthDayViewModel[] {
   return input.grid.map((gridDate) => {
     const isToday = gridDate.date === input.today;
     const isSelected = gridDate.date === input.selectedDate;
-    const hasEvents = input.events.some((event) => occursOnCalendarDate(event, gridDate.date));
+    const hasEvents = input.occurrences.some((occurrence) =>
+      occursOnCalendarDate(occurrence, gridDate.date));
     const holiday = getHolidayInfo(gridDate.date, input.holidayCoverage);
 
     return {

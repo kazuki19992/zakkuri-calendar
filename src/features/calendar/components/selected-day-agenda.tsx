@@ -38,7 +38,7 @@ export function SelectedDayAgenda({
         <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text>
       ) : (
         items.map((item) => (
-          <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={item.accessibilityLabel} onPress={() => onEditEvent?.(item.id)} style={styles.item}>
+          <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={item.accessibilityLabel} onPress={() => onEditEvent?.(item.eventId)} style={styles.item}>
             <Text style={[styles.itemTitle, { color: theme.text }]}>{item.title}</Text>
             <Text style={[styles.itemMeta, { color: theme.textSecondary }]}>{item.temporalLabel}</Text>
           </Pressable>

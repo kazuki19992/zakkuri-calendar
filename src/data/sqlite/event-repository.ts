@@ -1,4 +1,10 @@
-import type { EventRepository } from '@/domain/calendar/repositories';
+import type {
+  ApplyRecurrenceMutationCommand,
+  DeleteOccurrenceExceptionCommand,
+  EventRepository,
+  OccurrenceEditData,
+  SaveOccurrenceExceptionCommand,
+} from '@/domain/calendar/repositories';
 import { parseCalendarEvent, type CalendarEvent } from '@/domain/calendar/event';
 import {
   normalizeEventReminders,
@@ -6,7 +12,15 @@ import {
   type EventReminder,
 } from '@/domain/calendar/event-reminder';
 import type { AppDatabase, AppDatabaseParameters } from './database';
-import { mapEventRow, mapReminderRow, type EventRow, type ReminderRow } from './row-mappers';
+import {
+  mapEventRow,
+  mapRecurrenceExceptionRow,
+  mapReminderRow,
+  type EventRow,
+  type RecurrenceExceptionRow,
+  type ReminderRow,
+} from './row-mappers';
+import type { EventOverrideField, OccurrenceIdentity, RecurrenceException } from '@/domain/calendar/recurrence-exception';
 
 type NormalizedEventAggregate = Readonly<{
   event: CalendarEvent;
@@ -107,6 +121,79 @@ const INSERT_REMINDER_SQL = `INSERT INTO event_reminders (
   $id, $eventId, $minutesBefore, $sortOrder
 )`;
 
+const UPSERT_EXCEPTION_SQL = `INSERT INTO recurrence_exceptions (
+  series_event_id, original_occurrence_date, kind, replacement_event_id,
+  override_fields_json, created_at, updated_at
+) VALUES (
+  $seriesEventId, $originalOccurrenceDate, $kind, $replacementEventId,
+  $overrideFieldsJson, $createdAt, $updatedAt
+) ON CONFLICT(series_event_id, original_occurrence_date) DO UPDATE SET
+  kind = excluded.kind,
+  replacement_event_id = excluded.replacement_event_id,
+  override_fields_json = excluded.override_fields_json,
+  updated_at = excluded.updated_at`;
+
+function exceptionParameters(exception: RecurrenceException): AppDatabaseParameters {
+  return {
+    $seriesEventId: exception.seriesEventId,
+    $originalOccurrenceDate: exception.originalOccurrenceDate,
+    $kind: exception.kind,
+    $replacementEventId: exception.replacementEventId,
+    $overrideFieldsJson: JSON.stringify(exception.overrideFields),
+    $createdAt: exception.createdAt,
+    $updatedAt: exception.updatedAt,
+  };
+}
+
+async function loadAggregate(database: AppDatabase, id: string): Promise<EventAggregate | null> {
+  const row = await database.first<EventRow>('SELECT * FROM events WHERE id = $id', { $id: id });
+  if (row === null) return null;
+  const reminderRows = await database.all<ReminderRow>(
+    `SELECT * FROM event_reminders WHERE event_id = $eventId ORDER BY sort_order, id`,
+    { $eventId: id },
+  );
+  return { event: mapEventRow(row), reminders: reminderRows.map(mapReminderRow) };
+}
+
+async function replaceAggregate(database: AppDatabase, aggregate: EventAggregate): Promise<void> {
+  const normalized = normalizeAggregate(aggregate);
+  await assertFuzzyDefinitionConsistency(database, normalized.event);
+  const updated = await database.run(
+    `UPDATE events SET
+      calendar_id = $calendarId, title = $title, temporal_type = $temporalType,
+      anchor_date = $anchorDate, temporal_definition_id = $temporalDefinitionId,
+      start_time = $startTime, duration_type = $durationType, duration_minutes = $durationMinutes,
+      end_date = $endDate, location = $location, notes = $notes, color_id = $colorId,
+      recurrence_rule_json = $recurrenceRuleJson,
+      fuzzy_resolution_context_json = $fuzzyResolutionContextJson,
+      created_time_zone_id = $createdTimeZoneId, updated_at = $updatedAt
+     WHERE id = $id`,
+    eventParameters(normalized.event),
+  );
+  if (updated.changes === 0) {
+    await database.run(INSERT_EVENT_SQL, eventParameters(normalized.event));
+  }
+  await database.run('DELETE FROM event_reminders WHERE event_id = $eventId', {
+    $eventId: normalized.event.id,
+  });
+  for (const reminder of normalized.reminders) {
+    await database.run(INSERT_REMINDER_SQL, reminderParameters(reminder));
+  }
+}
+
+async function assertSeriesRevision(
+  database: AppDatabase,
+  id: string,
+  expectedUpdatedAt: string,
+): Promise<void> {
+  const result = await database.run(
+    `UPDATE events SET updated_at = updated_at
+     WHERE id = $id AND updated_at = $expectedUpdatedAt`,
+    { $id: id, $expectedUpdatedAt: expectedUpdatedAt },
+  );
+  if (result.changes !== 1) throw new Error('Recurring event changed while editing');
+}
+
 export class SqliteEventRepository implements EventRepository {
   constructor(private readonly database: AppDatabase) {}
 
@@ -122,15 +209,7 @@ export class SqliteEventRepository implements EventRepository {
   }
 
   async getById(id: string): Promise<EventAggregate | null> {
-    const row = await this.database.first<EventRow>('SELECT * FROM events WHERE id = $id', { $id: id });
-    if (!row) return null;
-    const reminders = await this.database.all<ReminderRow>(
-      `SELECT * FROM event_reminders
-       WHERE event_id = $eventId
-       ORDER BY sort_order, id`,
-      { $eventId: id },
-    );
-    return { event: mapEventRow(row), reminders: reminders.map(mapReminderRow) };
+    return loadAggregate(this.database, id);
   }
 
   async listByAnchorRange(calendarId: string, from: string, through: string): Promise<CalendarEvent[]> {
@@ -144,6 +223,168 @@ export class SqliteEventRepository implements EventRepository {
       { $calendarId: calendarId, $from: from, $through: through },
     );
     return rows.map(mapEventRow);
+  }
+
+  async listSchedule(calendarId: string, from: string, through: string) {
+    const eventRows = await this.database.all<EventRow>(
+      `SELECT events.* FROM events
+       WHERE calendar_id = $calendarId
+         AND NOT EXISTS (
+           SELECT 1 FROM recurrence_exceptions
+           WHERE replacement_event_id = events.id
+         )
+         AND (
+           (anchor_date <= $through AND COALESCE(end_date, anchor_date) >= $from)
+           OR (recurrence_rule_json IS NOT NULL AND anchor_date <= $through)
+         )
+       ORDER BY anchor_date, start_time, created_at, id`,
+      { $calendarId: calendarId, $from: from, $through: through },
+    );
+    const exceptionRows = await this.database.all<RecurrenceExceptionRow>(
+      `SELECT recurrence_exceptions.* FROM recurrence_exceptions
+       JOIN events AS series ON series.id = recurrence_exceptions.series_event_id
+       WHERE series.calendar_id = $calendarId
+       ORDER BY series_event_id, original_occurrence_date`,
+      { $calendarId: calendarId },
+    );
+    const replacementRows = await this.database.all<EventRow>(
+      `SELECT replacement.* FROM events AS replacement
+       JOIN recurrence_exceptions
+         ON recurrence_exceptions.replacement_event_id = replacement.id
+       JOIN events AS series ON series.id = recurrence_exceptions.series_event_id
+       WHERE series.calendar_id = $calendarId
+       ORDER BY replacement.anchor_date, replacement.created_at, replacement.id`,
+      { $calendarId: calendarId },
+    );
+    return {
+      events: eventRows.map(mapEventRow),
+      exceptions: exceptionRows.map(mapRecurrenceExceptionRow),
+      replacementEvents: replacementRows.map(mapEventRow),
+    };
+  }
+
+  async getOccurrenceEditData(identity: OccurrenceIdentity): Promise<OccurrenceEditData | null> {
+    const series = await loadAggregate(this.database, identity.seriesEventId);
+    if (series === null || series.event.recurrenceRule === null) return null;
+    const rows = await this.database.all<RecurrenceExceptionRow>(
+      `SELECT * FROM recurrence_exceptions
+       WHERE series_event_id = $seriesEventId
+       ORDER BY original_occurrence_date`,
+      { $seriesEventId: identity.seriesEventId },
+    );
+    const exceptions = rows.map(mapRecurrenceExceptionRow);
+    const exception = exceptions.find((item) =>
+      item.originalOccurrenceDate === identity.originalOccurrenceDate) ?? null;
+    const replacement = exception?.replacementEventId === null || exception === null
+      ? null
+      : await loadAggregate(this.database, exception.replacementEventId);
+    return { series, exception, replacement, exceptions };
+  }
+
+  async saveOccurrenceException(command: SaveOccurrenceExceptionCommand): Promise<void> {
+    await this.database.exclusiveTransaction(async (transaction) => {
+      await assertSeriesRevision(
+        transaction,
+        command.identity.seriesEventId,
+        command.expectedSeriesUpdatedAt,
+      );
+      const previous = await transaction.first<RecurrenceExceptionRow>(
+        `SELECT * FROM recurrence_exceptions
+         WHERE series_event_id = $seriesEventId
+           AND original_occurrence_date = $originalOccurrenceDate`,
+        {
+          $seriesEventId: command.identity.seriesEventId,
+          $originalOccurrenceDate: command.identity.originalOccurrenceDate,
+        },
+      );
+      await replaceAggregate(transaction, command.replacement);
+      await transaction.run(UPSERT_EXCEPTION_SQL, exceptionParameters({
+        ...command.identity,
+        kind: 'replaced',
+        replacementEventId: command.replacement.event.id,
+        overrideFields: command.overrideFields,
+        createdAt: previous?.created_at ?? command.now,
+        updatedAt: command.now,
+      }));
+      if (previous?.replacement_event_id !== null
+          && previous?.replacement_event_id !== undefined
+          && previous.replacement_event_id !== command.replacement.event.id) {
+        await transaction.run('DELETE FROM events WHERE id = $id', {
+          $id: previous.replacement_event_id,
+        });
+      }
+      await transaction.run('UPDATE events SET updated_at = $now WHERE id = $id', {
+        $id: command.identity.seriesEventId,
+        $now: command.now,
+      });
+    });
+  }
+
+  async deleteOccurrenceException(command: DeleteOccurrenceExceptionCommand): Promise<void> {
+    await this.database.exclusiveTransaction(async (transaction) => {
+      await assertSeriesRevision(
+        transaction,
+        command.identity.seriesEventId,
+        command.expectedSeriesUpdatedAt,
+      );
+      const previous = await transaction.first<RecurrenceExceptionRow>(
+        `SELECT * FROM recurrence_exceptions
+         WHERE series_event_id = $seriesEventId
+           AND original_occurrence_date = $originalOccurrenceDate`,
+        {
+          $seriesEventId: command.identity.seriesEventId,
+          $originalOccurrenceDate: command.identity.originalOccurrenceDate,
+        },
+      );
+      await transaction.run(UPSERT_EXCEPTION_SQL, exceptionParameters({
+        ...command.identity,
+        kind: 'deleted',
+        replacementEventId: null,
+        overrideFields: [],
+        createdAt: previous?.created_at ?? command.now,
+        updatedAt: command.now,
+      }));
+      if (previous?.replacement_event_id !== null && previous?.replacement_event_id !== undefined) {
+        await transaction.run('DELETE FROM events WHERE id = $id', {
+          $id: previous.replacement_event_id,
+        });
+      }
+      await transaction.run('UPDATE events SET updated_at = $now WHERE id = $id', {
+        $id: command.identity.seriesEventId,
+        $now: command.now,
+      });
+    });
+  }
+
+  async applyRecurrenceMutation(command: ApplyRecurrenceMutationCommand): Promise<void> {
+    await this.database.exclusiveTransaction(async (transaction) => {
+      await assertSeriesRevision(transaction, command.seriesId, command.expectedSeriesUpdatedAt);
+      if (command.plan.previousSeries === null) {
+        await transaction.run('DELETE FROM events WHERE id = $id', { $id: command.seriesId });
+      } else {
+        await replaceAggregate(transaction, command.plan.previousSeries);
+      }
+      if (command.plan.nextSeries !== null) {
+        await replaceAggregate(transaction, command.plan.nextSeries);
+      }
+      for (const identity of command.plan.deleteExceptionIdentities) {
+        await transaction.run(
+          `DELETE FROM recurrence_exceptions
+           WHERE series_event_id = $seriesEventId
+             AND original_occurrence_date = $originalOccurrenceDate`,
+          {
+            $seriesEventId: identity.seriesEventId,
+            $originalOccurrenceDate: identity.originalOccurrenceDate,
+          },
+        );
+      }
+      for (const exception of command.plan.upsertExceptions) {
+        await transaction.run(UPSERT_EXCEPTION_SQL, exceptionParameters(exception));
+      }
+      for (const id of command.plan.deleteReplacementEventIds) {
+        await transaction.run('DELETE FROM events WHERE id = $id', { $id: id });
+      }
+    });
   }
 
   async update(aggregate: EventAggregate): Promise<void> {

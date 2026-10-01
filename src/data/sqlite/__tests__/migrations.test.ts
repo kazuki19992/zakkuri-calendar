@@ -49,7 +49,7 @@ describe('migrateDatabase', () => {
     await migrateDatabase(database.database, environment);
 
     const writes = database.run.mock.calls as [string, Record<string, unknown>][];
-    expect(writes).toHaveLength(29);
+    expect(writes).toHaveLength(30);
     expect(writes.every(([sql]) => sql.includes('ON CONFLICT DO NOTHING'))).toBe(true);
     expect(writes[0][1]).toMatchObject({
       $id: 'personal-default',
@@ -123,6 +123,22 @@ describe('migrateDatabase', () => {
       expect.objectContaining({ $key: 'this_week', $resolverType: 'weekRemainder' }));
     expect(database.run).toHaveBeenCalledWith(expect.stringContaining('schema_migrations'), {
       $version: 3, $appliedAt: environment.now(),
+    });
+  });
+
+  it('version 3から繰り返し例外tableと置換予定の一意indexを追加する', async () => {
+    const database = createDatabaseDouble();
+    database.first.mockResolvedValue({ version: 3 });
+
+    await migrateDatabase(database.database, environment);
+
+    const schemaSql = database.exec.mock.calls.map(([sql]) => sql).join('\n');
+    expect(LATEST_SCHEMA_VERSION).toBe(4);
+    expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS recurrence_exceptions');
+    expect(schemaSql).toContain('PRIMARY KEY (series_event_id, original_occurrence_date)');
+    expect(schemaSql).toContain('recurrence_exceptions_replacement_event_id');
+    expect(database.run).toHaveBeenCalledWith(expect.stringContaining('schema_migrations'), {
+      $version: 4, $appliedAt: environment.now(),
     });
   });
 

@@ -7,7 +7,7 @@ import { SqliteEventRepository } from '../event-repository';
 import { createRepositoryContainer } from '../repository-container';
 import { SqliteSettingsRepository } from '../settings-repository';
 import { SqliteTemporalDefinitionRepository } from '../temporal-definition-repository';
-import type { CalendarRow, EventRow, TemporalDefinitionRow } from '../row-mappers';
+import type { CalendarRow, EventRow, RecurrenceExceptionRow, TemporalDefinitionRow } from '../row-mappers';
 
 const now = '2026-09-08T00:00:00.000Z';
 const calendarRow: CalendarRow = {
@@ -85,6 +85,29 @@ describe('SQLite repositories', () => {
     expect(db.all.mock.calls[0][0]).toContain('anchor_date <= $through');
     expect(db.all.mock.calls[0][0]).toContain('recurrence_rule_json IS NOT NULL AND anchor_date <= $through');
     expect(db.all.mock.calls[0][0]).toContain('ORDER BY anchor_date, start_time, created_at, id');
+  });
+
+  it('予定・全例外・置換予定をschedule snapshotとして読む', async () => {
+    const db = createDatabaseDouble();
+    const exceptionRow: RecurrenceExceptionRow = {
+      series_event_id: 'event-1', original_occurrence_date: '2026-09-15',
+      kind: 'replaced', replacement_event_id: 'replacement-1',
+      override_fields_json: '["title"]', created_at: now, updated_at: now,
+    };
+    db.all
+      .mockResolvedValueOnce([eventRow])
+      .mockResolvedValueOnce([exceptionRow])
+      .mockResolvedValueOnce([{ ...eventRow, id: 'replacement-1', recurrence_rule_json: null }]);
+
+    await expect(new SqliteEventRepository(db.database).listSchedule(
+      'personal-default', '2026-09-01', '2026-09-30',
+    )).resolves.toMatchObject({
+      events: [{ id: 'event-1' }],
+      exceptions: [{ seriesEventId: 'event-1', originalOccurrenceDate: '2026-09-15' }],
+      replacementEvents: [{ id: 'replacement-1' }],
+    });
+    expect(db.all.mock.calls[1][0]).toContain('recurrence_exceptions');
+    expect(db.all.mock.calls[2][0]).toContain('replacement_event_id');
   });
 
   it('予定と正規化済み通知を専用transaction handleで一体作成する', async () => {

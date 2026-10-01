@@ -3,7 +3,7 @@ import { createStandardTemporalDefinitions } from '@/domain/temporal/standard-de
 import type { AppDatabase } from './database';
 
 export const DATABASE_NAME = 'zakkuri-calendar.db';
-export const LATEST_SCHEMA_VERSION = 3;
+export const LATEST_SCHEMA_VERSION = 4;
 
 export type MigrationEnvironment = Readonly<{
   now: () => string;
@@ -116,6 +116,28 @@ CREATE INDEX temporal_definitions_enabled_idx
   ON temporal_definitions(calendar_id, is_enabled, sort_order);
 ALTER TABLE events ADD COLUMN fuzzy_resolution_context_json TEXT;
 UPDATE events SET end_date = anchor_date WHERE temporal_type = 'fuzzy' AND end_date IS NULL;
+`;
+
+const SCHEMA_VERSION_4_SQL = `
+CREATE TABLE IF NOT EXISTS recurrence_exceptions (
+  series_event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  original_occurrence_date TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('deleted', 'replaced')),
+  replacement_event_id TEXT REFERENCES events(id) ON DELETE CASCADE,
+  override_fields_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (series_event_id, original_occurrence_date),
+  CHECK (
+    (kind = 'deleted' AND replacement_event_id IS NULL)
+    OR (kind = 'replaced' AND replacement_event_id IS NOT NULL)
+  )
+);
+CREATE UNIQUE INDEX IF NOT EXISTS recurrence_exceptions_replacement_event_id
+  ON recurrence_exceptions(replacement_event_id)
+  WHERE replacement_event_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS recurrence_exceptions_series_date
+  ON recurrence_exceptions(series_event_id, original_occurrence_date);
 `;
 
 export async function migrateDatabase(
@@ -246,6 +268,16 @@ export async function migrateDatabase(
          VALUES ($version, $appliedAt)
          ON CONFLICT DO NOTHING`,
         { $version: 3, $appliedAt: now },
+      );
+    }
+
+    if (currentVersion < 4) {
+      await transaction.exec(SCHEMA_VERSION_4_SQL);
+      await transaction.run(
+        `INSERT INTO schema_migrations (version, applied_at)
+         VALUES ($version, $appliedAt)
+         ON CONFLICT DO NOTHING`,
+        { $version: 4, $appliedAt: environment.now() },
       );
     }
     });

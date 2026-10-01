@@ -54,6 +54,11 @@ function createDependencies() {
     create: jest.fn(),
     getById: jest.fn(),
     listByAnchorRange: jest.fn().mockResolvedValue([event]),
+    listSchedule: jest.fn(),
+    getOccurrenceEditData: jest.fn(),
+    saveOccurrenceException: jest.fn(),
+    deleteOccurrenceException: jest.fn(),
+    applyRecurrenceMutation: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   };

@@ -39,6 +39,8 @@ describe('migrateDatabase', () => {
     expect(schemaSql).toContain('ON DELETE CASCADE');
     expect(schemaSql).toContain('CREATE INDEX event_reminders_event_order_idx');
     expect(schemaSql).toContain('CREATE INDEX events_recurrence_anchor_idx');
+    expect(schemaSql).toContain('ALTER TABLE events ADD COLUMN fuzzy_resolution_context_json TEXT');
+    expect(schemaSql).toContain("UPDATE events SET end_date = anchor_date WHERE temporal_type = 'fuzzy'");
   });
 
   it('seeds stable defaults with bound values without overwriting existing values', async () => {
@@ -47,7 +49,7 @@ describe('migrateDatabase', () => {
     await migrateDatabase(database.database, environment);
 
     const writes = database.run.mock.calls as [string, Record<string, unknown>][];
-    expect(writes).toHaveLength(27);
+    expect(writes).toHaveLength(29);
     expect(writes.every(([sql]) => sql.includes('ON CONFLICT DO NOTHING'))).toBe(true);
     expect(writes[0][1]).toMatchObject({
       $id: 'personal-default',
@@ -55,7 +57,7 @@ describe('migrateDatabase', () => {
       $createdAt: environment.now(),
     });
     const definitionWrites = writes.filter(([sql]) => sql.includes('temporal_definitions'));
-    expect(definitionWrites).toHaveLength(22);
+    expect(definitionWrites).toHaveLength(23);
     expect(definitionWrites[0][1]).toMatchObject({
       $id: 'personal-default:morning',
       $resolverType: 'timeOfDay',
@@ -71,7 +73,7 @@ describe('migrateDatabase', () => {
       expect.stringContaining('app_settings'),
       expect.objectContaining({ $key: 'undetermined_fade_minutes', $valueJson: '120' }),
     ]);
-    expect(writes.at(-2)?.[1]).toMatchObject({ $version: 1 });
+    expect(writes.find(([, parameters]) => parameters.$version === 1)?.[1]).toMatchObject({ $version: 1 });
     expect(writes.at(-1)?.[1]).toMatchObject({ $version: LATEST_SCHEMA_VERSION });
   });
 
@@ -103,14 +105,25 @@ describe('migrateDatabase', () => {
     ));
   });
 
-  it('does not rerun schema or write migration rows for an existing version 2 database', async () => {
+  it('version 2から既存fuzzyを補完して今週中定義を追加する', async () => {
     const database = createDatabaseDouble();
     database.first.mockResolvedValue({ version: 2 });
+    database.all.mockResolvedValue([{ id: 'personal-default' }]);
 
     await migrateDatabase(database.database, environment);
 
-    expect(database.run).not.toHaveBeenCalled();
-    expect(database.exec).toHaveBeenCalledTimes(3);
+    const schemaSql = database.exec.mock.calls.map(([sql]) => sql).join('\n');
+    expect(schemaSql).toContain('CREATE TABLE temporal_definitions_v3');
+    expect(schemaSql).toContain("resolver_type IN ('timeOfDay', 'week', 'weekRemainder', 'monthDays', 'monthLastDays')");
+    expect(schemaSql).toContain('INSERT INTO temporal_definitions_v3');
+    expect(schemaSql).toContain('ALTER TABLE temporal_definitions_v3 RENAME TO temporal_definitions');
+    expect(database.exec).toHaveBeenCalledWith(expect.stringContaining('fuzzy_resolution_context_json'));
+    expect(database.exec).toHaveBeenCalledWith(expect.stringContaining("temporal_type = 'fuzzy'"));
+    expect(database.run).toHaveBeenCalledWith(expect.stringContaining('temporal_definitions'),
+      expect.objectContaining({ $key: 'this_week', $resolverType: 'weekRemainder' }));
+    expect(database.run).toHaveBeenCalledWith(expect.stringContaining('schema_migrations'), {
+      $version: 3, $appliedAt: environment.now(),
+    });
   });
 
   it('does not record a completed version after a seed fails', async () => {

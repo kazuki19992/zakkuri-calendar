@@ -101,6 +101,45 @@ describe('独自月カレンダー表示', () => {
     expect(StyleSheet.flatten(view.getByText('8').props.style).color).toBe(Colors.light.background);
   });
 
+  it('相対予定を点ではなく破線の期間バーで示す', async () => {
+    const baseDay = createDays().find((item) => item.date === '2026-09-21');
+    if (baseDay === undefined) throw new Error('テスト用の日付がありません');
+    const view = await render(<MonthDayCell day={{
+      ...baseDay,
+      hasFixedEvents: false,
+      hasFuzzyRangeEvents: true,
+    }} onPress={jest.fn()} />);
+
+    expect(StyleSheet.flatten(view.getByTestId(
+      'month-calendar.event-dot.2026-09-21',
+      { includeHiddenElements: true },
+    ).props.style).opacity)
+      .toBe(0);
+    const rangeBarStyle = StyleSheet.flatten(view.getByTestId(
+      'month-calendar.fuzzy-range-bar.2026-09-21',
+      { includeHiddenElements: true },
+    ).props.style);
+    expect(rangeBarStyle).toMatchObject({ borderStyle: 'dashed' });
+    expect(rangeBarStyle.opacity).toBeUndefined();
+  });
+
+  it('選択日の相対予定を期間ラベル付きの破線項目で示す', async () => {
+    const view = await render(<SelectedDayAgenda
+      selectedDate="2026-09-21"
+      holidayName={null}
+      holidaySupport="available"
+      items={[{
+        kind: 'fuzzyRange', id: 'relative', eventId: 'relative', title: '今週やること',
+        temporalLabel: '今週中・9月21日〜9月25日', rangeLabel: '9月21日〜9月25日',
+        accessibilityLabel: '今週やること、今週中・9月21日〜9月25日、相対予定',
+      }]}
+    />);
+
+    expect(StyleSheet.flatten(view.getByTestId('selected-day-agenda.fuzzy-range.relative').props.style))
+      .toMatchObject({ borderStyle: 'dashed' });
+    expect(view.getByText('今週中・9月21日〜9月25日')).toBeOnTheScreen();
+  });
+
   it('読み込み失敗から再試行できる', async () => {
     const onRetry = jest.fn();
     const user = userEvent.setup();

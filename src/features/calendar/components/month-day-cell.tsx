@@ -12,6 +12,7 @@ export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellPr
   const theme = useTheme();
   const isHoliday = day.holidayName !== null || day.weekday === 0;
   const isSaturday = day.weekday === 6;
+  const hasFixedEvents = day.hasFixedEvents ?? day.hasEvents;
 
   return (
     <Pressable
@@ -50,7 +51,17 @@ export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellPr
         style={[
           styles.eventDot,
           { backgroundColor: theme.calendarAccent },
-          !day.hasEvents && styles.hidden,
+          !hasFixedEvents && styles.hidden,
+        ]}
+      />
+      <View
+        testID={`month-calendar.fuzzy-range-bar.${day.date}`}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+        style={[
+          styles.fuzzyRangeBar,
+          { borderColor: theme.calendarAccent },
+          !day.hasFuzzyRangeEvents && styles.hidden,
         ]}
       />
     </Pressable>
@@ -69,6 +80,7 @@ const styles = StyleSheet.create({
   dayCircle: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   dayNumber: { fontSize: 14, fontWeight: '500', lineHeight: 18 },
   eventDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
+  fuzzyRangeBar: { width: 14, height: 4, borderWidth: 1, borderStyle: 'dashed', borderRadius: 2, marginTop: 2 },
   hidden: { opacity: 0 },
   inactive: { opacity: 0.45 },
   pressed: { opacity: 0.65 },

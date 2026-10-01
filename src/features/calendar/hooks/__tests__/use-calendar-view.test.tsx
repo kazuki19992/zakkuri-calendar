@@ -26,6 +26,8 @@ const event: CalendarEvent = {
   anchorDate: '2026-09-09',
   temporalType: 'fuzzy',
   temporalDefinitionId: 'personal-default:afternoon',
+  endDate: '2026-09-09',
+  resolutionContext: null,
   location: null,
   notes: null,
   colorId: null,
@@ -88,6 +90,8 @@ function createDependencies() {
     setCalendarVisible: jest.fn().mockResolvedValue(undefined),
     getLastEventEditorTab: jest.fn(),
     setLastEventEditorTab: jest.fn(),
+    getThisWeekDeadlineWeekday: jest.fn(),
+    setThisWeekDeadlineWeekday: jest.fn(),
   };
   return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }
@@ -99,6 +103,7 @@ describe('カレンダー表示の状態調整', () => {
       ...event,
       id: 'series-1',
       anchorDate: '2026-09-01',
+      endDate: '2026-09-01',
       recurrenceRule: {
         version: 1,
         frequency: 'daily',

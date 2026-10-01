@@ -8,6 +8,7 @@ import { useEventEditor } from '../use-event-editor';
 
 const calendar: Calendar = { id: 'personal-default', name: 'マイカレンダー', timeZoneId: 'Asia/Tokyo', colorId: 'blue', createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z' };
 const morning: TemporalDefinition = { id: 'personal-default:morning', calendarId: calendar.id, key: 'morning', label: '朝', granularity: 'day', resolverConfig: { kind: 'timeOfDay', startMinute: 360, endMinute: 720 }, fadeInRatio: 0.2, fadeOutRatio: 0.2, isSystem: true, isEnabled: true, sortOrder: 1, createdAt: calendar.createdAt, updatedAt: calendar.updatedAt };
+const nextWeek: TemporalDefinition = { ...morning, id: 'personal-default:next_week_first_half', key: 'next_week_first_half', label: '来週前半', granularity: 'week', resolverConfig: { kind: 'week', selectionWeekOffset: 1, startWeekday: 1, endWeekday: 3 }, sortOrder: 20 };
 const exactEvent: Extract<CalendarEvent, { temporalType: 'exact' }> = {
   id: 'event-1', calendarId: calendar.id, title: '歯医者', anchorDate: '2026-09-09', temporalType: 'exact', startTime: '23:30', duration: { type: 'fixed', minutes: 2_940 }, createdTimeZoneId: 'Asia/Tokyo', location: '渋谷区', notes: '保険証を持参', colorId: 'teal', recurrenceRule: { version: 1, frequency: 'weekly', interval: 2, weekdays: [3, 5], end: { type: 'count', count: 5 } }, createdAt: calendar.createdAt, updatedAt: calendar.updatedAt,
 };
@@ -20,13 +21,75 @@ function createRepositories(): Readonly<{ calendars: jest.Mocked<CalendarReposit
   return {
     calendars: { getDefault: jest.fn().mockResolvedValue(calendar), setColor: jest.fn() },
     events: { create: jest.fn(), getById: jest.fn().mockResolvedValue(null), listByAnchorRange: jest.fn(), update: jest.fn(), delete: jest.fn() },
-    settings: { getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined) },
+    settings: { getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
     temporalDefinitions: { listEnabled: jest.fn().mockResolvedValue([morning]), getById: jest.fn(), disable: jest.fn() },
   };
 }
 const initial = { date: '2026-09-09', startTime: '09:30', endTime: '11:45', temporalType: 'fuzzy' as const };
 
 describe('予定編集の主要状態', () => {
+  it('相対定義を選ぶと期間をpreviewして繰り返しなしで保存する', async () => {
+    const repositories = createRepositories();
+    repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning, nextWeek]);
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories, initial: { ...initial, date: '2026-09-30' },
+      createId: () => 'relative-event', now: () => '2026-09-30T12:00:00.000Z',
+      getTimeZoneId: () => 'Asia/Tokyo',
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.selectDefinition(nextWeek.id); result.current.setTitle('来週の準備'); });
+
+    expect(result.current).toMatchObject({
+      isDateEditable: false,
+      isRecurrenceEditable: false,
+      relativeDatePreview: '10月5日（月）〜10月7日（水）',
+    });
+    await act(async () => { await result.current.save(); });
+    expect(repositories.events.create).toHaveBeenCalledWith(expect.objectContaining({
+      event: expect.objectContaining({
+        anchorDate: '2026-10-05', endDate: '2026-10-07', recurrenceRule: null,
+        resolutionContext: expect.objectContaining({ referenceDate: '2026-09-30', periodAnchorDate: '2026-10-05' }),
+      }),
+    }));
+  });
+
+  it('保存済み相対定義を取得できなくても期間と解決条件を維持する', async () => {
+    const repositories = createRepositories();
+    const relativeEvent: CalendarEvent = {
+      ...exactEvent,
+      temporalType: 'fuzzy',
+      temporalDefinitionId: nextWeek.id,
+      anchorDate: '2026-10-05',
+      endDate: '2026-10-07',
+      resolutionContext: {
+        version: 1,
+        referenceDate: '2026-09-30',
+        periodAnchorDate: '2026-10-05',
+        parameterSnapshot: {},
+      },
+      recurrenceRule: null,
+    };
+    repositories.events.getById.mockResolvedValue({ event: relativeEvent, reminders: [] });
+    repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning]);
+    repositories.temporalDefinitions.getById.mockResolvedValue(null);
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      initial: { ...initial, date: '2026-09-30' },
+      eventId: relativeEvent.id,
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.relativeDatePreview).toBe('10月5日（月）〜10月7日（水）');
+    await act(async () => { await result.current.save(); });
+
+    expect(repositories.events.update).toHaveBeenCalledWith(expect.objectContaining({
+      event: expect.objectContaining({
+        anchorDate: '2026-10-05',
+        endDate: '2026-10-07',
+        resolutionContext: relativeEvent.resolutionContext,
+      }),
+    }));
+  });
   it('保存済みタブを復元しタブ往復でも入力値を保持する', async () => {
     const repositories = createRepositories(); repositories.settings.getLastEventEditorTab.mockResolvedValue('exact');
     const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));

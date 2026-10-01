@@ -170,6 +170,8 @@ describe('ざっくり予定作成の状態調整', () => {
         anchorDate: '2026-09-10',
         temporalType: 'fuzzy',
         temporalDefinitionId: afternoon.id,
+        endDate: '2026-09-10',
+        resolutionContext: null,
         location: null,
         notes: null,
         colorId: null,

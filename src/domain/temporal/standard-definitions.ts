@@ -24,6 +24,7 @@ const specs: readonly SeedSpec[] = [
   { key: 'evening', label: '夕方', granularity: 'day', resolverConfig: { kind: 'timeOfDay', startMinute: 960, endMinute: 1140 }, fadeInRatio: 0.25, fadeOutRatio: 0.25 },
   { key: 'night', label: '夜', granularity: 'day', resolverConfig: { kind: 'timeOfDay', startMinute: 1080, endMinute: 1380 }, fadeInRatio: 0.25, fadeOutRatio: 0.25 },
   { key: 'late_night', label: '深夜', granularity: 'day', resolverConfig: { kind: 'timeOfDay', startMinute: 1320, endMinute: 1560 }, fadeInRatio: 0.25, fadeOutRatio: 0.25 },
+  { key: 'this_week', label: '今週中', granularity: 'week', resolverConfig: { kind: 'weekRemainder', selectionWeekOffset: 0 }, fadeInRatio: 0, fadeOutRatio: 0 },
   { key: 'this_week_first_half', label: '今週前半', granularity: 'week', resolverConfig: { kind: 'week', selectionWeekOffset: 0, startWeekday: 1, endWeekday: 3 }, fadeInRatio: 0, fadeOutRatio: 0 },
   { key: 'this_week_second_half', label: '今週後半', granularity: 'week', resolverConfig: { kind: 'week', selectionWeekOffset: 0, startWeekday: 4, endWeekday: 5 }, fadeInRatio: 0, fadeOutRatio: 0 },
   { key: 'this_weekend', label: '今週末', granularity: 'week', resolverConfig: { kind: 'week', selectionWeekOffset: 0, startWeekday: 6, endWeekday: 7 }, fadeInRatio: 0, fadeOutRatio: 0 },

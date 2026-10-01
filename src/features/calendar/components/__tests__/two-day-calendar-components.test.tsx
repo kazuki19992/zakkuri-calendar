@@ -168,6 +168,26 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(onEditEvent).toHaveBeenCalledWith('all-day-event');
   });
 
+  it('相対予定を期間ラベルと連続位置を持つ破線項目で示す', async () => {
+    const fuzzyRangeItem = {
+      ...allDayItem,
+      kind: 'fuzzyRange' as const,
+      id: 'relative-range',
+      eventId: 'relative-range',
+      title: '今週やること',
+      temporalLabel: '今週中・9月8日〜9月11日',
+      rangePosition: 'start' as const,
+      accessibilityLabel: '今週やること、今週中・9月8日〜9月11日、相対予定、期間の開始',
+    };
+    const view = await renderTwoDayView({
+      strip: [prevBuffer, { ...day1, allDayItems: [fuzzyRangeItem] }, day2, nextBuffer],
+    });
+
+    expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.fuzzy-range.relative-range').props.style))
+      .toMatchObject({ borderStyle: 'dashed', borderTopRightRadius: 0 });
+    expect(view.getByText('今週中・9月8日〜9月11日')).toBeOnTheScreen();
+  });
+
   it('祝日を終日領域の読み取り専用項目として表示し、日付ヘッダーの高さを変えない', async () => {
     const onEditEvent = jest.fn();
     const view = await renderTwoDayView({

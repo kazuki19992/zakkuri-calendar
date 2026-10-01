@@ -3,7 +3,7 @@ import { createStandardTemporalDefinitions } from '@/domain/temporal/standard-de
 import type { AppDatabase } from './database';
 
 export const DATABASE_NAME = 'zakkuri-calendar.db';
-export const LATEST_SCHEMA_VERSION = 2;
+export const LATEST_SCHEMA_VERSION = 3;
 
 export type MigrationEnvironment = Readonly<{
   now: () => string;
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS temporal_definitions (
   key TEXT NOT NULL,
   label TEXT NOT NULL,
   granularity TEXT NOT NULL CHECK (granularity IN ('day', 'week', 'month')),
-  resolver_type TEXT NOT NULL CHECK (resolver_type IN ('timeOfDay', 'week', 'monthDays', 'monthLastDays')),
+  resolver_type TEXT NOT NULL CHECK (resolver_type IN ('timeOfDay', 'week', 'weekRemainder', 'monthDays', 'monthLastDays')),
   resolver_config_json TEXT NOT NULL,
   fade_in_ratio REAL NOT NULL CHECK (fade_in_ratio >= 0 AND fade_in_ratio <= 1),
   fade_out_ratio REAL NOT NULL CHECK (fade_out_ratio >= 0 AND fade_out_ratio <= 1),
@@ -90,14 +90,46 @@ CREATE INDEX events_recurrence_anchor_idx ON events(calendar_id, anchor_date)
   WHERE recurrence_rule_json IS NOT NULL;
 `;
 
+const SCHEMA_VERSION_3_SQL = `
+CREATE TABLE temporal_definitions_v3 (
+  id TEXT PRIMARY KEY,
+  calendar_id TEXT NOT NULL REFERENCES calendars(id),
+  key TEXT NOT NULL,
+  label TEXT NOT NULL,
+  granularity TEXT NOT NULL CHECK (granularity IN ('day', 'week', 'month')),
+  resolver_type TEXT NOT NULL CHECK (resolver_type IN ('timeOfDay', 'week', 'weekRemainder', 'monthDays', 'monthLastDays')),
+  resolver_config_json TEXT NOT NULL,
+  fade_in_ratio REAL NOT NULL CHECK (fade_in_ratio >= 0 AND fade_in_ratio <= 1),
+  fade_out_ratio REAL NOT NULL CHECK (fade_out_ratio >= 0 AND fade_out_ratio <= 1),
+  is_system INTEGER NOT NULL CHECK (is_system IN (0, 1)),
+  is_enabled INTEGER NOT NULL CHECK (is_enabled IN (0, 1)),
+  sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (fade_in_ratio + fade_out_ratio <= 1),
+  UNIQUE (calendar_id, key)
+);
+INSERT INTO temporal_definitions_v3 SELECT * FROM temporal_definitions;
+DROP TABLE temporal_definitions;
+ALTER TABLE temporal_definitions_v3 RENAME TO temporal_definitions;
+CREATE INDEX temporal_definitions_enabled_idx
+  ON temporal_definitions(calendar_id, is_enabled, sort_order);
+ALTER TABLE events ADD COLUMN fuzzy_resolution_context_json TEXT;
+UPDATE events SET end_date = anchor_date WHERE temporal_type = 'fuzzy' AND end_date IS NULL;
+`;
+
 export async function migrateDatabase(
   database: AppDatabase,
   environment: MigrationEnvironment,
 ): Promise<void> {
   await database.exec('PRAGMA journal_mode = WAL;');
   await database.exec('PRAGMA foreign_keys = ON;');
+  // 親テーブルのCHECK制約を再構築する間だけ無効化し、同一transaction内で
+  // 同名テーブルへ戻す。通常利用へ制約OFFの接続を漏らさないようfinallyで復元する。
+  await database.exec('PRAGMA foreign_keys = OFF;');
 
-  await database.exclusiveTransaction(async (transaction) => {
+  try {
+    await database.exclusiveTransaction(async (transaction) => {
     await transaction.exec(MIGRATION_TABLE_SQL);
     const current = await transaction.first<{ version: number | null }>(
       'SELECT MAX(version) AS version FROM schema_migrations',
@@ -181,5 +213,43 @@ export async function migrateDatabase(
         { $version: 2, $appliedAt: environment.now() },
       );
     }
-  });
+
+    if (currentVersion < 3) {
+      await transaction.exec(SCHEMA_VERSION_3_SQL);
+      const now = environment.now();
+      const calendars = await transaction.all<{ id: string }>('SELECT id FROM calendars');
+      for (const calendar of calendars) {
+        const definition = createStandardTemporalDefinitions(calendar.id, now)
+          .find((candidate) => candidate.key === 'this_week');
+        if (definition === undefined) throw new Error('Missing standard this_week definition');
+        await transaction.run(
+          `INSERT INTO temporal_definitions (
+            id, calendar_id, key, label, granularity, resolver_type, resolver_config_json,
+            fade_in_ratio, fade_out_ratio, is_system, is_enabled, sort_order, created_at, updated_at
+          ) VALUES (
+            $id, $calendarId, $key, $label, $granularity, $resolverType, $resolverConfigJson,
+            $fadeInRatio, $fadeOutRatio, $isSystem, $isEnabled, $sortOrder, $createdAt, $updatedAt
+          ) ON CONFLICT DO NOTHING`,
+          {
+            $id: definition.id, $calendarId: definition.calendarId, $key: definition.key,
+            $label: definition.label, $granularity: definition.granularity,
+            $resolverType: definition.resolverConfig.kind,
+            $resolverConfigJson: JSON.stringify(definition.resolverConfig),
+            $fadeInRatio: definition.fadeInRatio, $fadeOutRatio: definition.fadeOutRatio,
+            $isSystem: 1, $isEnabled: 1, $sortOrder: definition.sortOrder,
+            $createdAt: definition.createdAt, $updatedAt: definition.updatedAt,
+          },
+        );
+      }
+      await transaction.run(
+        `INSERT INTO schema_migrations (version, applied_at)
+         VALUES ($version, $appliedAt)
+         ON CONFLICT DO NOTHING`,
+        { $version: 3, $appliedAt: now },
+      );
+    }
+    });
+  } finally {
+    await database.exec('PRAGMA foreign_keys = ON;');
+  }
 }

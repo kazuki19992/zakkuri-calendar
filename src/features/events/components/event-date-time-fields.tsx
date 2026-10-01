@@ -56,6 +56,7 @@ export function EventDateTimeFields({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${label} ${value}`}
+      accessibilityState={{ disabled: disabled || (field.endsWith('Date') && !isDateEditable) }}
       disabled={disabled || (field.endsWith('Date') && !isDateEditable)}
       onPress={() => setPicker(field)}
       style={[styles.row, { borderBottomColor: theme.calendarBorder }]}

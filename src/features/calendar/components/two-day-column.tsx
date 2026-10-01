@@ -102,9 +102,19 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
             <Text numberOfLines={1} style={[styles.itemTime, { color: theme.calendarHoliday }]}>{item.temporalLabel}</Text>
           </View>
         ) : (
-          <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={item.accessibilityLabel}
+          <Pressable key={item.id}
+            testID={item.kind === 'fuzzyRange' ? `two-day-calendar.fuzzy-range.${item.id}` : undefined}
+            accessibilityRole="button" accessibilityLabel={item.accessibilityLabel}
             onPress={() => item.eventId === null ? undefined : onEditEvent?.(item.eventId)}
-            style={[styles.item, { backgroundColor: theme.calendarEvent }] }>
+            style={[
+              styles.item,
+              { backgroundColor: theme.calendarEvent },
+              item.kind === 'fuzzyRange' && styles.fuzzyRangeItem,
+              item.kind === 'fuzzyRange' && { borderColor: theme.calendarEventText },
+              item.kind === 'fuzzyRange' && item.rangePosition === 'start' && styles.rangeStart,
+              item.kind === 'fuzzyRange' && item.rangePosition === 'middle' && styles.rangeMiddle,
+              item.kind === 'fuzzyRange' && item.rangePosition === 'end' && styles.rangeEnd,
+            ] }>
             <Text numberOfLines={1} style={[styles.itemTitle, { color: theme.calendarEventText }]}>{item.title}</Text>
             <Text numberOfLines={1} style={[styles.itemTime, { color: theme.calendarEventText }]}>{item.temporalLabel}</Text>
           </Pressable>
@@ -138,6 +148,10 @@ const styles = StyleSheet.create({
   allDayRegion: { flex: 1, minHeight: 30, padding: 2, borderBottomWidth: StyleSheet.hairlineWidth },
   item: { minHeight: 44, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 3 },
   holidayItem: { borderLeftWidth: 3 },
+  fuzzyRangeItem: { borderWidth: 1, borderStyle: 'dashed' },
+  rangeStart: { borderTopRightRadius: 0, borderBottomRightRadius: 0 },
+  rangeMiddle: { borderRadius: 0 },
+  rangeEnd: { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
   overflow: { minHeight: 24, paddingHorizontal: 6, textAlignVertical: 'center' },
   itemTitle: { fontSize: 12, fontWeight: '500' },
   itemTime: { fontSize: 10, marginTop: 1 },

@@ -130,6 +130,8 @@ export function useQuickCreateEvent({
       anchorDate,
       temporalType: 'fuzzy',
       temporalDefinitionId: selectedDefinitionId,
+      endDate: anchorDate,
+      resolutionContext: null,
       createdTimeZoneId: getTimeZoneId(),
       location: null,
       notes: null,

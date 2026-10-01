@@ -22,6 +22,7 @@ const eventRow: EventRow = {
   anchor_date: '2026-09-08', temporal_definition_id: null, start_time: '14:30',
   duration_type: 'fixed', duration_minutes: 30, created_time_zone_id: 'Asia/Tokyo',
   end_date: null, location: null, notes: null, color_id: null, recurrence_rule_json: null,
+  fuzzy_resolution_context_json: null,
   created_at: '2026-09-08T00:00:00.000Z', updated_at: '2026-09-08T00:00:00.000Z',
 };
 
@@ -60,7 +61,8 @@ describe('row mappers', () => {
   it.each([
     [eventRow, { temporalType: 'exact', startTime: '14:30', duration: { type: 'fixed', minutes: 30 } }],
     [{ ...eventRow, temporal_type: 'allDay', start_time: null, duration_type: null, duration_minutes: null, end_date: '2026-09-08' }, { temporalType: 'allDay', endDate: '2026-09-08' }],
-    [{ ...eventRow, temporal_type: 'fuzzy', temporal_definition_id: 'personal-default:morning', start_time: null, duration_type: null, duration_minutes: null }, { temporalType: 'fuzzy', temporalDefinitionId: 'personal-default:morning' }],
+    [{ ...eventRow, temporal_type: 'fuzzy', temporal_definition_id: 'personal-default:morning', start_time: null, duration_type: null, duration_minutes: null, end_date: '2026-09-08' },
+      { temporalType: 'fuzzy', temporalDefinitionId: 'personal-default:morning', endDate: '2026-09-08', resolutionContext: null }],
   ] as const)('maps each event temporal type without nullable storage fields', (row, expected) => {
     const event = mapEventRow(row);
     expect(event).toMatchObject(expected);
@@ -104,6 +106,7 @@ describe('row mappers', () => {
     () => mapEventRow({ ...eventRow, anchor_date: '2026-02-30' }),
     () => mapEventRow({ ...eventRow, start_time: null }),
     () => mapEventRow({ ...eventRow, temporal_type: 'allDay', end_date: null }),
+    () => mapEventRow({ ...eventRow, temporal_type: 'fuzzy', temporal_definition_id: 'personal-default:morning', end_date: '2026-09-08', fuzzy_resolution_context_json: '{broken' }),
     () => mapReminderRow({ ...reminderRow, minutes_before: -1 }),
   ])('throws an id-only corruption error for malformed persisted data', (map) => {
     expect(map).toThrow(CorruptDatabaseRowError);

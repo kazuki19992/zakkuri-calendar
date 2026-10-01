@@ -105,6 +105,8 @@ describe('ホームルート', () => {
         setCalendarVisible: jest.fn(),
         getLastEventEditorTab: jest.fn(),
         setLastEventEditorTab: jest.fn(),
+        getThisWeekDeadlineWeekday: jest.fn(),
+        setThisWeekDeadlineWeekday: jest.fn(),
       },
     };
     const state = { mode: 'twoDay' } as CalendarViewState;

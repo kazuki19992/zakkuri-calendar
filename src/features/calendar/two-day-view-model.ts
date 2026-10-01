@@ -7,6 +7,7 @@ import { getDay, parse } from 'date-fns';
 import {
   createAgendaItems,
   getHolidayInfo,
+  isResolvedRelativeEvent,
   occursOnCalendarDate,
   type HolidayRangeCoverage,
   type HolidaySupport,
@@ -28,15 +29,26 @@ export type TwoDayViewModel = Readonly<{
 }>;
 
 export type TwoDayAllDayItemViewModel = Readonly<{
-  kind: 'event' | 'holiday';
+  kind: 'event' | 'fuzzyRange' | 'holiday';
   id: string;
   eventId: string | null;
   colorId: EventColorId | 'holiday';
   isInteractive: boolean;
   title: string;
   temporalLabel: string;
+  rangePosition?: 'single' | 'start' | 'middle' | 'end';
   accessibilityLabel: string;
 }>;
+
+function getRangePosition(
+  occurrence: EventOccurrence,
+  date: string,
+): 'single' | 'start' | 'middle' | 'end' {
+  if (occurrence.occurrenceStartDate === occurrence.occurrenceThroughDate) return 'single';
+  if (date === occurrence.occurrenceStartDate) return 'start';
+  if (date === occurrence.occurrenceThroughDate) return 'end';
+  return 'middle';
+}
 
 function getDateParts(date: string): readonly [number, number, number] {
   const [year, month, day] = date.split('-').map(Number);
@@ -75,13 +87,31 @@ function createDayViewModel(
       }).kind !== 'timed';
     }),
     definitionLabels,
-  ).map((item): TwoDayAllDayItemViewModel => ({
-    ...item,
-    kind: 'event',
-    eventId: item.eventId,
-    colorId: DEFAULT_EVENT_COLOR_ID,
-    isInteractive: true,
-  }));
+  ).map((item): TwoDayAllDayItemViewModel => {
+    const occurrence = occurrencesForDate.find((candidate) => candidate.key === item.id);
+    const isFuzzyRange = occurrence !== undefined && isResolvedRelativeEvent(occurrence.event);
+    const rangePosition = isFuzzyRange ? getRangePosition(occurrence, date) : null;
+    const positionLabel = rangePosition === 'start'
+      ? '期間の開始'
+      : rangePosition === 'middle'
+        ? '期間の途中'
+        : rangePosition === 'end'
+          ? '期間の終了'
+          : rangePosition === 'single'
+            ? '1日の期間'
+            : null;
+    return {
+      ...item,
+      kind: isFuzzyRange ? 'fuzzyRange' : 'event',
+      eventId: item.eventId,
+      colorId: DEFAULT_EVENT_COLOR_ID,
+      isInteractive: true,
+      ...(rangePosition === null ? {} : { rangePosition }),
+      accessibilityLabel: positionLabel === null
+        ? item.accessibilityLabel
+        : `${item.accessibilityLabel}、${positionLabel}`,
+    };
+  });
   const holidayItems: readonly TwoDayAllDayItemViewModel[] = holiday.name === null ? [] : [{
     kind: 'holiday',
     id: `holiday:${date}`,

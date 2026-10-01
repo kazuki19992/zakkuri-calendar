@@ -254,6 +254,29 @@ describe('予定の発生回展開', () => {
     ]);
   });
 
+  it('複数日のざっくり予定は保存済み終了日まで占有する', () => {
+    const event: CalendarEvent = {
+      ...exactEvent,
+      temporalType: 'fuzzy',
+      anchorDate: '2026-09-30',
+      endDate: '2026-10-02',
+      temporalDefinitionId: 'personal-default:next_week_first_half',
+      resolutionContext: {
+        version: 1,
+        referenceDate: '2026-09-23',
+        periodAnchorDate: '2026-09-28',
+        parameterSnapshot: {},
+      },
+    };
+
+    expect(expandOk(event, '2026-10-01', '2026-10-01')).toEqual([
+      expect.objectContaining({
+        occurrenceStartDate: '2026-09-30',
+        occurrenceThroughDate: '2026-10-02',
+      }),
+    ]);
+  });
+
   it('表示開始前に始まり期間内へ続く発生回も返す', () => {
     const event = recurring({
       ...exactEvent,

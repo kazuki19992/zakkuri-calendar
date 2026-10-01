@@ -543,9 +543,11 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         today: state.today,
         occurrences: visibleOccurrences,
         holidayCoverage: state.snapshot.holidayCoverage,
+        definitionLabels: new Map([...state.snapshot.definitions.values()]
+          .map((definition) => [definition.id, definition.label] as const)),
       }),
-    [input.weekStartsOn, state.selectedDate, state.snapshot.holidayCoverage, state.today,
-      state.visibleMonth, visibleOccurrences],
+    [input.weekStartsOn, state.selectedDate, state.snapshot.definitions,
+      state.snapshot.holidayCoverage, state.today, state.visibleMonth, visibleOccurrences],
   );
   const datePickerDays = useMemo(
     () =>
@@ -555,9 +557,12 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         today: state.today,
         occurrences: datePickerVisibleOccurrences,
         holidayCoverage: datePickerState.snapshot.holidayCoverage,
+        definitionLabels: new Map([...datePickerState.snapshot.definitions.values()]
+          .map((definition) => [definition.id, definition.label] as const)),
       }),
-    [datePickerState.month, datePickerState.snapshot.holidayCoverage, datePickerVisibleOccurrences,
-      input.weekStartsOn, state.selectedDate, state.today],
+    [datePickerState.month, datePickerState.snapshot.definitions,
+      datePickerState.snapshot.holidayCoverage, datePickerVisibleOccurrences, input.weekStartsOn,
+      state.selectedDate, state.today],
   );
   const selectedAgendaItems = useMemo(
     () =>

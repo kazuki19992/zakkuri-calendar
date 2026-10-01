@@ -61,6 +61,7 @@ describe('繰り返しシリーズの変更計画', () => {
 
     expect(plan.previousSeries?.event.recurrenceRule?.end)
       .toEqual({ type: 'until', date: '2026-10-11' });
+    expect(plan.removePreviousSeries).toBe(false);
     expect(plan.nextSeries?.event).toMatchObject({
       id: 'series-2', title: '新しい定例会', anchorDate: '2026-10-12',
     });
@@ -89,6 +90,7 @@ describe('繰り返しシリーズの変更計画', () => {
       submitted: aggregate(), exceptions: [], createSeriesId: () => 'series-2', now: NOW,
     });
     expect(plan.previousSeries).toBeNull();
+    expect(plan.removePreviousSeries).toBe(true);
     expect(plan.nextSeries?.event.id).toBe('series-2');
   });
 
@@ -114,6 +116,7 @@ describe('繰り返しシリーズの変更計画', () => {
       exceptions: [futureException], now: NOW,
     });
     expect(plan.nextSeries?.event).toMatchObject({ id: 'series-1', title: '全体変更' });
+    expect(plan.removePreviousSeries).toBe(false);
     expect(plan.upsertExceptions).toEqual([futureException]);
   });
 

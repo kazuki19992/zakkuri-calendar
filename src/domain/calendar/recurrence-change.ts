@@ -16,6 +16,7 @@ export type ChangedEventField = EventOverrideField | 'recurrence';
 export type RecurrenceMutationScope = 'occurrence' | 'following' | 'series';
 
 export type RecurrenceMutationPlan = Readonly<{
+  removePreviousSeries: boolean;
   previousSeries: EventAggregate | null;
   nextSeries: EventAggregate | null;
   upsertExceptions: readonly RecurrenceException[];
@@ -260,6 +261,7 @@ export function planFollowingMutation(
   });
 
   return {
+    removePreviousSeries: countBefore === 0,
     previousSeries,
     nextSeries,
     upsertExceptions: transferred,
@@ -329,6 +331,7 @@ export function planSeriesMutation(input: PlanSeriesMutationInput): RecurrenceMu
     now: input.now,
   });
   return {
+    removePreviousSeries: false,
     previousSeries: null,
     nextSeries,
     upsertExceptions: shiftedExceptions,

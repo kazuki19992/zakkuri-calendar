@@ -136,6 +136,7 @@ expect(plan.nextSeries?.event.anchorDate).toBe('2026-10-12');
 
 ```ts
 export type RecurrenceMutationPlan = Readonly<{
+  removePreviousSeries: boolean;
   previousSeries: EventAggregate | null; nextSeries: EventAggregate | null;
   upsertExceptions: readonly RecurrenceException[];
   deleteExceptionIdentities: readonly OccurrenceIdentity[];

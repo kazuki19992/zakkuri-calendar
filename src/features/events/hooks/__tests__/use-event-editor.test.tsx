@@ -151,6 +151,23 @@ describe('予定編集の主要状態', () => {
     }));
   });
 
+  it('シリーズ全体の削除は旧シリーズ削除を明示する', async () => {
+    const repositories = createRepositories();
+    repositories.events.getOccurrenceEditData.mockResolvedValue({
+      series: exactAggregate, exception: null, replacement: null, exceptions: [],
+    });
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories, initial, eventId: exactEvent.id, occurrenceDate: '2026-09-23',
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { await result.current.remove(); });
+    await act(async () => { await result.current.selectScope('series'); });
+
+    expect(repositories.events.applyRecurrenceMutation).toHaveBeenCalledWith(expect.objectContaining({
+      plan: expect.objectContaining({ removePreviousSeries: true, nextSeries: null }),
+    }));
+  });
+
   it('相対定義を選ぶと期間をpreviewして繰り返しなしで保存する', async () => {
     const repositories = createRepositories();
     repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning, nextWeek]);

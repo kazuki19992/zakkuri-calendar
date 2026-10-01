@@ -147,6 +147,30 @@ describe('SQLite repositories', () => {
     });
   });
 
+  it('シリーズ全体の更新で既存行を削除しない', async () => {
+    const db = createTransactionDatabaseDouble();
+    await new SqliteEventRepository(db.database).applyRecurrenceMutation({
+      seriesId: exactEvent.id,
+      expectedSeriesUpdatedAt: exactEvent.updatedAt,
+      plan: {
+        removePreviousSeries: false,
+        previousSeries: null,
+        nextSeries: { event: { ...exactEvent, title: '全体変更' }, reminders: [] },
+        upsertExceptions: [],
+        deleteExceptionIdentities: [],
+        deleteReplacementEventIds: [],
+      },
+    });
+
+    expect(db.transactionRun).not.toHaveBeenCalledWith(
+      'DELETE FROM events WHERE id = $id', { $id: exactEvent.id },
+    );
+    expect(db.transactionRun).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE events SET'),
+      expect.objectContaining({ $id: exactEvent.id, $title: '全体変更' }),
+    );
+  });
+
   it('予定と正規化済み通知を専用transaction handleで一体作成する', async () => {
     const db = createTransactionDatabaseDouble();
     await new SqliteEventRepository(db.database).create({ event: exactEvent, reminders: [reminder30, reminder10] });

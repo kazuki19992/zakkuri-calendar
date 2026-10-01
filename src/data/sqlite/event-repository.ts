@@ -412,9 +412,9 @@ export class SqliteEventRepository implements EventRepository {
   async applyRecurrenceMutation(command: ApplyRecurrenceMutationCommand): Promise<void> {
     await this.database.exclusiveTransaction(async (transaction) => {
       await assertSeriesRevision(transaction, command.seriesId, command.expectedSeriesUpdatedAt);
-      if (command.plan.previousSeries === null) {
+      if (command.plan.removePreviousSeries) {
         await transaction.run('DELETE FROM events WHERE id = $id', { $id: command.seriesId });
-      } else {
+      } else if (command.plan.previousSeries !== null) {
         await replaceAggregate(transaction, command.plan.previousSeries);
       }
       if (command.plan.nextSeries !== null) {

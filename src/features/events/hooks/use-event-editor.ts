@@ -618,6 +618,7 @@ export function useEventEditor({
             : occurrenceEditData.exceptions;
           plan = {
             ...plan,
+            removePreviousSeries: scope === 'series' || plan.removePreviousSeries,
             nextSeries: null,
             upsertExceptions: [],
             deleteExceptionIdentities: affected.map((exception) => ({

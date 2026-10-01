@@ -30,6 +30,73 @@ function createRepositories(): Readonly<{ calendars: jest.Mocked<CalendarReposit
 const initial = { date: '2026-09-09', startTime: '09:30', endTime: '11:45', temporalType: 'fuzzy' as const };
 
 describe('予定編集の主要状態', () => {
+  it('繰り返しOccurrenceは保存時に範囲を選び単発例外として保存できる', async () => {
+    const repositories = createRepositories();
+    repositories.events.getOccurrenceEditData.mockResolvedValue({
+      series: exactAggregate,
+      exception: null,
+      replacement: null,
+      exceptions: [],
+    });
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories,
+      initial,
+      eventId: exactEvent.id,
+      occurrenceDate: '2026-09-23',
+      createId: () => 'replacement-1',
+      now: () => '2026-09-20T00:00:00.000Z',
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.startDate).toBe('2026-09-23');
+
+    await act(async () => { result.current.setTitle('この回だけ変更'); });
+    let saveResult = true;
+    await act(async () => { saveResult = await result.current.save(); });
+    expect(saveResult).toBe(false);
+    expect(repositories.events.update).not.toHaveBeenCalled();
+    expect({ titleError: result.current.titleError, dateError: result.current.dateError,
+      endTimeError: result.current.endTimeError, recurrenceError: result.current.recurrenceError,
+      saveError: result.current.saveError }).toEqual({ titleError: null, dateError: null,
+      endTimeError: null, recurrenceError: null, saveError: null });
+    expect(result.current.scopeRequest).toEqual({
+      operation: 'save', needsExceptionResetConfirmation: false,
+      options: [
+        { scope: 'occurrence', label: 'この予定' },
+        { scope: 'following', label: 'これ以降の予定' },
+        { scope: 'series', label: 'すべての予定' },
+      ],
+    });
+    await act(async () => { result.current.cancelScope(); });
+    expect(result.current.title).toBe('この回だけ変更');
+
+    await act(async () => { await result.current.save(); });
+    await act(async () => { await result.current.selectScope('occurrence'); });
+    expect(repositories.events.saveOccurrenceException).toHaveBeenCalledWith(expect.objectContaining({
+      identity: { seriesEventId: 'event-1', originalOccurrenceDate: '2026-09-23' },
+      overrideFields: ['title'],
+      replacement: expect.objectContaining({ event: expect.objectContaining({
+        id: 'replacement-1', title: 'この回だけ変更', recurrenceRule: null,
+      }) }),
+    }));
+  });
+
+  it('繰り返し規則を変えると単発範囲を表示しない', async () => {
+    const repositories = createRepositories();
+    repositories.events.getOccurrenceEditData.mockResolvedValue({
+      series: exactAggregate, exception: null, replacement: null, exceptions: [],
+    });
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories, initial, eventId: exactEvent.id, occurrenceDate: '2026-09-23',
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.setRecurrencePreset('daily'); });
+    await act(async () => { await result.current.save(); });
+    expect(result.current.scopeRequest).toMatchObject({
+      needsExceptionResetConfirmation: true,
+      options: [{ scope: 'following' }, { scope: 'series' }],
+    });
+  });
+
   it('相対定義を選ぶと期間をpreviewして繰り返しなしで保存する', async () => {
     const repositories = createRepositories();
     repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning, nextWeek]);

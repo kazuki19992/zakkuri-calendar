@@ -19,7 +19,7 @@ function withOpacity(hex: string, opacity: number): string {
 export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
   item: TimelineItemViewModel;
   scale?: number;
-  onPress?(id: string): void;
+  onPress?(id: string, originalOccurrenceDate?: string): void;
 }>) {
   const theme = useTheme();
   const width = `${100 / item.overlapCount}%` as const;
@@ -48,7 +48,9 @@ export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
       accessibilityLabel={item.accessibilityLabel}
       style={[styles.position, { top, height, width, left }]}
       onTouchEnd={(event) => event.stopPropagation()}
-      onPress={() => onPress?.(item.eventId)}
+      onPress={() => item.originalOccurrenceDate === undefined
+        ? onPress?.(item.eventId)
+        : onPress?.(item.eventId, item.originalOccurrenceDate)}
     >
       <View testID={`timeline-event.${item.id}.card`} style={styles.card}>
         <LinearGradient

@@ -7,7 +7,7 @@ export type SelectedDayAgendaProps = Readonly<{
   holidayName: string | null;
   holidaySupport: 'available' | 'unsupported';
   items: readonly AgendaItemViewModel[];
-  onEditEvent?(id: string): void;
+  onEditEvent?(id: string, originalOccurrenceDate?: string): void;
 }>;
 
 function formatSelectedDate(date: string): string {
@@ -43,7 +43,9 @@ export function SelectedDayAgenda({
             testID={item.kind === 'fuzzyRange' ? `selected-day-agenda.fuzzy-range.${item.id}` : undefined}
             accessibilityRole="button"
             accessibilityLabel={item.accessibilityLabel}
-            onPress={() => onEditEvent?.(item.eventId)}
+            onPress={() => item.originalOccurrenceDate === undefined
+              ? onEditEvent?.(item.eventId)
+              : onEditEvent?.(item.eventId, item.originalOccurrenceDate)}
             style={[
               styles.item,
               item.kind === 'fuzzyRange' && { borderColor: theme.calendarAccent },

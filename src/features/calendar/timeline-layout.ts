@@ -89,6 +89,7 @@ export function resolveTextAnchor(peakOffset: number): TimelineTextAnchor {
 export type TimelineItemViewModel = Readonly<{
   id: string;
   eventId: string;
+  originalOccurrenceDate?: string;
   title: string;
   temporalLabel: string;
   accessibilityLabel: string;
@@ -245,6 +246,9 @@ export function createDayTimelineItems(input: Readonly<{
     items.push({
       id: occurrence.key,
       eventId: occurrence.eventId,
+      ...(occurrence.occurrenceIdentity === null
+        ? {}
+        : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),
       title: event.title,
       temporalLabel,
       accessibilityLabel: [

@@ -14,6 +14,7 @@ export type AgendaItemViewModel = Readonly<{
   kind?: 'fuzzyRange';
   id: string;
   eventId: string;
+  originalOccurrenceDate?: string;
   title: string;
   temporalLabel: string;
   rangeLabel?: string;
@@ -79,6 +80,9 @@ export function createAgendaItems(
       ...(isFuzzyRange ? { kind: 'fuzzyRange' as const } : {}),
       id: occurrence.key,
       eventId: occurrence.eventId,
+      ...(occurrence.occurrenceIdentity === null
+        ? {}
+        : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),
       title: event.title,
       temporalLabel,
       ...(rangeLabel === null ? {} : { rangeLabel }),

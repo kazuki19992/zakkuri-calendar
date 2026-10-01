@@ -70,6 +70,7 @@ describe('月表示の表示用モデル', () => {
     expect(createAgendaItems([occurrence], new Map())).toEqual([{
       id: occurrence.key,
       eventId: 'event-1',
+      originalOccurrenceDate: '2026-09-21',
       title: '敬老会',
       temporalLabel: '終日',
       accessibilityLabel: '敬老会、終日、繰り返し予定',

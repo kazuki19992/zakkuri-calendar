@@ -32,6 +32,7 @@ export type TwoDayAllDayItemViewModel = Readonly<{
   kind: 'event' | 'fuzzyRange' | 'holiday';
   id: string;
   eventId: string | null;
+  originalOccurrenceDate?: string;
   colorId: EventColorId | 'holiday';
   isInteractive: boolean;
   title: string;

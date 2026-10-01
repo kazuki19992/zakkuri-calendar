@@ -41,7 +41,7 @@
 - Consumes: `CalendarEvent`、`EventAggregate`、`isCalendarDate`。
 - Produces: `OccurrenceIdentity`、`EventOverrideField`、`RecurrenceException`、`CalendarScheduleSnapshot`、`parseRecurrenceException()`、`materializeOccurrenceReplacement()`。
 
-- [ ] **Step 1: parserと合成規則の失敗testを書く**
+- [x] **Step 1: parserと合成規則の失敗testを書く**
 
 ```ts
 expect(parseRecurrenceException(validException).ok).toBe(true);
@@ -54,8 +54,8 @@ expect(actual.anchorDate).toBe('2026-10-05');
 
 `deleted`/`replaced`の必須値、重複mask、無効日付、全mask、元Occurrenceの日付を保つケースも追加する。
 
-- [ ] **Step 2: `npm test -- src/domain/calendar/__tests__/recurrence-exception.test.ts --runInBand`を実行し、未実装exportでFAILすることを確認する**
-- [ ] **Step 3: 次の公開型を実装し、mask対象だけ置換予定から合成する**
+- [x] **Step 2: `npm test -- src/domain/calendar/__tests__/recurrence-exception.test.ts --runInBand`を実行し、未実装exportでFAILすることを確認する**
+- [x] **Step 3: 次の公開型を実装し、mask対象だけ置換予定から合成する**
 
 ```ts
 export type OccurrenceIdentity = Readonly<{ seriesEventId: string; originalOccurrenceDate: string }>;
@@ -70,8 +70,8 @@ export type CalendarScheduleSnapshot = Readonly<{
 }>;
 ```
 
-- [ ] **Step 4: 同じtest commandを実行してPASSを確認する**
-- [ ] **Step 5: `git commit -m "feat(domain): 繰り返し予定の例外モデルを追加"`で対象2 fileをcommitする**
+- [x] **Step 4: 同じtest commandを実行してPASSを確認する**
+- [x] **Step 5: `git commit -m "feat(domain): 繰り返し予定の例外モデルを追加"`で対象2 fileをcommitする**
 
 ### Task 2: 例外を考慮したOccurrence展開
 
@@ -83,7 +83,7 @@ export type CalendarScheduleSnapshot = Readonly<{
 - Consumes: Task 1の`CalendarScheduleSnapshot`、`OccurrenceIdentity`、`materializeOccurrenceReplacement()`。
 - Produces: `expandEventOccurrences({ snapshot, from, through })`と`EventOccurrence.occurrenceIdentity`。
 
-- [ ] **Step 1: 削除・置換・範囲外移動の失敗testを書く**
+- [x] **Step 1: 削除・置換・範囲外移動の失敗testを書く**
 
 ```ts
 const result = expandEventOccurrences({ snapshot, from: '2026-10-01', through: '2026-10-31' });
@@ -94,8 +94,8 @@ expect(result.ok && result.value.find((item) => item.eventId === 'replacement-1'
 
 元日付を消すこと、移動先だけ表示すること、非繰り返し予定の互換性も追加する。
 
-- [ ] **Step 2: `npm test -- src/domain/calendar/__tests__/event-occurrence.test.ts --runInBand`を実行し、旧APIまたは重複表示でFAILすることを確認する**
-- [ ] **Step 3: series展開後にidentityで例外を適用し、`deleted`を除外、`replaced`を合成して表示範囲を再判定する**
+- [x] **Step 2: `npm test -- src/domain/calendar/__tests__/event-occurrence.test.ts --runInBand`を実行し、旧APIまたは重複表示でFAILすることを確認する**
+- [x] **Step 3: series展開後にidentityで例外を適用し、`deleted`を除外、`replaced`を合成して表示範囲を再判定する**
 
 ```ts
 export type EventOccurrence = Readonly<{
@@ -105,8 +105,8 @@ export type EventOccurrence = Readonly<{
 }>;
 ```
 
-- [ ] **Step 4: 同じtest commandを実行してPASSを確認する**
-- [ ] **Step 5: `git commit -m "feat(domain): 繰り返し例外を予定展開へ反映"`でcommitする**
+- [x] **Step 4: 同じtest commandを実行してPASSを確認する**
+- [x] **Step 5: `git commit -m "feat(domain): 繰り返し例外を予定展開へ反映"`でcommitする**
 
 ### Task 3: シリーズ範囲変更の純粋計算
 
@@ -119,7 +119,7 @@ export type EventOccurrence = Readonly<{
 - Consumes: `CalendarEvent`、`RecurrenceRuleV1`、`RecurrenceException`、Occurrence generator。
 - Produces: `ChangedEventField`、`RecurrenceMutationScope`、`planFollowingMutation()`、`planSeriesMutation()`、`getChangedEventFields()`。
 
-- [ ] **Step 1: 分割・変更mask・end条件の失敗testを書く**
+- [x] **Step 1: 分割・変更mask・end条件の失敗testを書く**
 
 ```ts
 expect(getChangedEventFields(existingOccurrence, submittedDraft)).toEqual(['title']);
@@ -131,8 +131,8 @@ expect(plan.nextSeries?.event.anchorDate).toBe('2026-10-12');
 
 週複数曜日、月末欠番、うるう日、`count`残数、`until`、先頭分割、再分割、既存override非伝播を追加する。
 
-- [ ] **Step 2: `npm test -- src/domain/calendar/__tests__/recurrence-change.test.ts --runInBand`を実行し、module未実装でFAILすることを確認する**
-- [ ] **Step 3: 次のplanを返す差分検出・分割・ordinal rekeyを実装する**
+- [x] **Step 2: `npm test -- src/domain/calendar/__tests__/recurrence-change.test.ts --runInBand`を実行し、module未実装でFAILすることを確認する**
+- [x] **Step 3: 次のplanを返す差分検出・分割・ordinal rekeyを実装する**
 
 ```ts
 export type RecurrenceMutationPlan = Readonly<{
@@ -145,8 +145,8 @@ export type RecurrenceMutationPlan = Readonly<{
 
 規則変更時は対象例外を削除対象へ入れ、規則未変更時だけ未来側を新シリーズへ転送する。
 
-- [ ] **Step 4: `npm test -- src/domain/calendar/__tests__/recurrence-change.test.ts src/domain/calendar/__tests__/event-occurrence.test.ts --runInBand`でPASSを確認する**
-- [ ] **Step 5: `git commit -m "feat(domain): 繰り返しシリーズの範囲変更を計画"`でcommitする**
+- [x] **Step 4: `npm test -- src/domain/calendar/__tests__/recurrence-change.test.ts src/domain/calendar/__tests__/event-occurrence.test.ts --runInBand`でPASSを確認する**
+- [x] **Step 5: `git commit -m "feat(domain): 繰り返しシリーズの範囲変更を計画"`でcommitする**
 
 ### Task 4: SQLite schema v4と原子的Repository
 
@@ -163,7 +163,7 @@ export type RecurrenceMutationPlan = Readonly<{
 - Consumes: Tasks 1-3のsnapshot、exception、mutation plan。
 - Produces: `listSchedule()`、`getOccurrenceEditData()`、`saveOccurrenceException()`、`deleteOccurrenceException()`、`applyRecurrenceMutation()`。
 
-- [ ] **Step 1: schema・mapping・transactionの失敗testを書く**
+- [x] **Step 1: schema・mapping・transactionの失敗testを書く**
 
 ```ts
 expect(LATEST_SCHEMA_VERSION).toBe(4);
@@ -174,8 +174,8 @@ await expect(events.listSchedule('personal-default', '2026-10-01', '2026-10-31')
 
 複合PK、replacement unique index、cascade、JSON mask、全例外取得、途中失敗rollback、`expectedUpdatedAt`不一致も追加する。
 
-- [ ] **Step 2: `npm test -- src/data/sqlite/__tests__/migrations.test.ts src/data/sqlite/__tests__/row-mappers.test.ts src/data/sqlite/__tests__/repositories.test.ts --runInBand`でschema v3と未実装APIによるFAILを確認する**
-- [ ] **Step 3: version 4 migrationとrow mapperを実装する**
+- [x] **Step 2: `npm test -- src/data/sqlite/__tests__/migrations.test.ts src/data/sqlite/__tests__/row-mappers.test.ts src/data/sqlite/__tests__/repositories.test.ts --runInBand`でschema v3と未実装APIによるFAILを確認する**
+- [x] **Step 3: version 4 migrationとrow mapperを実装する**
 
 ```sql
 CREATE TABLE IF NOT EXISTS recurrence_exceptions (
@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS recurrence_exceptions (
 );
 ```
 
-- [ ] **Step 4: `EventRepository`へsnapshot読取と排他transaction commandを追加し、シリーズの`updated_at = expectedUpdatedAt`を最初に検査する**
+- [x] **Step 4: `EventRepository`へsnapshot読取と排他transaction commandを追加し、シリーズの`updated_at = expectedUpdatedAt`を最初に検査する**
 
 ```ts
 listSchedule(calendarId: string, from: string, through: string): Promise<CalendarScheduleSnapshot>;
@@ -197,8 +197,8 @@ deleteOccurrenceException(command: DeleteOccurrenceExceptionCommand): Promise<vo
 applyRecurrenceMutation(command: ApplyRecurrenceMutationCommand): Promise<void>;
 ```
 
-- [ ] **Step 5: Step 2のtest commandを再実行してPASSを確認する**
-- [ ] **Step 6: `git commit -m "feat(sqlite): 繰り返し例外を原子的に永続化"`でcommitする**
+- [x] **Step 5: Step 2のtest commandを再実行してPASSを確認する**
+- [x] **Step 6: `git commit -m "feat(sqlite): 繰り返し例外を原子的に永続化"`でcommitする**
 
 ### Task 5: カレンダーからOccurrence identityを編集画面へ渡す
 
@@ -220,7 +220,7 @@ applyRecurrenceMutation(command: ApplyRecurrenceMutationCommand): Promise<void>;
 - Consumes: `listSchedule()`と`EventOccurrence.occurrenceIdentity`。
 - Produces: `EventEditTarget { eventId, originalOccurrenceDate? }`を全viewからrouteへ渡す。
 
-- [ ] **Step 1: 月・2日・agenda・routeの失敗testを書く**
+- [x] **Step 1: 月・2日・agenda・routeの失敗testを書く**
 
 ```ts
 fireEvent.press(screen.getByLabelText('予定を編集'));
@@ -229,8 +229,8 @@ expect(router.push).toHaveBeenCalledWith({ pathname: '/events/[id]',
   params: { id: 'series-1', occurrenceDate: '2026-10-12' } });
 ```
 
-- [ ] **Step 2: `npm test -- src/features/calendar src/app/__tests__/index.test.tsx --runInBand`で旧string callbackによるFAILを確認する**
-- [ ] **Step 3: 次のtargetをview model itemへ保持し、全Press handlerとrouteへ渡す**
+- [x] **Step 2: `npm test -- src/features/calendar src/app/__tests__/index.test.tsx --runInBand`で旧string callbackによるFAILを確認する**
+- [x] **Step 3: 次のtargetをview model itemへ保持し、全Press handlerとrouteへ渡す**
 
 ```ts
 export type EventEditTarget = Readonly<{ eventId: string; originalOccurrenceDate?: string }>;
@@ -238,8 +238,8 @@ export type EventEditTarget = Readonly<{ eventId: string; originalOccurrenceDate
 
 `useCalendarView`は`listByAnchorRange()`を`listSchedule()`へ置換する。
 
-- [ ] **Step 4: Step 2のtest commandでPASSを確認する**
-- [ ] **Step 5: `git commit -m "feat(calendar): 繰り返しOccurrenceを編集対象として渡す"`でcommitする**
+- [x] **Step 4: Step 2のtest commandでPASSを確認する**
+- [x] **Step 5: `git commit -m "feat(calendar): 繰り返しOccurrenceを編集対象として渡す"`でcommitする**
 
 ### Task 6: 編集hookのscope stateとRepository command
 
@@ -255,7 +255,7 @@ export type EventEditTarget = Readonly<{ eventId: string; originalOccurrenceDate
 - Consumes: Repository occurrence API、Task 3 planner、route `occurrenceDate`。
 - Produces: `scopeRequest`、`selectScope()`、`cancelScope()`、`confirmExceptionReset()`。
 
-- [ ] **Step 1: state machineの失敗testを書く**
+- [x] **Step 1: state machineの失敗testを書く**
 
 ```ts
 await act(async () => result.current.requestSave());
@@ -268,8 +268,8 @@ expect(result.current.title).toBe('編集途中のタイトル');
 
 規則変更時のoccurrence除外、reset確認、単発upsert/delete、following/series、競合時draft保持、二重tap防止を追加する。
 
-- [ ] **Step 2: `npm test -- src/features/events/__tests__/recurrence-edit-model.test.ts src/features/events/hooks/__tests__/use-event-editor.test.tsx src/app/events/__tests__/[id].test.tsx --runInBand`で未実装stateによるFAILを確認する**
-- [ ] **Step 3: 次のscope modelとcommand生成を実装する**
+- [x] **Step 2: `npm test -- src/features/events/__tests__/recurrence-edit-model.test.ts src/features/events/hooks/__tests__/use-event-editor.test.tsx src/app/events/__tests__/[id].test.tsx --runInBand`で未実装stateによるFAILを確認する**
+- [x] **Step 3: 次のscope modelとcommand生成を実装する**
 
 ```ts
 export type RecurrenceEditScope = 'occurrence' | 'following' | 'series';
@@ -282,8 +282,8 @@ export type ScopeRequest = Readonly<{
 
 load時は元aggregateと現在例外を保持し、表示draftと元シリーズ値を分離する。scope確定後だけRepository commandを実行する。
 
-- [ ] **Step 4: Step 2のtest commandでPASSを確認する**
-- [ ] **Step 5: `git commit -m "feat(events): 繰り返し編集の範囲選択状態を追加"`でcommitする**
+- [x] **Step 4: Step 2のtest commandでPASSを確認する**
+- [x] **Step 5: `git commit -m "feat(events): 繰り返し編集の範囲選択状態を追加"`でcommitする**
 
 ### Task 7: 範囲選択と例外reset確認UI
 
@@ -299,7 +299,7 @@ load時は元aggregateと現在例外を保持し、表示draftと元シリー�
 - Consumes: Task 6の`ScopeRequest`とcallback。
 - Produces: Save/Delete時だけ表示されるアクセシブルなscope dialog。
 
-- [ ] **Step 1: 表示・取消・選択・reset確認の失敗testを書く**
+- [x] **Step 1: 表示・取消・選択・reset確認の失敗testを書く**
 
 ```ts
 expect(screen.getByText('変更する範囲')).toBeTruthy();
@@ -311,8 +311,8 @@ expect(onSelect).toHaveBeenCalledWith('following');
 
 削除copy、規則変更時の「この予定」非表示、44pt操作領域、busy時不可も追加する。
 
-- [ ] **Step 2: `npm test -- src/features/events/components/__tests__/recurrence-scope-dialog.test.tsx src/features/events/screens/__tests__/event-editor-screen.test.tsx --runInBand`で未実装componentによるFAILを確認する**
-- [ ] **Step 3: React Native `Modal`、theme token、Reduce Motion、Safe Areaを使ってdialogを実装する**
+- [x] **Step 2: `npm test -- src/features/events/components/__tests__/recurrence-scope-dialog.test.tsx src/features/events/screens/__tests__/event-editor-screen.test.tsx --runInBand`で未実装componentによるFAILを確認する**
+- [x] **Step 3: React Native `Modal`、theme token、Reduce Motion、Safe Areaを使ってdialogを実装する**
 
 ```tsx
 <View accessibilityViewIsModal accessibilityLabel="変更する範囲">
@@ -322,8 +322,8 @@ expect(onSelect).toHaveBeenCalledWith('following');
 </View>
 ```
 
-- [ ] **Step 4: `npm test -- src/features/events --runInBand`でPASSを確認する**
-- [ ] **Step 5: `git commit -m "feat(events): 繰り返し予定の編集範囲UIを追加"`でcommitする**
+- [x] **Step 4: `npm test -- src/features/events --runInBand`でPASSを確認する**
+- [x] **Step 5: `git commit -m "feat(events): 繰り返し予定の編集範囲UIを追加"`でcommitする**
 
 ### Task 8: 全体検証・レビュー・PR
 
@@ -335,8 +335,8 @@ expect(onSelect).toHaveBeenCalledWith('following');
 - Consumes: Tasks 1-7の完成状態。
 - Produces: checked plan、全検証結果、`develop`向けOpen PR。
 
-- [ ] **Step 1: checkboxと設計用語を実装結果へ同期し、`rg -n 'T[B]D|PLACEHOLD[E]R|fill i[n]' docs/superpowers/specs/2026-10-01-recurrence-exceptions-design.md docs/superpowers/plans/2026-10-01-recurrence-exceptions.md`がmatchなしになることを確認する**
-- [ ] **Step 2: 全自動検証を実行する**
+- [x] **Step 1: checkboxと設計用語を実装結果へ同期し、`rg -n 'T[B]D|PLACEHOLD[E]R|fill i[n]' docs/superpowers/specs/2026-10-01-recurrence-exceptions-design.md docs/superpowers/plans/2026-10-01-recurrence-exceptions.md`がmatchなしになることを確認する**
+- [x] **Step 2: 全自動検証を実行する**
 
 ```bash
 npm run typecheck
@@ -347,7 +347,7 @@ git diff --check
 
 Expected: すべてexit 0。
 
-- [ ] **Step 3: fresh reviewerへ`origin/develop...HEAD`のschema、rollback、Occurrence重複、scope state、アクセシビリティを依頼し、有効な指摘を修正する**
-- [ ] **Step 4: Step 2の4 commandを再実行してすべてexit 0を確認する**
-- [ ] **Step 5: document差分があれば`git commit -m "docs: 繰り返し例外の実装結果を同期"`でcommitする**
+- [x] **Step 3: fresh reviewerへ`origin/develop...HEAD`のschema、rollback、Occurrence重複、scope state、アクセシビリティを依頼し、有効な指摘を修正する**
+- [x] **Step 4: Step 2の4 commandを再実行してすべてexit 0を確認する**
+- [x] **Step 5: document差分があれば`git commit -m "docs: 繰り返し例外の実装結果を同期"`でcommitする**
 - [ ] **Step 6: branchをpushし、目的・設計判断・影響範囲・検証・実機未確認項目・`Closes #26`を含む日本語PRを`develop`向けに作成する**

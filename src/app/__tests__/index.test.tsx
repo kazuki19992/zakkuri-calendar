@@ -37,7 +37,7 @@ jest.mock('@/features/calendar/screens/calendar-screen', () => {
     }: {
       state: CalendarViewState;
       onAddEvent(date: string): void;
-      onEditEvent?(id: string): void;
+      onEditEvent?(id: string, originalOccurrenceDate?: string): void;
       onCreateExactAt?(date: string, startTime: string): void;
       onOpenSettings?(): void;
     }) => {
@@ -52,7 +52,7 @@ jest.mock('@/features/calendar/screens/calendar-screen', () => {
         ),
         React.createElement(
           Pressable,
-          { accessibilityRole: 'button', accessibilityLabel: '予定を編集', onPress: () => onEditEvent?.('event-1') },
+          { accessibilityRole: 'button', accessibilityLabel: '予定を編集', onPress: () => onEditEvent?.('event-1', '2026-10-12') },
           React.createElement(Text, null, '予定を編集'),
         ),
         React.createElement(
@@ -89,6 +89,11 @@ describe('ホームルート', () => {
         create: jest.fn(),
         getById: jest.fn(),
         listByAnchorRange: jest.fn(),
+        listSchedule: jest.fn(),
+        getOccurrenceEditData: jest.fn(),
+        saveOccurrenceException: jest.fn(),
+        deleteOccurrenceException: jest.fn(),
+        applyRecurrenceMutation: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
       },
@@ -129,7 +134,9 @@ describe('ホームルート', () => {
     await user.press(screen.getByRole('button', { name: '予定を追加' }));
     expect(push).toHaveBeenCalledWith({ pathname: '/events/new', params: { date: '2026-09-21' } });
     await user.press(screen.getByRole('button', { name: '予定を編集' }));
-    expect(push).toHaveBeenCalledWith({ pathname: '/events/[id]', params: { id: 'event-1' } });
+    expect(push).toHaveBeenCalledWith({
+      pathname: '/events/[id]', params: { id: 'event-1', occurrenceDate: '2026-10-12' },
+    });
     await user.press(screen.getByRole('button', { name: '時刻から予定を追加' }));
     expect(push).toHaveBeenCalledWith({
       pathname: '/events/new',

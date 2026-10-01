@@ -27,7 +27,7 @@ export function TwoDayView({
   panHandlers: PanResponderInstance['panHandlers'];
   /** カルーセルが基準位置・スライド距離を計算するための画面幅の計測結果を通知する。 */
   onCarouselLayout(width: number): void;
-  onEditEvent?(id: string): void;
+  onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
   now?: () => Date;
 }>) {

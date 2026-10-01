@@ -33,6 +33,7 @@ function asOccurrence(
   return {
     key: event.id,
     eventId: event.id,
+    occurrenceIdentity: null,
     occurrenceStartDate: event.anchorDate,
     occurrenceThroughDate: throughDate,
     isRecurring: false,
@@ -49,7 +50,8 @@ describe('月表示の表示用モデル', () => {
     };
     const occurrence: EventOccurrence = {
       key: 'event-1:recurrence:2026-09-21',
-      eventId: 'event-1',
+      eventId: 'replacement-1',
+      occurrenceIdentity: { seriesEventId: 'event-1', originalOccurrenceDate: '2026-09-21' },
       occurrenceStartDate: '2026-09-21',
       occurrenceThroughDate: '2026-09-23',
       isRecurring: true,
@@ -68,9 +70,10 @@ describe('月表示の表示用モデル', () => {
     expect(createAgendaItems([occurrence], new Map())).toEqual([{
       id: occurrence.key,
       eventId: 'event-1',
+      originalOccurrenceDate: '2026-09-21',
       title: '敬老会',
       temporalLabel: '終日',
-      accessibilityLabel: '敬老会、終日、繰り返し予定',
+      accessibilityLabel: '敬老会、終日、繰り返し予定、個別に変更済み',
     }]);
   });
 

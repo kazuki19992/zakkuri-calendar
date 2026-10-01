@@ -7,6 +7,10 @@ import { parseEventReminder, type EventReminder } from '@/domain/calendar/event-
 import { parseCalendarEvent, type CalendarEvent } from '@/domain/calendar/event';
 import { parseRecurrenceRule, type RecurrenceRuleV1 } from '@/domain/calendar/recurrence';
 import {
+  parseRecurrenceException,
+  type RecurrenceException,
+} from '@/domain/calendar/recurrence-exception';
+import {
   parseTemporalDefinition,
   type TemporalDefinition,
 } from '@/domain/temporal/temporal-definition';
@@ -32,6 +36,16 @@ export type EventRow = Readonly<{
 
 export type ReminderRow = Readonly<{
   id: string; event_id: string; minutes_before: number; sort_order: number;
+}>;
+
+export type RecurrenceExceptionRow = Readonly<{
+  series_event_id: string;
+  original_occurrence_date: string;
+  kind: string;
+  replacement_event_id: string | null;
+  override_fields_json: string;
+  created_at: string;
+  updated_at: string;
 }>;
 
 export class CorruptDatabaseRowError extends Error {
@@ -156,6 +170,34 @@ export function mapReminderRow(row: ReminderRow): EventReminder {
     sortOrder: row.sort_order,
   });
   if (!parsed.ok) throw new CorruptDatabaseRowError('event reminder', row.id);
+  return parsed.value;
+}
+
+export function mapRecurrenceExceptionRow(row: RecurrenceExceptionRow): RecurrenceException {
+  let overrideFields: unknown;
+  try {
+    overrideFields = JSON.parse(row.override_fields_json) as unknown;
+  } catch {
+    throw new CorruptDatabaseRowError(
+      'recurrence exception',
+      `${row.series_event_id}:${row.original_occurrence_date}`,
+    );
+  }
+  const parsed = parseRecurrenceException({
+    seriesEventId: row.series_event_id,
+    originalOccurrenceDate: row.original_occurrence_date,
+    kind: row.kind,
+    replacementEventId: row.replacement_event_id,
+    overrideFields,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+  if (!parsed.ok) {
+    throw new CorruptDatabaseRowError(
+      'recurrence exception',
+      `${row.series_event_id}:${row.original_occurrence_date}`,
+    );
+  }
   return parsed.value;
 }
 

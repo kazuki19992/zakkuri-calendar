@@ -9,13 +9,16 @@ import { EventEditorTabs } from '../components/event-editor-tabs';
 import { EventMetadataFields } from '../components/event-metadata-fields';
 import { EventReminderEditor } from '../components/event-reminder-editor';
 import { RecurrenceEditor } from '../components/recurrence-editor';
+import { RecurrenceScopeDialog } from '../components/recurrence-scope-dialog';
 import { TemporalDefinitionPicker } from '../components/temporal-definition-picker';
 import type { EventEditorState } from '../hooks/use-event-editor';
+import type { RecurrenceEditScope } from '../recurrence-edit-model';
 
-export function EventEditorScreen({ state, onSave, onDelete, onCancel }: Readonly<{
+export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCancel }: Readonly<{
   state: EventEditorState;
   onSave(): void;
   onDelete(): void;
+  onSelectScope?(scope: RecurrenceEditScope): void;
   onCancel(): void;
 }>) {
   const theme = useTheme();
@@ -59,9 +62,13 @@ export function EventEditorScreen({ state, onSave, onDelete, onCancel }: Readonl
           {section('通知', <EventReminderEditor reminders={state.reminders} disabled={busy} error={state.reminderError} onAdd={state.addReminder} onRemove={state.removeReminder} onMove={state.moveReminder} />)}
           {section('メモ', <EventMetadataFields field="notes" location={state.location} notes={state.notes} disabled={busy} onLocationChange={state.setLocation} onNotesChange={state.setNotes} />)}
           {state.saveError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.saveError}</Text> : null}
-          {state.mode === 'edit' ? <DeleteEventButton title={state.title} disabled={busy} isRecurring={state.recurrenceDraft.preset !== 'none'} onDelete={onDelete} /> : null}
+          {state.mode === 'edit' ? <DeleteEventButton title={state.title} disabled={busy}
+            isRecurring={state.recurrenceDraft.preset !== 'none'}
+            usesScopeSelection={state.usesRecurrenceScope} onDelete={onDelete} /> : null}
         </ScrollView> : null}
       </KeyboardAvoidingView>
+      <RecurrenceScopeDialog request={state.scopeRequest} busy={busy}
+        onSelect={(scope) => onSelectScope?.(scope)} onCancel={state.cancelScope} />
     </SafeAreaView>
   );
 }

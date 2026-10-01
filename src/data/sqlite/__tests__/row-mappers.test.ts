@@ -3,9 +3,11 @@ import {
   mapCalendarRow,
   mapEventRow,
   mapReminderRow,
+  mapRecurrenceExceptionRow,
   mapTemporalDefinitionRow,
   type EventRow,
   type ReminderRow,
+  type RecurrenceExceptionRow,
   type TemporalDefinitionRow,
 } from '../row-mappers';
 
@@ -28,6 +30,13 @@ const eventRow: EventRow = {
 
 const reminderRow: ReminderRow = {
   id: 'reminder-1', event_id: 'event-1', minutes_before: 30, sort_order: 0,
+};
+
+const exceptionRow: RecurrenceExceptionRow = {
+  series_event_id: 'series-1', original_occurrence_date: '2026-10-12',
+  kind: 'replaced', replacement_event_id: 'replacement-1',
+  override_fields_json: '["title","temporal"]',
+  created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-01T00:00:00.000Z',
 };
 
 describe('row mappers', () => {
@@ -98,6 +107,17 @@ describe('row mappers', () => {
     expect(mapReminderRow(reminderRow)).toEqual({
       id: 'reminder-1', eventId: 'event-1', minutesBefore: 30, sortOrder: 0,
     });
+  });
+
+  it('例外rowのmask JSONを検証してdomainへ写す', () => {
+    expect(mapRecurrenceExceptionRow(exceptionRow)).toEqual({
+      seriesEventId: 'series-1', originalOccurrenceDate: '2026-10-12',
+      kind: 'replaced', replacementEventId: 'replacement-1',
+      overrideFields: ['title', 'temporal'],
+      createdAt: '2026-10-01T00:00:00.000Z', updatedAt: '2026-10-01T00:00:00.000Z',
+    });
+    expect(() => mapRecurrenceExceptionRow({ ...exceptionRow, override_fields_json: '{broken' }))
+      .toThrow(CorruptDatabaseRowError);
   });
 
   it.each([

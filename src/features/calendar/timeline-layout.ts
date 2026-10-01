@@ -89,6 +89,7 @@ export function resolveTextAnchor(peakOffset: number): TimelineTextAnchor {
 export type TimelineItemViewModel = Readonly<{
   id: string;
   eventId: string;
+  originalOccurrenceDate?: string;
   title: string;
   temporalLabel: string;
   accessibilityLabel: string;
@@ -244,7 +245,10 @@ export function createDayTimelineItems(input: Readonly<{
 
     items.push({
       id: occurrence.key,
-      eventId: occurrence.eventId,
+      eventId: occurrence.occurrenceIdentity?.seriesEventId ?? occurrence.eventId,
+      ...(occurrence.occurrenceIdentity === null
+        ? {}
+        : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),
       title: event.title,
       temporalLabel,
       accessibilityLabel: [
@@ -252,6 +256,10 @@ export function createDayTimelineItems(input: Readonly<{
         temporalLabel,
         ...continuationLabels,
         occurrence.isRecurring ? '繰り返し予定' : null,
+        occurrence.occurrenceIdentity !== null
+          && occurrence.eventId !== occurrence.occurrenceIdentity.seriesEventId
+          ? '個別に変更済み'
+          : null,
       ].filter((label): label is string => label !== null).join('、'),
       startMinute,
       endMinute,

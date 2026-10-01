@@ -45,6 +45,7 @@ describe('独自月カレンダー表示', () => {
         items={[{
           id: 'series-1:recurrence:2026-09-21',
           eventId: 'series-1',
+          originalOccurrenceDate: '2026-09-21',
           title: '通院',
           temporalLabel: '10:00',
           accessibilityLabel: '通院、10:00、繰り返し予定',
@@ -55,7 +56,7 @@ describe('独自月カレンダー表示', () => {
 
     await user.press(view.getByRole('button', { name: '通院、10:00、繰り返し予定' }));
 
-    expect(onEditEvent).toHaveBeenCalledWith('series-1');
+    expect(onEditEvent).toHaveBeenCalledWith('series-1', '2026-09-21');
   });
 
   it('月曜日から日曜日の見出しと7列6行の日付を表示して選択できる', async () => {

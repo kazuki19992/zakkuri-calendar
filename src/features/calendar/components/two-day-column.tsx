@@ -17,7 +17,7 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
   variant?: 'summary' | 'timeline';
   scale?: number;
   nowTop?: number | null;
-  onEditEvent?(id: string): void;
+  onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
 }>) {
   const theme = useTheme();
@@ -105,7 +105,11 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
           <Pressable key={item.id}
             testID={item.kind === 'fuzzyRange' ? `two-day-calendar.fuzzy-range.${item.id}` : undefined}
             accessibilityRole="button" accessibilityLabel={item.accessibilityLabel}
-            onPress={() => item.eventId === null ? undefined : onEditEvent?.(item.eventId)}
+            onPress={() => item.eventId === null
+              ? undefined
+              : item.originalOccurrenceDate === undefined
+                ? onEditEvent?.(item.eventId)
+                : onEditEvent?.(item.eventId, item.originalOccurrenceDate)}
             style={[
               styles.item,
               { backgroundColor: theme.calendarEvent },

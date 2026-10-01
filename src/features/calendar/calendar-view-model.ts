@@ -14,6 +14,7 @@ export type AgendaItemViewModel = Readonly<{
   kind?: 'fuzzyRange';
   id: string;
   eventId: string;
+  originalOccurrenceDate?: string;
   title: string;
   temporalLabel: string;
   rangeLabel?: string;
@@ -78,7 +79,10 @@ export function createAgendaItems(
     return {
       ...(isFuzzyRange ? { kind: 'fuzzyRange' as const } : {}),
       id: occurrence.key,
-      eventId: occurrence.eventId,
+      eventId: occurrence.occurrenceIdentity?.seriesEventId ?? occurrence.eventId,
+      ...(occurrence.occurrenceIdentity === null
+        ? {}
+        : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),
       title: event.title,
       temporalLabel,
       ...(rangeLabel === null ? {} : { rangeLabel }),
@@ -87,6 +91,10 @@ export function createAgendaItems(
         temporalLabel,
         isFuzzyRange ? '相対予定' : null,
         occurrence.isRecurring ? '繰り返し予定' : null,
+        occurrence.occurrenceIdentity !== null
+          && occurrence.eventId !== occurrence.occurrenceIdentity.seriesEventId
+          ? '個別に変更済み'
+          : null,
       ].filter((label): label is string => label !== null).join('、'),
     };
   });

@@ -53,7 +53,12 @@ function createDependencies() {
   const events: jest.Mocked<EventRepository> = {
     create: jest.fn(),
     getById: jest.fn(),
-    listByAnchorRange: jest.fn().mockResolvedValue([event]),
+    listByAnchorRange: jest.fn(),
+    listSchedule: jest.fn().mockResolvedValue({ events: [event], exceptions: [], replacementEvents: [] }),
+    getOccurrenceEditData: jest.fn(),
+    saveOccurrenceException: jest.fn(),
+    deleteOccurrenceException: jest.fn(),
+    applyRecurrenceMutation: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   };
@@ -112,7 +117,7 @@ describe('カレンダー表示の状態調整', () => {
         end: { type: 'never' },
       },
     };
-    dependencies.events.listByAnchorRange.mockResolvedValue([recurringEvent]);
+    dependencies.events.listSchedule.mockResolvedValue({ events: [recurringEvent], exceptions: [], replacementEvents: [] });
     const { result } = await renderHook(() => useCalendarView({
       ...dependencies,
       weekStartsOn: 1,
@@ -168,7 +173,7 @@ describe('カレンダー表示の状態調整', () => {
     });
     // スワイプ用予備列(既定1日ずつ)の分だけ、表示2日より前後へ広げて取得する。
     // 前日側はさらに、日跨ぎ予定の継続描画のため1日分広げる。
-    expect(dependencies.events.listByAnchorRange).toHaveBeenCalledWith(
+    expect(dependencies.events.listSchedule).toHaveBeenCalledWith(
       calendar.id,
       '2026-09-06',
       '2026-09-10',
@@ -388,7 +393,7 @@ describe('カレンダー表示の状態調整', () => {
       useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
     );
     await waitFor(() => expect(result.current.status).toBe('ready'));
-    dependencies.events.listByAnchorRange.mockRejectedValueOnce(new Error('database unavailable'));
+    dependencies.events.listSchedule.mockRejectedValueOnce(new Error('database unavailable'));
 
     await act(async () => expect(await result.current.showDate('2026-10-15')).toBe(false));
 
@@ -418,7 +423,7 @@ describe('カレンダー表示の状態調整', () => {
       datePickerError: null,
       isDatePickerLoading: false,
     });
-    expect(dependencies.events.listByAnchorRange).toHaveBeenLastCalledWith(
+    expect(dependencies.events.listSchedule).toHaveBeenLastCalledWith(
       calendar.id,
       '2026-09-28',
       '2026-11-08',
@@ -431,7 +436,7 @@ describe('カレンダー表示の状態調整', () => {
       useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
     );
     await waitFor(() => expect(result.current.status).toBe('ready'));
-    dependencies.events.listByAnchorRange.mockRejectedValueOnce(new Error('database unavailable'));
+    dependencies.events.listSchedule.mockRejectedValueOnce(new Error('database unavailable'));
 
     await act(async () =>
       expect(await result.current.loadDatePickerMonth('2026-10-01')).toBe(false));
@@ -455,7 +460,7 @@ describe('カレンダー表示の状態調整', () => {
     await act(async () => expect(await result.current.selectMode('month')).toBe(true));
     expect(result.current.mode).toBe('month');
     expect(result.current.monthDays).toHaveLength(42);
-    expect(dependencies.events.listByAnchorRange).toHaveBeenLastCalledWith(
+    expect(dependencies.events.listSchedule).toHaveBeenLastCalledWith(
       calendar.id,
       '2026-08-31',
       '2026-10-11',
@@ -471,7 +476,7 @@ describe('カレンダー表示の状態調整', () => {
       useCalendarView({ ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12) }),
     );
     await waitFor(() => expect(result.current.status).toBe('ready'));
-    dependencies.events.listByAnchorRange.mockRejectedValueOnce(new Error('database unavailable'));
+    dependencies.events.listSchedule.mockRejectedValueOnce(new Error('database unavailable'));
 
     await act(async () => expect(await result.current.showNextPeriod()).toBe(false));
 
@@ -502,21 +507,21 @@ describe('カレンダー表示の状態調整', () => {
     await act(async () => result.current.showNextPeriod());
     await act(async () => expect(await result.current.showToday()).toBe(true));
     expect(result.current.anchorDate).toBe('2026-09-08');
-    const calls = dependencies.events.listByAnchorRange.mock.calls.length;
+    const calls = dependencies.events.listSchedule.mock.calls.length;
 
     await rerender({ revision: 1 });
     await waitFor(() =>
-      expect(dependencies.events.listByAnchorRange).toHaveBeenCalledTimes(calls + 1),
+      expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(calls + 1),
     );
   });
 
   it('古い非同期応答は新しい再取得結果を上書きしない', async () => {
     const dependencies = createDependencies();
-    const oldRequest = createDeferred<CalendarEvent[]>();
+    const oldRequest = createDeferred<{ events: CalendarEvent[]; exceptions: []; replacementEvents: [] }>();
     const refreshedEvent = { ...event, id: 'event-refreshed', title: '更新後の予定' };
-    dependencies.events.listByAnchorRange
+    dependencies.events.listSchedule
       .mockReturnValueOnce(oldRequest.promise)
-      .mockResolvedValueOnce([refreshedEvent]);
+      .mockResolvedValueOnce({ events: [refreshedEvent], exceptions: [], replacementEvents: [] });
     const { result, rerender } = await renderHook(
       ({ revision }: { revision: number }) =>
         useCalendarView({
@@ -533,7 +538,7 @@ describe('カレンダー表示の状態調整', () => {
     expect(result.current.twoDayDays[1].timelineItems[0]?.title).toBe('更新後の予定');
 
     await act(async () => {
-      oldRequest.resolve([event]);
+      oldRequest.resolve({ events: [event], exceptions: [], replacementEvents: [] });
       await Promise.resolve();
     });
     expect(result.current.twoDayDays[1].timelineItems[0]?.title).toBe('更新後の予定');
@@ -541,7 +546,7 @@ describe('カレンダー表示の状態調整', () => {
 
   it('期間移動中の再取得が完了すると読み込み中を解除する', async () => {
     const dependencies = createDependencies();
-    const transitionRequest = createDeferred<CalendarEvent[]>();
+    const transitionRequest = createDeferred<{ events: CalendarEvent[]; exceptions: []; replacementEvents: [] }>();
     const { result, rerender } = await renderHook(
       ({ revision }: { revision: number }) =>
         useCalendarView({
@@ -553,9 +558,9 @@ describe('カレンダー表示の状態調整', () => {
       { initialProps: { revision: 0 } },
     );
     await waitFor(() => expect(result.current.status).toBe('ready'));
-    dependencies.events.listByAnchorRange
+    dependencies.events.listSchedule
       .mockReturnValueOnce(transitionRequest.promise)
-      .mockResolvedValueOnce([event]);
+      .mockResolvedValueOnce({ events: [event], exceptions: [], replacementEvents: [] });
     let transitionResult!: Promise<boolean>;
 
     await act(async () => {
@@ -567,7 +572,7 @@ describe('カレンダー表示の状態調整', () => {
 
     await waitFor(() => expect(result.current.isPeriodLoading).toBe(false));
     expect(result.current.anchorDate).toBe('2026-09-08');
-    await act(async () => transitionRequest.resolve([event]));
+    await act(async () => transitionRequest.resolve({ events: [event], exceptions: [], replacementEvents: [] }));
     await expect(transitionResult).resolves.toBe(false);
   });
 });

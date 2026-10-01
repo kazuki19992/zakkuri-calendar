@@ -17,6 +17,12 @@ import {
 import type { Result } from '@/domain/shared/result';
 import type { CalendarEvent } from './event';
 import { isCalendarDate } from './month';
+import {
+  materializeOccurrenceReplacement,
+  type CalendarScheduleSnapshot,
+  type OccurrenceIdentity,
+  type RecurrenceException,
+} from './recurrence-exception';
 import type { RecurrenceRuleV1 } from './recurrence';
 import { toMinutesOfDay } from './time';
 
@@ -26,6 +32,7 @@ const MINUTES_PER_DAY = 24 * 60;
 export type EventOccurrence = Readonly<{
   key: string;
   eventId: string;
+  occurrenceIdentity: OccurrenceIdentity | null;
   occurrenceStartDate: string;
   occurrenceThroughDate: string;
   isRecurring: boolean;
@@ -79,10 +86,14 @@ function createOccurrence(
   event: CalendarEvent,
   startDate: string,
   isRecurring: boolean,
+  occurrenceIdentity: OccurrenceIdentity | null = isRecurring
+    ? { seriesEventId: event.id, originalOccurrenceDate: startDate }
+    : null,
 ): EventOccurrence {
   return {
     key: isRecurring ? `${event.id}:recurrence:${startDate}` : event.id,
     eventId: event.id,
+    occurrenceIdentity,
     occurrenceStartDate: startDate,
     occurrenceThroughDate: addCalendarDays(startDate, getOccurrenceSpanDays(event)),
     isRecurring,
@@ -279,22 +290,85 @@ function expandRecurringEvent(
   return occurrences.filter((occurrence) => intersectsRange(occurrence, from, through));
 }
 
-export function expandEventOccurrences(input: Readonly<{
-  events: readonly CalendarEvent[];
+type EventOccurrenceExpansionInput = Readonly<{
   from: string;
   through: string;
-}>): Result<readonly EventOccurrence[], EventOccurrenceExpansionError> {
+}> & (
+  | Readonly<{ events: readonly CalendarEvent[]; snapshot?: never }>
+  | Readonly<{ snapshot: CalendarScheduleSnapshot; events?: never }>
+);
+
+function exceptionKey(identity: OccurrenceIdentity): string {
+  return `${identity.seriesEventId}\u0000${identity.originalOccurrenceDate}`;
+}
+
+function getSeriesExpansionRange(
+  event: CalendarEvent,
+  exceptions: readonly RecurrenceException[],
+  from: string,
+  through: string,
+): Readonly<{ from: string; through: string }> {
+  const dates = exceptions
+    .filter((exception) => exception.seriesEventId === event.id)
+    .map((exception) => exception.originalOccurrenceDate);
+  return {
+    from: dates.reduce((minimum, date) => date < minimum ? date : minimum, from),
+    through: dates.reduce((maximum, date) => date > maximum ? date : maximum, through),
+  };
+}
+
+export function expandEventOccurrences(
+  input: EventOccurrenceExpansionInput,
+): Result<readonly EventOccurrence[], EventOccurrenceExpansionError> {
   if (!isCalendarDate(input.from)) return fail('from', 'from must be a real calendar date');
   if (!isCalendarDate(input.through)) return fail('through', 'through must be a real calendar date');
   if (input.from > input.through) return fail('range', 'from must not be after through');
 
-  const occurrences = input.events.flatMap((event) => {
+  const snapshot = 'snapshot' in input && input.snapshot !== undefined
+    ? input.snapshot
+    : { events: input.events, exceptions: [], replacementEvents: [] };
+  const replacementById = new Map(snapshot.replacementEvents.map((event) => [event.id, event]));
+  const exceptionByIdentity = new Map(
+    snapshot.exceptions.map((exception) => [exceptionKey(exception), exception]),
+  );
+  if (snapshot.exceptions.some((exception) =>
+    exception.kind === 'replaced' && !replacementById.has(exception.replacementEventId ?? ''))) {
+    return fail('exceptions', 'replacement event must exist');
+  }
+
+  const sourceOccurrences = snapshot.events.flatMap((event) => {
     if (event.recurrenceRule !== null) {
-      return expandRecurringEvent(event, input.from, input.through);
+      const range = getSeriesExpansionRange(event, snapshot.exceptions, input.from, input.through);
+      return expandRecurringEvent(event, range.from, range.through);
     }
     const occurrence = createOccurrence(event, event.anchorDate, false);
     return intersectsRange(occurrence, input.from, input.through) ? [occurrence] : [];
   });
+
+  const occurrences = sourceOccurrences.flatMap((occurrence): readonly EventOccurrence[] => {
+    if (occurrence.occurrenceIdentity === null) return [occurrence];
+    const exception = exceptionByIdentity.get(exceptionKey(occurrence.occurrenceIdentity));
+    if (exception === undefined) return [occurrence];
+    if (exception.kind === 'deleted') return [];
+    const replacementEvent = replacementById.get(exception.replacementEventId ?? '');
+    if (replacementEvent === undefined) return [];
+    const event = materializeOccurrenceReplacement({
+      seriesEvent: occurrence.event,
+      replacementEvent,
+      overrideFields: exception.overrideFields,
+      occurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate,
+    });
+    const replacementOccurrence = createOccurrence(
+      event,
+      event.anchorDate,
+      true,
+      occurrence.occurrenceIdentity,
+    );
+    return [{
+      ...replacementOccurrence,
+      key: `${occurrence.key}:replacement`,
+    }];
+  }).filter((occurrence) => intersectsRange(occurrence, input.from, input.through));
 
   occurrences.sort((left, right) =>
     left.occurrenceStartDate.localeCompare(right.occurrenceStartDate)

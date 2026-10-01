@@ -9,11 +9,22 @@ import {
   type ExactDuration,
 } from '@/domain/calendar/event';
 import type { EventAggregate } from '@/domain/calendar/event-reminder';
+import {
+  buildSeriesScopedAggregate,
+  getChangedEventFields,
+  planFollowingMutation,
+  planSeriesMutation,
+} from '@/domain/calendar/recurrence-change';
+import {
+  materializeOccurrenceReplacement,
+  type EventOverrideField,
+} from '@/domain/calendar/recurrence-exception';
 import { offsetCalendarDate } from '@/domain/calendar/month';
 import type { RecurrenceRuleV1 } from '@/domain/calendar/recurrence';
 import type {
   CalendarRepository,
   EventRepository,
+  OccurrenceEditData,
   SettingsRepository,
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
@@ -38,6 +49,11 @@ import {
   type RecurrencePreset,
   type ReminderDraft,
 } from '../event-editor-model';
+import {
+  createScopeRequest,
+  type RecurrenceEditScope,
+  type ScopeRequest,
+} from '../recurrence-edit-model';
 
 type EditorStatus = 'loading' | 'ready' | 'error';
 
@@ -71,6 +87,8 @@ export type EventEditorState = Readonly<{
   saveError: string | null;
   isSaving: boolean;
   isDeleting: boolean;
+  usesRecurrenceScope: boolean;
+  scopeRequest: ScopeRequest | null;
   setTitle(value: string): void;
   setEditorTab(value: EventEditorTab): void;
   setAllDay(value: boolean): void;
@@ -95,6 +113,8 @@ export type EventEditorState = Readonly<{
   retry(): void;
   save(): Promise<boolean>;
   remove(): Promise<boolean>;
+  selectScope(scope: RecurrenceEditScope): Promise<boolean>;
+  cancelScope(): void;
 }>;
 
 type UseEventEditorInput = Readonly<{
@@ -110,6 +130,7 @@ type UseEventEditorInput = Readonly<{
   }>;
   initialTab?: EventEditorTab;
   eventId?: string;
+  occurrenceDate?: string;
   createId?: () => string;
   createReminderId?: () => string;
   now?: () => string;
@@ -134,6 +155,7 @@ export function useEventEditor({
   initial,
   initialTab,
   eventId,
+  occurrenceDate,
   createId = Crypto.randomUUID,
   createReminderId = Crypto.randomUUID,
   now = defaultNow,
@@ -144,6 +166,9 @@ export function useEventEditor({
   const [newEventId] = useState(() => createId());
   const [status, setStatus] = useState<EditorStatus>('loading');
   const [existingAggregate, setExistingAggregate] = useState<EventAggregate | null>(null);
+  const [occurrenceEditData, setOccurrenceEditData] = useState<OccurrenceEditData | null>(null);
+  const [pendingAggregate, setPendingAggregate] = useState<EventAggregate | null>(null);
+  const [scopeRequest, setScopeRequest] = useState<ScopeRequest | null>(null);
   const [calendarId, setCalendarId] = useState<string | null>(null);
   const [calendarName, setCalendarName] = useState('');
   const [calendarColorId, setCalendarColorId] = useState<EventColorId>('blue');
@@ -184,15 +209,50 @@ export function useEventEditor({
     let active = true;
     const load = async (): Promise<void> => {
       try {
-        const [calendar, loadedAggregate, savedTab, deadlineWeekday] = await Promise.all([
+        const [calendar, loadedValue, savedTab, deadlineWeekday] = await Promise.all([
           calendars.getDefault(),
-          eventId === undefined ? Promise.resolve(null) : events.getById(eventId),
+          eventId === undefined
+            ? Promise.resolve(null)
+            : occurrenceDate === undefined
+              ? events.getById(eventId)
+              : events.getOccurrenceEditData({
+                seriesEventId: eventId,
+                originalOccurrenceDate: occurrenceDate,
+              }),
           eventId === undefined && initialEditorTab === undefined
             ? settings.getLastEventEditorTab()
             : Promise.resolve(null),
           settings.getThisWeekDeadlineWeekday(),
         ]);
         if (!active) return;
+        const loadedOccurrenceData = occurrenceDate === undefined
+          ? null
+          : loadedValue as OccurrenceEditData | null;
+        let loadedAggregate = occurrenceDate === undefined
+          ? loadedValue as EventAggregate | null
+          : null;
+        if (loadedOccurrenceData !== null && occurrenceDate !== undefined) {
+          const replacement = loadedOccurrenceData.replacement?.event
+            ?? loadedOccurrenceData.series.event;
+          const fields = loadedOccurrenceData.exception?.overrideFields ?? [];
+          const materialized = materializeOccurrenceReplacement({
+            seriesEvent: loadedOccurrenceData.series.event,
+            replacementEvent: replacement,
+            overrideFields: fields,
+            occurrenceDate,
+          });
+          loadedAggregate = {
+            event: {
+              ...materialized,
+              id: loadedOccurrenceData.series.event.id,
+              recurrenceRule: loadedOccurrenceData.series.event.recurrenceRule,
+            },
+            reminders: fields.includes('reminders')
+              ? loadedOccurrenceData.replacement?.reminders ?? []
+              : loadedOccurrenceData.series.reminders,
+          };
+          setOccurrenceEditData(loadedOccurrenceData);
+        }
         if (eventId !== undefined && loadedAggregate === null) throw new Error('event not found');
         const targetCalendarId = loadedAggregate?.event.calendarId ?? calendar.id;
         let loadedDefinitions = await temporalDefinitions.listEnabled(targetCalendarId);
@@ -258,7 +318,8 @@ export function useEventEditor({
     };
     void load();
     return () => { active = false; };
-  }, [calendars, eventId, events, initialEditorTab, initialValues, loadRevision, settings, temporalDefinitions]);
+  }, [calendars, eventId, events, initialEditorTab, initialValues, loadRevision,
+    occurrenceDate, settings, temporalDefinitions]);
 
   const clearErrors = useCallback(() => {
     setTitleError(null);
@@ -437,7 +498,13 @@ export function useEventEditor({
     try {
       const aggregate = { event: parsedEvent.value, reminders: builtReminders.value };
       if (existingEvent === undefined) await events.create(aggregate);
-      else await events.update(aggregate);
+      else if (occurrenceEditData !== null && existingAggregate !== null) {
+        const recurrenceChanged = getChangedEventFields(existingAggregate, aggregate)
+          .includes('recurrence');
+        setPendingAggregate(aggregate);
+        setScopeRequest(createScopeRequest('save', recurrenceChanged));
+        return false;
+      } else await events.update(aggregate);
       return true;
     } catch {
       setSaveError('保存できませんでした。もう一度お試しください。');
@@ -448,10 +515,15 @@ export function useEventEditor({
     }
   }, [calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
     getTimeZoneId, isAllDay, location, newEventId, notes, now, recurrenceDraft, reminders,
-    definitions, relativeResolution, selectedDefinitionId, startDate, startTime, status, title]);
+    definitions, occurrenceEditData, relativeResolution, selectedDefinitionId,
+    startDate, startTime, status, title]);
 
   const remove = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || existingAggregate === null) return false;
+    if (occurrenceEditData !== null) {
+      setScopeRequest(createScopeRequest('delete', false));
+      return false;
+    }
     operationRef.current = true;
     setIsDeleting(true);
     setSaveError(null);
@@ -465,7 +537,119 @@ export function useEventEditor({
       operationRef.current = false;
       setIsDeleting(false);
     }
-  }, [events, existingAggregate]);
+  }, [events, existingAggregate, occurrenceEditData]);
+
+  const cancelScope = useCallback(() => {
+    setScopeRequest(null);
+    setPendingAggregate(null);
+  }, []);
+
+  const selectScope = useCallback(async (scope: RecurrenceEditScope): Promise<boolean> => {
+    if (operationRef.current || scopeRequest === null || occurrenceEditData === null
+        || existingAggregate === null
+        || occurrenceDate === undefined) return false;
+    operationRef.current = true;
+    const deleting = scopeRequest.operation === 'delete';
+    if (deleting) setIsDeleting(true);
+    else setIsSaving(true);
+    setSaveError(null);
+    try {
+      const identity = {
+        seriesEventId: occurrenceEditData.series.event.id,
+        originalOccurrenceDate: occurrenceDate,
+      };
+      if (deleting && scope === 'occurrence') {
+        await events.deleteOccurrenceException({
+          identity,
+          expectedSeriesUpdatedAt: occurrenceEditData.series.event.updatedAt,
+          now: now(),
+        });
+      } else if (!deleting && scope === 'occurrence' && pendingAggregate !== null) {
+        const seriesOccurrence = buildSeriesScopedAggregate({
+          series: occurrenceEditData.series,
+          occurrenceDate,
+          displayed: pendingAggregate,
+          submitted: pendingAggregate,
+        });
+        const overrideFields = getChangedEventFields(seriesOccurrence, pendingAggregate)
+          .filter((field): field is EventOverrideField => field !== 'recurrence');
+        const replacementId = occurrenceEditData.replacement?.event.id ?? newEventId;
+        await events.saveOccurrenceException({
+          identity,
+          replacement: {
+            event: { ...pendingAggregate.event, id: replacementId, recurrenceRule: null },
+            reminders: pendingAggregate.reminders.map((reminder) => ({
+              ...reminder,
+              eventId: replacementId,
+            })),
+          },
+          overrideFields,
+          expectedSeriesUpdatedAt: occurrenceEditData.series.event.updatedAt,
+          now: now(),
+        });
+      } else {
+        const editorAggregate = pendingAggregate ?? existingAggregate;
+        const submitted = buildSeriesScopedAggregate({
+          series: occurrenceEditData.series,
+          occurrenceDate,
+          displayed: existingAggregate,
+          submitted: editorAggregate,
+        });
+        let plan = scope === 'following'
+          ? planFollowingMutation({
+            series: occurrenceEditData.series,
+            boundaryDate: occurrenceDate,
+            submitted,
+            exceptions: occurrenceEditData.exceptions,
+            createSeriesId: createId,
+            now: now(),
+          })
+          : planSeriesMutation({
+            series: occurrenceEditData.series,
+            boundaryDate: occurrenceDate,
+            submitted,
+            exceptions: occurrenceEditData.exceptions,
+            now: now(),
+          });
+        if (deleting) {
+          const affected = scope === 'following'
+            ? occurrenceEditData.exceptions.filter((exception) =>
+              exception.originalOccurrenceDate >= occurrenceDate)
+            : occurrenceEditData.exceptions;
+          plan = {
+            ...plan,
+            removePreviousSeries: scope === 'series' || plan.removePreviousSeries,
+            nextSeries: null,
+            upsertExceptions: [],
+            deleteExceptionIdentities: affected.map((exception) => ({
+              seriesEventId: exception.seriesEventId,
+              originalOccurrenceDate: exception.originalOccurrenceDate,
+            })),
+            deleteReplacementEventIds: affected.flatMap((exception) =>
+              exception.replacementEventId === null ? [] : [exception.replacementEventId]),
+          };
+        }
+        await events.applyRecurrenceMutation({
+          seriesId: occurrenceEditData.series.event.id,
+          expectedSeriesUpdatedAt: occurrenceEditData.series.event.updatedAt,
+          plan,
+        });
+      }
+      setScopeRequest(null);
+      setPendingAggregate(null);
+      return true;
+    } catch {
+      setSaveError(deleting
+        ? '削除できませんでした。もう一度お試しください。'
+        : '保存できませんでした。もう一度お試しください。');
+      return false;
+    } finally {
+      operationRef.current = false;
+      setIsSaving(false);
+      setIsDeleting(false);
+    }
+  }, [createId, events, existingAggregate, newEventId, now, occurrenceDate,
+    occurrenceEditData, pendingAggregate, scopeRequest]);
 
   return {
     status,
@@ -497,6 +681,8 @@ export function useEventEditor({
     saveError,
     isSaving,
     isDeleting,
+    usesRecurrenceScope: occurrenceEditData !== null,
+    scopeRequest,
     setTitle,
     setEditorTab,
     setAllDay,
@@ -521,5 +707,7 @@ export function useEventEditor({
     retry,
     save,
     remove,
+    selectScope,
+    cancelScope,
   };
 }

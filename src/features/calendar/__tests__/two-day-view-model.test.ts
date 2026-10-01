@@ -50,6 +50,7 @@ function asOccurrence(event: CalendarEvent): EventOccurrence {
   return {
     key: event.id,
     eventId: event.id,
+    occurrenceIdentity: null,
     occurrenceStartDate: event.anchorDate,
     occurrenceThroughDate: event.temporalType === 'allDay' || event.temporalType === 'fuzzy'
       ? event.endDate
@@ -77,6 +78,7 @@ describe('2日表示の表示用モデル', () => {
     const occurrences: readonly EventOccurrence[] = ['2026-09-30', '2026-10-01'].map((date) => ({
       key: `series-1:recurrence:${date}`,
       eventId: 'series-1',
+      occurrenceIdentity: { seriesEventId: 'series-1', originalOccurrenceDate: date },
       occurrenceStartDate: date,
       occurrenceThroughDate: date,
       isRecurring: true,

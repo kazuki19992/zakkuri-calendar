@@ -172,8 +172,8 @@ function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): reado
 async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Promise<CalendarSnapshot> {
   const calendar = await input.calendars.getDefault();
   const range = getTargetRange(target, input.weekStartsOn);
-  const [events, isCalendarVisible, undeterminedFadeMinutes] = await Promise.all([
-    input.events.listByAnchorRange(calendar.id, range.from, range.through),
+  const [schedule, isCalendarVisible, undeterminedFadeMinutes] = await Promise.all([
+    input.events.listSchedule(calendar.id, range.from, range.through),
     input.settings.getCalendarVisible(calendar.id),
     input.settings.getUndeterminedFadeMinutes(),
   ]);
@@ -184,7 +184,7 @@ async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Pr
       result: input.holidayProvider.list(monthRange.from, monthRange.through),
     };
   });
-  const expanded = expandEventOccurrences({ events, from: range.from, through: range.through });
+  const expanded = expandEventOccurrences({ snapshot: schedule, from: range.from, through: range.through });
   if (!expanded.ok) throw new Error('event occurrence expansion failed');
   const occurrences = expanded.value;
   const fuzzyDefinitionIds = [

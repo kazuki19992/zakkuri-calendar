@@ -21,7 +21,7 @@ import { TWO_DAY_SWIPE_BUFFER_DAYS } from '../two-day-view-model';
 export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt, onOpenSettings }: Readonly<{
   state: CalendarViewState;
   onAddEvent(date: string): void;
-  onEditEvent?(id: string): void;
+  onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
   onOpenSettings?(): void;
 }>) {

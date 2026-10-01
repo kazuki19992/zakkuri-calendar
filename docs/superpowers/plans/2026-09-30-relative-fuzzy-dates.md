@@ -406,6 +406,6 @@ git commit -m "docs: 相対日付の実装内容へ仕様を同期"
 
 reviewerへbase SHA、head SHA、本plan、designを渡す。Critical・Importantは修正して再検証する。
 
-- [ ] **Step 7: branchをpushし、`develop`向けOpen PRを作成する**
+- [x] **Step 7: branchをpushし、`develop`向けOpen PRを作成する**
 
 PR本文へ目的、設計判断、全検証結果、実機未確認事項、`Closes #25`を日本語で記載する。worktreeはmergeまで保持する。

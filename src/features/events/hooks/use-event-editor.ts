@@ -10,6 +10,7 @@ import {
 } from '@/domain/calendar/event';
 import type { EventAggregate } from '@/domain/calendar/event-reminder';
 import {
+  buildSeriesScopedAggregate,
   getChangedEventFields,
   planFollowingMutation,
   planSeriesMutation,
@@ -514,7 +515,7 @@ export function useEventEditor({
     }
   }, [calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
     getTimeZoneId, isAllDay, location, newEventId, notes, now, recurrenceDraft, reminders,
-    definitions, existingAggregate, occurrenceEditData, relativeResolution, selectedDefinitionId,
+    definitions, occurrenceEditData, relativeResolution, selectedDefinitionId,
     startDate, startTime, status, title]);
 
   const remove = useCallback(async (): Promise<boolean> => {
@@ -564,7 +565,13 @@ export function useEventEditor({
           now: now(),
         });
       } else if (!deleting && scope === 'occurrence' && pendingAggregate !== null) {
-        const overrideFields = getChangedEventFields(existingAggregate, pendingAggregate)
+        const seriesOccurrence = buildSeriesScopedAggregate({
+          series: occurrenceEditData.series,
+          occurrenceDate,
+          displayed: pendingAggregate,
+          submitted: pendingAggregate,
+        });
+        const overrideFields = getChangedEventFields(seriesOccurrence, pendingAggregate)
           .filter((field): field is EventOverrideField => field !== 'recurrence');
         const replacementId = occurrenceEditData.replacement?.event.id ?? newEventId;
         await events.saveOccurrenceException({
@@ -581,7 +588,13 @@ export function useEventEditor({
           now: now(),
         });
       } else {
-        const submitted = pendingAggregate ?? existingAggregate;
+        const editorAggregate = pendingAggregate ?? existingAggregate;
+        const submitted = buildSeriesScopedAggregate({
+          series: occurrenceEditData.series,
+          occurrenceDate,
+          displayed: existingAggregate,
+          submitted: editorAggregate,
+        });
         let plan = scope === 'following'
           ? planFollowingMutation({
             series: occurrenceEditData.series,

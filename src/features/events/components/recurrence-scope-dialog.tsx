@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import type { RecurrenceEditScope, ScopeRequest } from '../recurrence-edit-model';
 
@@ -9,25 +11,48 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Rea
   onCancel(): void;
 }>) {
   const theme = useTheme();
+  const reduceMotion = useReduceMotion();
+  const [confirmationScope, setConfirmationScope] = useState<RecurrenceEditScope | null>(null);
   if (request === null) return null;
   const title = request.operation === 'delete' ? '削除する範囲' : '変更する範囲';
+  const confirmationLabel = confirmationScope === 'following'
+    ? 'これ以降の個別変更をリセットします'
+    : '現在のシリーズ全体の個別変更をリセットします';
   return (
-    <Modal transparent visible animationType="fade" onRequestClose={onCancel}>
+    <Modal transparent visible animationType={reduceMotion ? 'none' : 'fade'}
+      onRequestClose={() => { setConfirmationScope(null); onCancel(); }}>
       <View style={styles.overlay}>
         <Pressable accessibilityRole="button" accessibilityLabel="範囲選択をキャンセル"
-          disabled={busy} onPress={onCancel} style={StyleSheet.absoluteFill} />
+          disabled={busy} onPress={() => { setConfirmationScope(null); onCancel(); }}
+          style={StyleSheet.absoluteFill} />
         <View accessibilityViewIsModal style={[styles.dialog, {
           backgroundColor: theme.background,
           borderColor: theme.calendarBorder,
         }]}>
-          <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{title}</Text>
-          {request.needsExceptionResetConfirmation ? (
-            <Text style={[styles.warning, { color: theme.textSecondary }]}>対象範囲の個別変更はリセットされます</Text>
+          <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
+            {confirmationScope === null ? title : '個別変更のリセット'}
+          </Text>
+          {confirmationScope === null && request.needsExceptionResetConfirmation ? (
+            <Text style={[styles.warning, { color: theme.textSecondary }]}>
+              1件だけの予定には繰り返し設定を適用できません
+            </Text>
           ) : null}
-          {request.options.map((option) => (
+          {confirmationScope !== null ? (
+            <>
+              <Text style={[styles.warning, { color: theme.textSecondary }]}>{confirmationLabel}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="リセットして変更"
+                accessibilityState={{ disabled: busy }} disabled={busy}
+                onPress={() => { setConfirmationScope(null); onSelect(confirmationScope); }}
+                style={[styles.option, { borderTopColor: theme.calendarBorder }]}>
+                <Text style={{ color: theme.calendarAccent }}>リセットして変更</Text>
+              </Pressable>
+            </>
+          ) : request.options.map((option) => (
             <Pressable key={option.scope} accessibilityRole="button"
               accessibilityLabel={option.label} accessibilityState={{ disabled: busy }}
-              disabled={busy} onPress={() => onSelect(option.scope)}
+              disabled={busy} onPress={() => request.needsExceptionResetConfirmation
+                ? setConfirmationScope(option.scope)
+                : onSelect(option.scope)}
               style={[styles.option, { borderTopColor: theme.calendarBorder }]}>
               <Text style={{ color: request.operation === 'delete'
                 ? theme.calendarHoliday
@@ -35,7 +60,10 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Rea
             </Pressable>
           ))}
           <Pressable accessibilityRole="button" accessibilityLabel="キャンセル"
-            accessibilityState={{ disabled: busy }} disabled={busy} onPress={onCancel}
+            accessibilityState={{ disabled: busy }} disabled={busy}
+            onPress={confirmationScope === null
+              ? () => { setConfirmationScope(null); onCancel(); }
+              : () => setConfirmationScope(null)}
             style={[styles.option, { borderTopColor: theme.calendarBorder }]}>
             <Text style={{ color: theme.textSecondary }}>キャンセル</Text>
           </Pressable>

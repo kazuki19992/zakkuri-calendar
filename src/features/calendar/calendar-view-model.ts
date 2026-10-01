@@ -91,6 +91,10 @@ export function createAgendaItems(
         temporalLabel,
         isFuzzyRange ? '相対予定' : null,
         occurrence.isRecurring ? '繰り返し予定' : null,
+        occurrence.occurrenceIdentity !== null
+          && occurrence.eventId !== occurrence.occurrenceIdentity.seriesEventId
+          ? '個別に変更済み'
+          : null,
       ].filter((label): label is string => label !== null).join('、'),
     };
   });

@@ -256,6 +256,10 @@ export function createDayTimelineItems(input: Readonly<{
         temporalLabel,
         ...continuationLabels,
         occurrence.isRecurring ? '繰り返し予定' : null,
+        occurrence.occurrenceIdentity !== null
+          && occurrence.eventId !== occurrence.occurrenceIdentity.seriesEventId
+          ? '個別に変更済み'
+          : null,
       ].filter((label): label is string => label !== null).join('、'),
       startMinute,
       endMinute,

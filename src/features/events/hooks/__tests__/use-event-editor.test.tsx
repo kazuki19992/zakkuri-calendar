@@ -97,6 +97,60 @@ describe('予定編集の主要状態', () => {
     });
   });
 
+  it('既存の個別変更は無変更保存でmaskを維持する', async () => {
+    const repositories = createRepositories();
+    repositories.events.getOccurrenceEditData.mockResolvedValue({
+      series: exactAggregate,
+      exception: {
+        seriesEventId: exactEvent.id, originalOccurrenceDate: '2026-09-23', kind: 'replaced',
+        replacementEventId: 'replacement-1', overrideFields: ['title'],
+        createdAt: calendar.createdAt, updatedAt: calendar.updatedAt,
+      },
+      replacement: { event: { ...exactEvent, id: 'replacement-1', title: 'この回だけ',
+        anchorDate: '2026-09-23', recurrenceRule: null }, reminders: exactAggregate.reminders },
+      exceptions: [],
+    });
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories, initial, eventId: exactEvent.id, occurrenceDate: '2026-09-23',
+      now: () => '2026-09-20T00:00:00.000Z',
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { await result.current.save(); });
+    await act(async () => { await result.current.selectScope('occurrence'); });
+
+    expect(repositories.events.saveOccurrenceException).toHaveBeenCalledWith(
+      expect.objectContaining({ overrideFields: ['title'] }),
+    );
+  });
+
+  it('既存の個別値をこれ以降のシリーズへ広げない', async () => {
+    const repositories = createRepositories();
+    repositories.events.getOccurrenceEditData.mockResolvedValue({
+      series: exactAggregate,
+      exception: {
+        seriesEventId: exactEvent.id, originalOccurrenceDate: '2026-09-23', kind: 'replaced',
+        replacementEventId: 'replacement-1', overrideFields: ['title'],
+        createdAt: calendar.createdAt, updatedAt: calendar.updatedAt,
+      },
+      replacement: { event: { ...exactEvent, id: 'replacement-1', title: 'この回だけ',
+        anchorDate: '2026-09-23', recurrenceRule: null }, reminders: exactAggregate.reminders },
+      exceptions: [],
+    });
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories, initial, eventId: exactEvent.id, occurrenceDate: '2026-09-23',
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.setNotes('今回追加'); });
+    await act(async () => { await result.current.save(); });
+    await act(async () => { await result.current.selectScope('following'); });
+
+    expect(repositories.events.applyRecurrenceMutation).toHaveBeenCalledWith(expect.objectContaining({
+      plan: expect.objectContaining({ nextSeries: expect.objectContaining({
+        event: expect.objectContaining({ title: '歯医者', notes: '今回追加' }),
+      }) }),
+    }));
+  });
+
   it('相対定義を選ぶと期間をpreviewして繰り返しなしで保存する', async () => {
     const repositories = createRepositories();
     repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning, nextWeek]);

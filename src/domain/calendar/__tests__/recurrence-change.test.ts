@@ -2,6 +2,7 @@ import type { CalendarEvent } from '../event';
 import type { EventAggregate } from '../event-reminder';
 import type { RecurrenceException } from '../recurrence-exception';
 import {
+  buildSeriesScopedAggregate,
   getChangedEventFields,
   planFollowingMutation,
   planSeriesMutation,
@@ -35,6 +36,17 @@ describe('繰り返しシリーズの変更計画', () => {
     const before = aggregate();
     const after = aggregate({ title: '新しい定例会' });
     expect(getChangedEventFields(before, after)).toEqual(['title']);
+  });
+
+  test('既存の個別変更を広げず今回変更した値だけシリーズ基準へ適用する', () => {
+    const series = aggregate();
+    const displayed = aggregate({ title: 'この回だけ', anchorDate: '2026-10-12' });
+    const submitted = aggregate({
+      title: 'この回だけ', anchorDate: '2026-10-12', notes: '今回追加',
+    });
+
+    expect(buildSeriesScopedAggregate({ series, occurrenceDate: '2026-10-12', displayed, submitted }))
+      .toMatchObject({ event: { title: '定例会', notes: '今回追加', anchorDate: '2026-10-12' } });
   });
 
   test('これ以降では旧シリーズを境界直前で閉じ通常の新シリーズを作る', () => {
@@ -116,5 +128,31 @@ describe('繰り返しシリーズの変更計画', () => {
     expect(plan.deleteExceptionIdentities).toEqual([{
       seriesEventId: 'series-1', originalOccurrenceDate: '2026-10-19',
     }]);
+  });
+
+  test('月末シリーズの例外は日数ではなく発生順で移送する', () => {
+    const series = aggregate({
+      anchorDate: '2026-01-31',
+      recurrenceRule: { version: 1, frequency: 'monthly', interval: 1,
+        weekdays: [], end: { type: 'never' } },
+    });
+    const exception = { ...futureException, originalOccurrenceDate: '2026-05-31' };
+    const plan = planFollowingMutation({
+      series, boundaryDate: '2026-03-31',
+      submitted: aggregate({ ...series.event, anchorDate: '2026-04-01' }),
+      exceptions: [exception], createSeriesId: () => 'series-2', now: NOW,
+    });
+
+    expect(plan.upsertExceptions[0].originalOccurrenceDate).toBe('2026-05-01');
+  });
+
+  test('週次シリーズの日付移動は曜日集合も回転する', () => {
+    const plan = planFollowingMutation({
+      series: aggregate(), boundaryDate: '2026-10-12',
+      submitted: aggregate({ anchorDate: '2026-10-13' }), exceptions: [],
+      createSeriesId: () => 'series-2', now: NOW,
+    });
+
+    expect(plan.nextSeries?.event.recurrenceRule?.weekdays).toEqual([2]);
   });
 });

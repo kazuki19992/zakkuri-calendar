@@ -73,7 +73,7 @@ describe('月表示の表示用モデル', () => {
       originalOccurrenceDate: '2026-09-21',
       title: '敬老会',
       temporalLabel: '終日',
-      accessibilityLabel: '敬老会、終日、繰り返し予定',
+      accessibilityLabel: '敬老会、終日、繰り返し予定、個別に変更済み',
     }]);
   });
 

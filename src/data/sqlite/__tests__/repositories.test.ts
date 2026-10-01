@@ -108,6 +108,43 @@ describe('SQLite repositories', () => {
     });
     expect(db.all.mock.calls[1][0]).toContain('recurrence_exceptions');
     expect(db.all.mock.calls[2][0]).toContain('replacement_event_id');
+    expect(db.all.mock.calls[0][0]).toContain('replacement.anchor_date <= $through');
+  });
+
+  it('置換maskが空のときは例外と既存置換予定を削除する', async () => {
+    const db = createTransactionDatabaseDouble();
+    db.first.mockResolvedValue(eventRow);
+    db.all.mockResolvedValue([]);
+    const previous: RecurrenceExceptionRow = {
+      series_event_id: exactEvent.id, original_occurrence_date: '2026-09-14',
+      kind: 'replaced', replacement_event_id: 'replacement-1', override_fields_json: '["title"]',
+      created_at: now, updated_at: now,
+    };
+    const transactionFirst = jest.fn()
+      .mockResolvedValueOnce(eventRow)
+      .mockResolvedValueOnce(previous);
+    const transaction = { ...db.database, first: transactionFirst, all: jest.fn().mockResolvedValue([]),
+      run: db.transactionRun } as AppDatabase;
+    db.exclusiveTransaction.mockImplementation(async (task: (handle: AppDatabase) => Promise<void>) => {
+      await task(transaction);
+    });
+
+    await new SqliteEventRepository(db.database).saveOccurrenceException({
+      identity: { seriesEventId: exactEvent.id, originalOccurrenceDate: '2026-09-14' },
+      replacement: { event: { ...exactEvent, id: 'replacement-1', recurrenceRule: null }, reminders: [] },
+      overrideFields: [], expectedSeriesUpdatedAt: now, now,
+    });
+
+    expect(db.transactionRun).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM recurrence_exceptions'),
+      expect.objectContaining({ $seriesEventId: exactEvent.id }),
+    );
+    expect(db.transactionRun).not.toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO recurrence_exceptions'), expect.anything(),
+    );
+    expect(db.transactionRun).toHaveBeenCalledWith('DELETE FROM events WHERE id = $id', {
+      $id: 'replacement-1',
+    });
   });
 
   it('予定と正規化済み通知を専用transaction handleで一体作成する', async () => {
@@ -176,6 +213,17 @@ describe('SQLite repositories', () => {
     expect(db.all.mock.calls[0][0]).toContain('ORDER BY sort_order, id');
   });
 
+  it('繰り返し規則に存在しない発生日の編集導線を拒否する', async () => {
+    const db = createDatabaseDouble();
+    db.first.mockResolvedValue(eventRow);
+    db.all.mockResolvedValue([]);
+
+    await expect(new SqliteEventRepository(db.database).getOccurrenceEditData({
+      seriesEventId: exactEvent.id,
+      originalOccurrenceDate: '2026-09-15',
+    })).resolves.toBeNull();
+  });
+
   it('予定更新で通知を置換し、通知書込みの失敗をtransactionから返す', async () => {
     const db = createTransactionDatabaseDouble();
     const events = new SqliteEventRepository(db.database);
@@ -189,12 +237,14 @@ describe('SQLite repositories', () => {
     await expect(events.update({ event: exactEvent, reminders: [reminder10] })).rejects.toThrow('write failed');
   });
 
-  it('削除対象の予定の通知だけを先に同じtransactionで削除する', async () => {
+  it('シリーズ削除時は置換予定も同じtransactionで削除する', async () => {
     const db = createTransactionDatabaseDouble();
+    db.all.mockResolvedValue([{ replacement_event_id: 'replacement-1' }]);
     await new SqliteEventRepository(db.database).delete(exactEvent.id);
     expect(db.run).not.toHaveBeenCalled();
     expect(db.transactionRun).toHaveBeenNthCalledWith(1, expect.stringContaining('DELETE FROM event_reminders'), { $eventId: exactEvent.id });
     expect(db.transactionRun).toHaveBeenNthCalledWith(2, expect.stringContaining('DELETE FROM events'), { $id: exactEvent.id });
+    expect(db.transactionRun).toHaveBeenCalledWith('DELETE FROM events WHERE id = $id', { $id: 'replacement-1' });
   });
 
   it.each([[null, { type: 'instant' }], [{ value_json: 'private broken value' }, { type: 'instant' }]])(

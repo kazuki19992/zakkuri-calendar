@@ -24,4 +24,24 @@ describe('繰り返し予定の範囲選択dialog', () => {
     await user.press(view.getByLabelText('キャンセル'));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
+
+  test('規則変更は範囲選択後に例外resetを確認する', async () => {
+    const onSelect = jest.fn();
+    const user = userEvent.setup();
+    const view = await render(<RecurrenceScopeDialog request={{
+      operation: 'save',
+      options: [
+        { scope: 'following', label: 'これ以降の予定' },
+        { scope: 'series', label: 'すべての予定' },
+      ],
+      needsExceptionResetConfirmation: true,
+    }} busy={false} onSelect={onSelect} onCancel={jest.fn()} />);
+
+    expect(view.getByText('1件だけの予定には繰り返し設定を適用できません')).toBeOnTheScreen();
+    await user.press(view.getByLabelText('これ以降の予定'));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(view.getByText('これ以降の個別変更をリセットします')).toBeOnTheScreen();
+    await user.press(view.getByLabelText('リセットして変更'));
+    expect(onSelect).toHaveBeenCalledWith('following');
+  });
 });

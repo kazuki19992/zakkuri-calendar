@@ -20,7 +20,8 @@ import {
   type RecurrenceExceptionRow,
   type ReminderRow,
 } from './row-mappers';
-import type { EventOverrideField, OccurrenceIdentity, RecurrenceException } from '@/domain/calendar/recurrence-exception';
+import type { OccurrenceIdentity, RecurrenceException } from '@/domain/calendar/recurrence-exception';
+import { expandEventOccurrences } from '@/domain/calendar/event-occurrence';
 
 type NormalizedEventAggregate = Readonly<{
   event: CalendarEvent;
@@ -194,6 +195,24 @@ async function assertSeriesRevision(
   if (result.changes !== 1) throw new Error('Recurring event changed while editing');
 }
 
+async function loadValidOccurrence(
+  database: AppDatabase,
+  identity: OccurrenceIdentity,
+): Promise<EventAggregate | null> {
+  const series = await loadAggregate(database, identity.seriesEventId);
+  if (series === null || series.event.recurrenceRule === null) return null;
+  const expanded = expandEventOccurrences({
+    events: [series.event],
+    from: identity.originalOccurrenceDate,
+    through: identity.originalOccurrenceDate,
+  });
+  if (!expanded.ok || !expanded.value.some((occurrence) =>
+    occurrence.occurrenceIdentity?.originalOccurrenceDate === identity.originalOccurrenceDate)) {
+    return null;
+  }
+  return series;
+}
+
 export class SqliteEventRepository implements EventRepository {
   constructor(private readonly database: AppDatabase) {}
 
@@ -228,14 +247,22 @@ export class SqliteEventRepository implements EventRepository {
   async listSchedule(calendarId: string, from: string, through: string) {
     const eventRows = await this.database.all<EventRow>(
       `SELECT events.* FROM events
-       WHERE calendar_id = $calendarId
+       WHERE events.calendar_id = $calendarId
          AND NOT EXISTS (
            SELECT 1 FROM recurrence_exceptions
            WHERE replacement_event_id = events.id
          )
          AND (
-           (anchor_date <= $through AND COALESCE(end_date, anchor_date) >= $from)
-           OR (recurrence_rule_json IS NOT NULL AND anchor_date <= $through)
+           (events.anchor_date <= $through AND COALESCE(events.end_date, events.anchor_date) >= $from)
+           OR (events.recurrence_rule_json IS NOT NULL AND events.anchor_date <= $through)
+           OR EXISTS (
+             SELECT 1 FROM recurrence_exceptions AS moved_exception
+             JOIN events AS replacement
+               ON replacement.id = moved_exception.replacement_event_id
+             WHERE moved_exception.series_event_id = events.id
+               AND replacement.anchor_date <= $through
+               AND COALESCE(replacement.end_date, replacement.anchor_date) >= $from
+           )
          )
        ORDER BY anchor_date, start_time, created_at, id`,
       { $calendarId: calendarId, $from: from, $through: through },
@@ -264,8 +291,8 @@ export class SqliteEventRepository implements EventRepository {
   }
 
   async getOccurrenceEditData(identity: OccurrenceIdentity): Promise<OccurrenceEditData | null> {
-    const series = await loadAggregate(this.database, identity.seriesEventId);
-    if (series === null || series.event.recurrenceRule === null) return null;
+    const series = await loadValidOccurrence(this.database, identity);
+    if (series === null) return null;
     const rows = await this.database.all<RecurrenceExceptionRow>(
       `SELECT * FROM recurrence_exceptions
        WHERE series_event_id = $seriesEventId
@@ -288,6 +315,8 @@ export class SqliteEventRepository implements EventRepository {
         command.identity.seriesEventId,
         command.expectedSeriesUpdatedAt,
       );
+      const series = await loadValidOccurrence(transaction, command.identity);
+      if (series === null) throw new Error('Occurrence no longer exists');
       const previous = await transaction.first<RecurrenceExceptionRow>(
         `SELECT * FROM recurrence_exceptions
          WHERE series_event_id = $seriesEventId
@@ -297,6 +326,28 @@ export class SqliteEventRepository implements EventRepository {
           $originalOccurrenceDate: command.identity.originalOccurrenceDate,
         },
       );
+      if (command.overrideFields.length === 0) {
+        await transaction.run(
+          `DELETE FROM recurrence_exceptions
+           WHERE series_event_id = $seriesEventId
+             AND original_occurrence_date = $originalOccurrenceDate`,
+          {
+            $seriesEventId: command.identity.seriesEventId,
+            $originalOccurrenceDate: command.identity.originalOccurrenceDate,
+          },
+        );
+        if (previous?.replacement_event_id !== null
+            && previous?.replacement_event_id !== undefined) {
+          await transaction.run('DELETE FROM events WHERE id = $id', {
+            $id: previous.replacement_event_id,
+          });
+        }
+        await transaction.run('UPDATE events SET updated_at = $now WHERE id = $id', {
+          $id: command.identity.seriesEventId,
+          $now: command.now,
+        });
+        return;
+      }
       await replaceAggregate(transaction, command.replacement);
       await transaction.run(UPSERT_EXCEPTION_SQL, exceptionParameters({
         ...command.identity,
@@ -327,6 +378,8 @@ export class SqliteEventRepository implements EventRepository {
         command.identity.seriesEventId,
         command.expectedSeriesUpdatedAt,
       );
+      const series = await loadValidOccurrence(transaction, command.identity);
+      if (series === null) throw new Error('Occurrence no longer exists');
       const previous = await transaction.first<RecurrenceExceptionRow>(
         `SELECT * FROM recurrence_exceptions
          WHERE series_event_id = $seriesEventId
@@ -414,8 +467,18 @@ export class SqliteEventRepository implements EventRepository {
 
   async delete(id: string): Promise<void> {
     await this.database.exclusiveTransaction(async (transaction) => {
+      const replacements = await transaction.all<{ replacement_event_id: string }>(
+        `SELECT replacement_event_id FROM recurrence_exceptions
+         WHERE series_event_id = $id AND replacement_event_id IS NOT NULL`,
+        { $id: id },
+      );
       await transaction.run('DELETE FROM event_reminders WHERE event_id = $eventId', { $eventId: id });
       await transaction.run('DELETE FROM events WHERE id = $id', { $id: id });
+      for (const replacement of replacements) {
+        await transaction.run('DELETE FROM events WHERE id = $id', {
+          $id: replacement.replacement_event_id,
+        });
+      }
     });
   }
 }

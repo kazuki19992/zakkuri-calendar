@@ -402,7 +402,7 @@ git add docs src
 git commit -m "docs: 相対日付の実装内容へ仕様を同期"
 ```
 
-- [ ] **Step 6: code reviewを依頼し、有効な指摘を修正する**
+- [x] **Step 6: code reviewを依頼し、有効な指摘を修正する**
 
 reviewerへbase SHA、head SHA、本plan、designを渡す。Critical・Importantは修正して再検証する。
 

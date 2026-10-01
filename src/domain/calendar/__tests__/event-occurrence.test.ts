@@ -64,6 +64,7 @@ describe('予定の発生回展開', () => {
       value: [{
         key: 'event-1',
         eventId: 'event-1',
+        occurrenceIdentity: null,
         occurrenceStartDate: '2026-09-08',
         occurrenceThroughDate: '2026-09-08',
         isRecurring: false,
@@ -296,11 +297,19 @@ describe('予定の発生回展開', () => {
       expect.objectContaining({
         key: 'event-1:recurrence:2026-09-08',
         eventId: 'event-1',
+        occurrenceIdentity: {
+          seriesEventId: 'event-1',
+          originalOccurrenceDate: '2026-09-08',
+        },
         isRecurring: true,
       }),
       expect.objectContaining({
         key: 'event-1:recurrence:2026-09-09',
         eventId: 'event-1',
+        occurrenceIdentity: {
+          seriesEventId: 'event-1',
+          originalOccurrenceDate: '2026-09-09',
+        },
         isRecurring: true,
       }),
     ]);
@@ -321,5 +330,83 @@ describe('予定の発生回展開', () => {
     if (!result.ok) throw new Error(result.error.message);
 
     expect(result.value.map((occurrence) => occurrence.eventId)).toEqual(['a', 'c', 'b']);
+  });
+
+  it('削除例外を除外し移動した置換例外を移動先へ一度だけ表示する', () => {
+    const series = recurring({ ...exactEvent, id: 'series-1', anchorDate: '2026-10-05' }, {
+      version: 1,
+      frequency: 'weekly',
+      interval: 1,
+      weekdays: [1],
+      end: { type: 'count', count: 4 },
+    });
+    const replacement: CalendarEvent = {
+      ...series,
+      id: 'replacement-1',
+      title: '移動した定例会',
+      anchorDate: '2026-10-20',
+      recurrenceRule: null,
+    };
+
+    const result = expandEventOccurrences({
+      snapshot: {
+        events: [series],
+        exceptions: [
+          {
+            seriesEventId: 'series-1',
+            originalOccurrenceDate: '2026-10-12',
+            kind: 'replaced',
+            replacementEventId: 'replacement-1',
+            overrideFields: ['title', 'temporal'],
+            createdAt: exactEvent.createdAt,
+            updatedAt: exactEvent.updatedAt,
+          },
+          {
+            seriesEventId: 'series-1',
+            originalOccurrenceDate: '2026-10-19',
+            kind: 'deleted',
+            replacementEventId: null,
+            overrideFields: [],
+            createdAt: exactEvent.createdAt,
+            updatedAt: exactEvent.updatedAt,
+          },
+        ],
+        replacementEvents: [replacement],
+      },
+      from: '2026-10-01',
+      through: '2026-10-31',
+    });
+    if (!result.ok) throw new Error(result.error.message);
+
+    expect(dates(result.value)).toEqual(['2026-10-05', '2026-10-20', '2026-10-26']);
+    expect(result.value.filter((item) => item.eventId === 'replacement-1')).toHaveLength(1);
+    expect(result.value.find((item) => item.eventId === 'replacement-1')?.occurrenceIdentity)
+      .toEqual({ seriesEventId: 'series-1', originalOccurrenceDate: '2026-10-12' });
+  });
+
+  it('置換例外が表示範囲外へ移動した場合は元日付にも表示しない', () => {
+    const series = recurring({ ...exactEvent, id: 'series-1', anchorDate: '2026-10-12' }, dailyNever);
+    const replacement: CalendarEvent = {
+      ...series,
+      id: 'replacement-1',
+      anchorDate: '2026-10-20',
+      recurrenceRule: null,
+    };
+    const result = expandEventOccurrences({
+      snapshot: {
+        events: [series],
+        exceptions: [{
+          seriesEventId: 'series-1', originalOccurrenceDate: '2026-10-12',
+          kind: 'replaced', replacementEventId: 'replacement-1',
+          overrideFields: ['temporal'], createdAt: exactEvent.createdAt,
+          updatedAt: exactEvent.updatedAt,
+        }],
+        replacementEvents: [replacement],
+      },
+      from: '2026-10-12',
+      through: '2026-10-12',
+    });
+
+    expect(result).toEqual({ ok: true, value: [] });
   });
 });

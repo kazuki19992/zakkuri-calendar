@@ -56,6 +56,7 @@ function asOccurrence(event: CalendarEvent): EventOccurrence {
   return {
     key: event.id,
     eventId: event.id,
+    occurrenceIdentity: null,
     occurrenceStartDate: event.anchorDate,
     occurrenceThroughDate: event.anchorDate,
     isRecurring: false,
@@ -97,6 +98,7 @@ describe('日別タイムライン配置', () => {
     const occurrence: EventOccurrence = {
       key: 'series-1:recurrence:2026-09-15',
       eventId: 'series-1',
+      occurrenceIdentity: { seriesEventId: 'series-1', originalOccurrenceDate: '2026-09-15' },
       occurrenceStartDate: '2026-09-15',
       occurrenceThroughDate: '2026-09-16',
       isRecurring: true,

@@ -16,7 +16,7 @@ const state: EventEditorState = {
   colorId: null, location: '', notes: '',
   recurrenceDraft: { preset: 'none', frequency: 'weekly', intervalText: '1', weekdays: [5], endType: 'never', untilDate: '2026-09-25', countText: '1' },
   reminders: [], titleError: null, dateError: null, endTimeError: null, recurrenceError: null, reminderError: null, saveError: null,
-  isSaving: false, isDeleting: false, scopeRequest: null,
+  isSaving: false, isDeleting: false, usesRecurrenceScope: false, scopeRequest: null,
   setTitle: jest.fn(), setEditorTab: jest.fn(), setAllDay: jest.fn(), setStartDate: jest.fn(), setEndDate: jest.fn(),
   setStartTime: jest.fn(), setEndTime: jest.fn(), selectDefinition: jest.fn(), setColorId: jest.fn(), setLocation: jest.fn(), setNotes: jest.fn(),
   setRecurrencePreset: jest.fn(), setRecurrenceFrequency: jest.fn(), setRecurrenceIntervalText: jest.fn(), toggleRecurrenceWeekday: jest.fn(),

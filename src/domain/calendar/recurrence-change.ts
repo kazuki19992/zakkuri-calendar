@@ -33,6 +33,7 @@ type PlanFollowingMutationInput = Readonly<{
 
 type PlanSeriesMutationInput = Readonly<{
   series: EventAggregate;
+  boundaryDate: string;
   submitted: EventAggregate;
   exceptions: readonly RecurrenceException[];
   now: string;
@@ -186,10 +187,39 @@ export function planSeriesMutation(input: PlanSeriesMutationInput): RecurrenceMu
     input.series.event.recurrenceRule,
     input.submitted.event.recurrenceRule,
   );
+  const dayOffset = differenceInCalendarDays(
+    parse(input.submitted.event.anchorDate, DATE_FORMAT, new Date()),
+    parse(input.boundaryDate, DATE_FORMAT, new Date()),
+  );
+  const anchorDate = offsetDate(input.series.event.anchorDate, dayOffset);
+  const submittedEvent = input.submitted.event.temporalType === 'exact'
+    ? { ...input.submitted.event, anchorDate }
+    : {
+      ...input.submitted.event,
+      anchorDate,
+      endDate: offsetDate(
+        input.submitted.event.endDate,
+        differenceInCalendarDays(
+          parse(anchorDate, DATE_FORMAT, new Date()),
+          parse(input.submitted.event.anchorDate, DATE_FORMAT, new Date()),
+        ),
+      ),
+    };
+  const recurrenceRule = !recurrenceChanged
+      && submittedEvent.recurrenceRule?.end.type === 'until'
+    ? {
+      ...submittedEvent.recurrenceRule,
+      end: {
+        type: 'until' as const,
+        date: offsetDate(submittedEvent.recurrenceRule.end.date, dayOffset),
+      },
+    }
+    : submittedEvent.recurrenceRule;
   const nextSeries: EventAggregate = {
     event: {
-      ...input.submitted.event,
+      ...submittedEvent,
       id: input.series.event.id,
+      recurrenceRule,
       createdAt: input.series.event.createdAt,
       updatedAt: input.now,
     },
@@ -198,11 +228,16 @@ export function planSeriesMutation(input: PlanSeriesMutationInput): RecurrenceMu
       eventId: input.series.event.id,
     })),
   };
+  const shiftedExceptions = recurrenceChanged ? [] : input.exceptions.map((exception) => ({
+    ...exception,
+    originalOccurrenceDate: offsetDate(exception.originalOccurrenceDate, dayOffset),
+    updatedAt: input.now,
+  }));
   return {
     previousSeries: null,
     nextSeries,
-    upsertExceptions: recurrenceChanged ? [] : input.exceptions,
-    deleteExceptionIdentities: recurrenceChanged
+    upsertExceptions: shiftedExceptions,
+    deleteExceptionIdentities: recurrenceChanged || dayOffset !== 0
       ? input.exceptions.map(({ seriesEventId, originalOccurrenceDate }) => ({
         seriesEventId,
         originalOccurrenceDate,

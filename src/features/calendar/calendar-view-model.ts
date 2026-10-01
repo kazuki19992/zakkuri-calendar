@@ -79,7 +79,7 @@ export function createAgendaItems(
     return {
       ...(isFuzzyRange ? { kind: 'fuzzyRange' as const } : {}),
       id: occurrence.key,
-      eventId: occurrence.eventId,
+      eventId: occurrence.occurrenceIdentity?.seriesEventId ?? occurrence.eventId,
       ...(occurrence.occurrenceIdentity === null
         ? {}
         : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),

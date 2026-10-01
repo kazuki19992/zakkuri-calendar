@@ -62,7 +62,9 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
           {section('通知', <EventReminderEditor reminders={state.reminders} disabled={busy} error={state.reminderError} onAdd={state.addReminder} onRemove={state.removeReminder} onMove={state.moveReminder} />)}
           {section('メモ', <EventMetadataFields field="notes" location={state.location} notes={state.notes} disabled={busy} onLocationChange={state.setLocation} onNotesChange={state.setNotes} />)}
           {state.saveError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.saveError}</Text> : null}
-          {state.mode === 'edit' ? <DeleteEventButton title={state.title} disabled={busy} isRecurring={state.recurrenceDraft.preset !== 'none'} onDelete={onDelete} /> : null}
+          {state.mode === 'edit' ? <DeleteEventButton title={state.title} disabled={busy}
+            isRecurring={state.recurrenceDraft.preset !== 'none'}
+            usesScopeSelection={state.usesRecurrenceScope} onDelete={onDelete} /> : null}
         </ScrollView> : null}
       </KeyboardAvoidingView>
       <RecurrenceScopeDialog request={state.scopeRequest} busy={busy}

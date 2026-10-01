@@ -97,10 +97,24 @@ describe('繰り返しシリーズの変更計画', () => {
 
   test('すべての変更では現在のシリーズIDだけを維持する', () => {
     const plan = planSeriesMutation({
-      series: aggregate(), submitted: aggregate({ title: '全体変更' }),
+      series: aggregate(), boundaryDate: '2026-10-05',
+      submitted: aggregate({ title: '全体変更' }),
       exceptions: [futureException], now: NOW,
     });
     expect(plan.nextSeries?.event).toMatchObject({ id: 'series-1', title: '全体変更' });
     expect(plan.upsertExceptions).toEqual([futureException]);
+  });
+
+  test('すべての日付移動はシリーズanchorと既存例外を同じ日数だけ移す', () => {
+    const plan = planSeriesMutation({
+      series: aggregate(), boundaryDate: '2026-10-12',
+      submitted: aggregate({ anchorDate: '2026-10-13' }),
+      exceptions: [futureException], now: NOW,
+    });
+    expect(plan.nextSeries?.event.anchorDate).toBe('2026-10-06');
+    expect(plan.upsertExceptions[0].originalOccurrenceDate).toBe('2026-10-20');
+    expect(plan.deleteExceptionIdentities).toEqual([{
+      seriesEventId: 'series-1', originalOccurrenceDate: '2026-10-19',
+    }]);
   });
 });

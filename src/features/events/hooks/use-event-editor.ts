@@ -86,6 +86,7 @@ export type EventEditorState = Readonly<{
   saveError: string | null;
   isSaving: boolean;
   isDeleting: boolean;
+  usesRecurrenceScope: boolean;
   scopeRequest: ScopeRequest | null;
   setTitle(value: string): void;
   setEditorTab(value: EventEditorTab): void;
@@ -592,6 +593,7 @@ export function useEventEditor({
           })
           : planSeriesMutation({
             series: occurrenceEditData.series,
+            boundaryDate: occurrenceDate,
             submitted,
             exceptions: occurrenceEditData.exceptions,
             now: now(),
@@ -665,6 +667,7 @@ export function useEventEditor({
     saveError,
     isSaving,
     isDeleting,
+    usesRecurrenceScope: occurrenceEditData !== null,
     scopeRequest,
     setTitle,
     setEditorTab,

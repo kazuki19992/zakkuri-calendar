@@ -245,7 +245,7 @@ export function createDayTimelineItems(input: Readonly<{
 
     items.push({
       id: occurrence.key,
-      eventId: occurrence.eventId,
+      eventId: occurrence.occurrenceIdentity?.seriesEventId ?? occurrence.eventId,
       ...(occurrence.occurrenceIdentity === null
         ? {}
         : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),

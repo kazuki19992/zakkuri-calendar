@@ -50,7 +50,7 @@ describe('月表示の表示用モデル', () => {
     };
     const occurrence: EventOccurrence = {
       key: 'event-1:recurrence:2026-09-21',
-      eventId: 'event-1',
+      eventId: 'replacement-1',
       occurrenceIdentity: { seriesEventId: 'event-1', originalOccurrenceDate: '2026-09-21' },
       occurrenceStartDate: '2026-09-21',
       occurrenceThroughDate: '2026-09-23',

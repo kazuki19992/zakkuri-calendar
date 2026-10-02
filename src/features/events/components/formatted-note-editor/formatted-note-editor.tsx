@@ -36,6 +36,8 @@ export function FormattedNoteEditor({
           containerStyle: styles.editor,
           scrollEnabled: true,
           unstable_useExpoModulesBridge: false,
+          onShouldStartLoadWithRequest: (request: { navigationType?: string }) =>
+            request.navigationType !== 'click',
         }} />
     </View>
   );

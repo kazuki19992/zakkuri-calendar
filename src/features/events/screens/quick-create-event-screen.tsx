@@ -138,13 +138,14 @@ export function QuickCreateEventScreen({ state, onSave, onCancel }: QuickCreateE
             </Text>
           ) : null}
 
-          <Text style={[styles.label, styles.fieldSpacing, { color: theme.text }]}>時間帯</Text>
-          <TemporalDefinitionPicker
-            definitions={state.definitions}
-            selectedId={state.selectedDefinitionId}
-            disabled={state.isSaving}
-            onSelect={state.selectDefinition}
-          />
+          <View style={styles.fieldSpacing}>
+            <TemporalDefinitionPicker
+              definitions={state.definitions}
+              selectedId={state.selectedDefinitionId}
+              disabled={state.isSaving}
+              onSelect={state.selectDefinition}
+            />
+          </View>
           {state.saveError !== null ? (
             <Text accessibilityLiveRegion="polite" style={[styles.saveError, { color: theme.calendarHoliday }]}>
               {state.saveError}

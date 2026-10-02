@@ -5,9 +5,23 @@ import { EventReminderEditor } from '../event-reminder-editor';
 import { RecurrenceEditor } from '../recurrence-editor';
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('@expo/ui', () => {
+  const ReactModule = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  function Host({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
+    return ReactModule.createElement(View, props, children);
+  }
+  const Picker = Object.assign(
+    function Picker({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
+      return ReactModule.createElement(View, props, children);
+    },
+    { Item: function PickerItem() { return null; } },
+  );
+  return { Host, Picker };
+});
 
 describe('予定編集の追加項目', () => {
-  it('繰り返しpresetとcustom項目を表示する', async () => {
+  it('繰り返しの単一選択をdropdownで変更する', async () => {
     const onPresetChange = jest.fn();
     const props = {
       draft: { preset: 'none' as const, frequency: 'weekly' as const, intervalText: '1', weekdays: [1], endType: 'never' as const, untilDate: '2026-09-25', countText: '1' },
@@ -22,19 +36,46 @@ describe('予定編集の追加項目', () => {
       onCountChange: jest.fn(),
     };
     const view = await render(<RecurrenceEditor {...props} />);
-    expect(view.getByLabelText('繰り返しなし').props.accessibilityState).toMatchObject({ selected: true });
-    expect(view.getByLabelText('カスタム')).toBeOnTheScreen();
-    await act(async () => { fireEvent.press(view.getByLabelText('カスタム')); });
+    const presetPicker = view.getByTestId('event-editor.recurrence-preset-picker');
+    expect(presetPicker.props.selectedValue).toBe('none');
+    await act(async () => { fireEvent(presetPicker, 'valueChange', 'custom'); });
     expect(onPresetChange).toHaveBeenCalledWith('custom');
     await view.rerender(<RecurrenceEditor {...props} draft={{ ...props.draft, preset: 'custom' }} />);
     expect(view.getByLabelText('繰り返し間隔')).toBeOnTheScreen();
+    expect(view.getByTestId('event-editor.recurrence-frequency-picker').props.selectedValue)
+      .toBe('weekly');
+    expect(view.getByTestId('event-editor.recurrence-end-picker').props.selectedValue)
+      .toBe('never');
   });
 
-  it('継承色と固定8色をラベル付きで表示する', async () => {
-    const view = await render(<EventColorPicker calendarColorId="blue" value={null} disabled={false} onChange={jest.fn()} />);
-    expect(view.getByLabelText('カレンダーの色').props.accessibilityState).toMatchObject({ selected: true });
-    expect(view.getByLabelText('赤')).toBeOnTheScreen();
-    expect(view.getAllByRole('button')).toHaveLength(9);
+  it('複数選択の曜日は位置を変えないbadgeと選択状態を併用する', async () => {
+    const props = {
+      draft: { preset: 'custom' as const, frequency: 'weekly' as const, intervalText: '1',
+        weekdays: [1], endType: 'never' as const, untilDate: '2026-09-25', countText: '1' },
+      disabled: false,
+      error: null,
+      onPresetChange: jest.fn(),
+      onFrequencyChange: jest.fn(),
+      onIntervalChange: jest.fn(),
+      onWeekdayToggle: jest.fn(),
+      onEndTypeChange: jest.fn(),
+      onUntilDateChange: jest.fn(),
+      onCountChange: jest.fn(),
+    };
+    const view = await render(<RecurrenceEditor {...props} />);
+    expect(view.getByLabelText('月曜日').props.accessibilityState.selected).toBe(true);
+    expect(view.getByTestId('event-editor.recurrence-weekday-1-check')).toBeOnTheScreen();
+    expect(view.queryByTestId('event-editor.recurrence-weekday-2-check')).toBeNull();
+  });
+
+  it('色名と色見本を表示しdropdownで単一選択する', async () => {
+    const onChange = jest.fn();
+    const view = await render(<EventColorPicker calendarColorId="blue" value={null} disabled={false} onChange={onChange} />);
+    const picker = view.getByTestId('event-editor.color-picker');
+    expect(picker.props.selectedValue).toBe('calendar');
+    expect(view.getByTestId('event-editor.selected-color-swatch')).toBeOnTheScreen();
+    await act(async () => { fireEvent(picker, 'valueChange', 'red'); });
+    expect(onChange).toHaveBeenCalledWith('red');
   });
 
   it('場所とメモeditorへの導線を表示する', async () => {
@@ -52,5 +93,7 @@ describe('予定編集の追加項目', () => {
     expect(view.getByText('設定は保存されますが、端末への通知はまだ行われません')).toBeOnTheScreen();
     expect(view.getByLabelText('30分前を上へ')).toBeDisabled();
     expect(view.getByLabelText('30分前を削除')).toBeOnTheScreen();
+    expect(view.getByTestId('event-editor.reminder-preset-30-check')).toBeOnTheScreen();
+    expect(view.queryByTestId('event-editor.reminder-preset-10-check')).toBeNull();
   });
 });

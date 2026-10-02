@@ -88,7 +88,7 @@ routeはRepository、初期route parameter、保存成功後のcalendar refresh�
 
 ### 4.2 ざっくり
 
-ざっくりでは固定日付1日と、既存の日内`TemporalDefinition`を選択する。時間帯は選択状態をcheckmarkと`accessibilityState.selected`で示す。利用可能な時間帯がない場合は保存できず、時間帯欄へ固定メッセージを表示する。
+ざっくりでは固定日付1日と、既存の日内`TemporalDefinition`を選択する。時間帯は単一選択のため、粒度を含む日本語labelを持つdropdownで選ぶ。利用可能な時間帯がない場合は保存できず、時間帯欄へ固定メッセージを表示する。
 
 繰り返し、色、場所、通知、メモはざっくり予定でも設定できる。
 
@@ -108,9 +108,9 @@ routeはRepository、初期route parameter、保存成功後のcalendar refresh�
 
 内部値は日付`yyyy-MM-dd`、時刻`HH:mm`を維持する。画面上の日付は独自formatterで`9月25日（金）`の形式にする。OSやlocale任せの`Sep 25, 2026`を画面の主表示にしない。
 
-日付・時刻行は、整形済みの値を持つ`Pressable`と、編集中だけmountする`@expo/ui/community/datetime-picker`を組み合わせる。
+日付行は、整形済みの値そのものを操作領域とし、別行へ`yyyy/MM/dd`形式の入力を表示しない。時刻行も整形済みの値を持つ`Pressable`からpickerを開く。
 
-- iOSでは`locale="ja_JP"`を指定し、compactまたはinline pickerを編集時だけ表示する。
+- iOSでは`locale="ja_JP"`と`display="compact"`を指定したpickerを整形済み日付の操作領域へ重ね、日付を直接タップして開く。
 - Androidでは`presentation="dialog"`を利用し、確定またはdismissでunmountする。
 - 画面上の確定値は両platformとも独自formatterを使う。
 - 変換はlocal wall-clock値として扱い、UTC文字列や固定ミリ秒加算へ変換しない。
@@ -141,7 +141,9 @@ routeはRepository、初期route parameter、保存成功後のcalendar refresh�
 
 現在は既定カレンダー1件を読み取り専用で表示する。カレンダー切替UIやplaceholderは置かない。
 
-色は「カレンダーの色」と固定8色を選べる。前者は`colorId: null`、固定色は安定した`EventColorId`として保存する。色見本だけでなく日本語labelと選択checkmarkを併用し、`accessibilityState.selected`を設定する。ライト／ダークの塗りは既存palette registryを再利用する。
+色は「カレンダーの色」と固定8色をdropdownで選べる。前者は`colorId: null`、固定色は安定した`EventColorId`として保存する。選択中の色見本だけでなく日本語labelを併用し、ライト／ダークの塗りは既存palette registryを再利用する。
+
+時間帯、繰り返しpreset、カスタム頻度、終了条件、予定色のような単一選択はdropdownとする。曜日や通知presetのような複数選択・追加操作だけchipを維持し、選択時は色に加えて枠、文字の太さ、固定位置のcheck badge、`accessibilityState.selected`を併用する。check badgeは絶対配置として選択前後のchip位置を変えない。
 
 ### 6.3 場所
 

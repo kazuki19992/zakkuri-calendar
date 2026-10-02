@@ -21,7 +21,7 @@ const createExactEvent = (
   anchorDate: '2026-12-31',
   createdTimeZoneId: 'Asia/Tokyo',
   location: null,
-  notes: null,
+  noteDocument: null,
   colorId: null,
   recurrenceRule: null,
   temporalType: 'exact',

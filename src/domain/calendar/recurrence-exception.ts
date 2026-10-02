@@ -148,7 +148,9 @@ export function materializeOccurrenceReplacement(input: Readonly<{
     location: fields.has('location')
       ? input.replacementEvent.location
       : input.seriesEvent.location,
-    notes: fields.has('notes') ? input.replacementEvent.notes : input.seriesEvent.notes,
+    noteDocument: fields.has('notes')
+      ? input.replacementEvent.noteDocument
+      : input.seriesEvent.noteDocument,
     colorId: fields.has('color') ? input.replacementEvent.colorId : input.seriesEvent.colorId,
     recurrenceRule: null,
     createdAt: input.replacementEvent.createdAt,

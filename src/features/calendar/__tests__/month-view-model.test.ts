@@ -10,7 +10,7 @@ const baseEvent = {
   anchorDate: '2026-09-21',
   createdTimeZoneId: 'Asia/Tokyo',
   location: null,
-  notes: null,
+  noteDocument: null,
   colorId: null,
   recurrenceRule: null,
   createdAt: '2026-09-01T00:00:00.000Z',

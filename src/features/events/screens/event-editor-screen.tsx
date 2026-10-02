@@ -6,7 +6,8 @@ import { EventColorPicker } from '../components/event-color-picker';
 import { EventDateTimeFields } from '../components/event-date-time-fields';
 import { EventEditorHeader } from '../components/event-editor-header';
 import { EventEditorTabs } from '../components/event-editor-tabs';
-import { EventMetadataFields } from '../components/event-metadata-fields';
+import { EventMetadataFields, EventNoteField } from '../components/event-metadata-fields';
+import { FormattedNoteEditorModal } from '../components/formatted-note-editor/formatted-note-editor-modal';
 import { EventReminderEditor } from '../components/event-reminder-editor';
 import { RecurrenceEditor } from '../components/recurrence-editor';
 import { RecurrenceScopeDialog } from '../components/recurrence-scope-dialog';
@@ -58,9 +59,11 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
             <View style={styles.readonlyRow}><Text style={{ color: theme.textSecondary }}>カレンダー</Text><Text style={{ color: theme.text }}>{state.calendarName}</Text></View>
             <EventColorPicker calendarColorId={state.calendarColorId} value={state.colorId} disabled={busy} onChange={state.setColorId} />
           </View>)}
-          {section('場所', <EventMetadataFields field="location" location={state.location} notes={state.notes} disabled={busy} onLocationChange={state.setLocation} onNotesChange={state.setNotes} />)}
+          {section('場所', <EventMetadataFields location={state.location} disabled={busy}
+            onLocationChange={state.setLocation} />)}
           {section('通知', <EventReminderEditor reminders={state.reminders} disabled={busy} error={state.reminderError} onAdd={state.addReminder} onRemove={state.removeReminder} onMove={state.moveReminder} />)}
-          {section('メモ', <EventMetadataFields field="notes" location={state.location} notes={state.notes} disabled={busy} onLocationChange={state.setLocation} onNotesChange={state.setNotes} />)}
+          {section('メモ', <EventNoteField summary={state.noteSummary} disabled={busy}
+            error={state.noteLinkError} onPress={state.openNoteEditor} />)}
           {state.saveError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.saveError}</Text> : null}
           {state.mode === 'edit' ? <DeleteEventButton title={state.title} disabled={busy}
             isRecurring={state.recurrenceDraft.preset !== 'none'}
@@ -69,6 +72,10 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
       </KeyboardAvoidingView>
       <RecurrenceScopeDialog request={state.scopeRequest} busy={busy}
         onSelect={(scope) => onSelectScope?.(scope)} onCancel={state.cancelScope} />
+      <FormattedNoteEditorModal visible={state.isNoteEditorOpen}
+        initialDocument={state.noteDocument} disabled={busy} linkError={state.noteLinkError}
+        onCancel={state.cancelNoteEditor} onComplete={state.completeNoteEditor}
+        onOpenLink={(url) => { void state.openNoteLink(url); }} />
     </SafeAreaView>
   );
 }

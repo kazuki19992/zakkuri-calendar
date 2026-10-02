@@ -38,6 +38,7 @@ type Props = Readonly<{
   visible: boolean;
   initialDocument: EventNoteDocumentV1 | null;
   disabled: boolean;
+  linkError: string | null;
   onCancel(): void;
   onComplete(document: EventNoteDocumentV1 | null): void;
   onOpenLink(url: string): void;
@@ -54,6 +55,7 @@ export function FormattedNoteEditorModal({
 function FormattedNoteEditorModalContent({
   initialDocument,
   disabled,
+  linkError,
   onCancel,
   onComplete,
   onOpenLink,
@@ -168,6 +170,12 @@ function FormattedNoteEditorModalContent({
             </View>
           ) : null}
         </View>
+        {linkError === null ? null : (
+          <Text accessibilityRole="alert" style={[styles.linkError, {
+            backgroundColor: theme.background,
+            color: theme.calendarHoliday,
+          }]}>{linkError}</Text>
+        )}
         <FormattedNoteToolbar disabled={busy || !ready} state={selection}
           onToggleBold={() => editorRef.current?.toggleBold()}
           onToggleItalic={() => editorRef.current?.toggleItalic()}
@@ -191,4 +199,5 @@ const styles = StyleSheet.create({
   feedback: { alignItems: 'center', bottom: 0, justifyContent: 'center', left: 0, padding: 24, position: 'absolute', right: 0, top: 0 },
   error: { fontSize: 14, textAlign: 'center' },
   retry: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 88 },
+  linkError: { fontSize: 13, paddingHorizontal: 16, paddingVertical: 8, textAlign: 'center' },
 });

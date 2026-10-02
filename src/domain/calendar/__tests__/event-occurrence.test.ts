@@ -15,7 +15,7 @@ const exactEvent: CalendarEvent = {
   startTime: '10:00',
   duration: { type: 'fixed', minutes: 60 },
   location: null,
-  notes: null,
+  noteDocument: null,
   colorId: null,
   recurrenceRule: null,
   createdAt: '2026-09-01T00:00:00.000Z',

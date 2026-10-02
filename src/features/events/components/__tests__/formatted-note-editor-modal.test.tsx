@@ -51,7 +51,7 @@ describe('全画面の書式付きメモeditor', () => {
   test('ready後だけ完了要求を1回送りDOMの最新文書を返すまで確定しない', async () => {
     const onComplete = jest.fn();
     const user = userEvent.setup();
-    const view = await render(<FormattedNoteEditorModal visible initialDocument={null} disabled={false}
+    const view = await render(<FormattedNoteEditorModal visible initialDocument={null} disabled={false} linkError={null}
       onCancel={jest.fn()} onComplete={onComplete} onOpenLink={jest.fn()} />);
 
     expect(view.getByLabelText('完了')).toBeDisabled();
@@ -66,7 +66,7 @@ describe('全画面の書式付きメモeditor', () => {
   });
 
   test('DOMの選択状態をtoolbarへ反映しcommandをeditorへ送る', async () => {
-    const view = await render(<FormattedNoteEditorModal visible initialDocument={null} disabled={false}
+    const view = await render(<FormattedNoteEditorModal visible initialDocument={null} disabled={false} linkError={null}
       onCancel={jest.fn()} onComplete={jest.fn()} onOpenLink={jest.fn()} />);
     await act(async () => { await mockDomProps.onReady(); });
     await act(async () => {
@@ -89,7 +89,7 @@ describe('全画面の書式付きメモeditor', () => {
 
   test('不正な完了payloadではdraftを上書きせずeditorを閉じない', async () => {
     const onComplete = jest.fn();
-    const view = await render(<FormattedNoteEditorModal visible initialDocument={null} disabled={false}
+    const view = await render(<FormattedNoteEditorModal visible initialDocument={null} disabled={false} linkError={null}
       onCancel={jest.fn()} onComplete={onComplete} onOpenLink={jest.fn()} />);
     await act(async () => {
       await mockDomProps.onReady();
@@ -104,7 +104,7 @@ describe('全画面の書式付きメモeditor', () => {
     const onCancel = jest.fn();
     const user = userEvent.setup();
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const view = await render(<FormattedNoteEditorModal visible initialDocument={null} disabled={false}
+    const view = await render(<FormattedNoteEditorModal visible initialDocument={null} disabled={false} linkError={null}
       onCancel={onCancel} onComplete={jest.fn()} onOpenLink={jest.fn()} />);
     await act(async () => {
       await mockDomProps.onStateChange({
@@ -124,5 +124,12 @@ describe('全画面の書式付きメモeditor', () => {
     buttons?.find((button) => button.text === '破棄')?.onPress?.();
     expect(onCancel).toHaveBeenCalledTimes(1);
     alert.mockRestore();
+  });
+
+  test('外部browserを開けない場合はeditor内に固定文言を表示する', async () => {
+    const view = await render(<FormattedNoteEditorModal visible initialDocument={null}
+      disabled={false} linkError="リンクを開けませんでした。"
+      onCancel={jest.fn()} onComplete={jest.fn()} onOpenLink={jest.fn()} />);
+    expect(view.getByRole('alert')).toHaveTextContent('リンクを開けませんでした。');
   });
 });

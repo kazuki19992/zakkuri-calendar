@@ -1,6 +1,6 @@
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { EventColorPicker } from '../event-color-picker';
-import { EventMetadataFields } from '../event-metadata-fields';
+import { EventMetadataFields, EventNoteField } from '../event-metadata-fields';
 import { EventReminderEditor } from '../event-reminder-editor';
 import { RecurrenceEditor } from '../recurrence-editor';
 
@@ -37,10 +37,14 @@ describe('予定編集の追加項目', () => {
     expect(view.getAllByRole('button')).toHaveLength(9);
   });
 
-  it('場所と複数行メモを編集できる', async () => {
-    const view = await render(<EventMetadataFields location="" notes="" disabled={false} onLocationChange={jest.fn()} onNotesChange={jest.fn()} />);
+  it('場所とメモeditorへの導線を表示する', async () => {
+    const view = await render(<>
+      <EventMetadataFields location="" disabled={false} onLocationChange={jest.fn()} />
+      <EventNoteField summary="買い物リスト" disabled={false} error={null} onPress={jest.fn()} />
+    </>);
     expect(view.getByLabelText('場所')).toBeOnTheScreen();
-    expect(view.getByLabelText('メモ').props.multiline).toBe(true);
+    expect(view.getByLabelText('メモを編集')).toBeOnTheScreen();
+    expect(view.getByText('買い物リスト')).toBeOnTheScreen();
   });
 
   it('通知未発火の説明と並べ替え操作を表示する', async () => {

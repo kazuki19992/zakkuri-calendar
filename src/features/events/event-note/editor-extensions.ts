@@ -1,8 +1,8 @@
-import Bold from '@tiptap/extension-bold';
-import Document from '@tiptap/extension-document';
-import HardBreak from '@tiptap/extension-hard-break';
-import Italic from '@tiptap/extension-italic';
-import Link from '@tiptap/extension-link';
+import { Bold } from '@tiptap/extension-bold';
+import { Document } from '@tiptap/extension-document';
+import { HardBreak } from '@tiptap/extension-hard-break';
+import { Italic } from '@tiptap/extension-italic';
+import { Link } from '@tiptap/extension-link';
 import {
   BulletList,
   ListItem,
@@ -11,8 +11,8 @@ import {
   TaskItem,
   TaskList,
 } from '@tiptap/extension-list';
-import Paragraph from '@tiptap/extension-paragraph';
-import Text from '@tiptap/extension-text';
+import { Paragraph } from '@tiptap/extension-paragraph';
+import { Text } from '@tiptap/extension-text';
 import { Placeholder, UndoRedo } from '@tiptap/extensions';
 import { parseSafeEventNoteUrl } from '@/domain/calendar/event-note';
 

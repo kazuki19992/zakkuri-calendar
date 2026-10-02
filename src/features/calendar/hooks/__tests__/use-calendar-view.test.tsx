@@ -29,7 +29,7 @@ const event: CalendarEvent = {
   endDate: '2026-09-09',
   resolutionContext: null,
   location: null,
-  notes: null,
+  noteDocument: null,
   colorId: null,
   recurrenceRule: null,
   createdTimeZoneId: 'Asia/Tokyo',

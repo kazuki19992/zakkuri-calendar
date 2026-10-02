@@ -1,6 +1,13 @@
 import * as Crypto from 'expo-crypto';
+import { openBrowserAsync } from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EventColorId } from '@/domain/calendar/event-color';
+import {
+  normalizeEventNoteDocument,
+  parseSafeEventNoteUrl,
+  projectEventNoteToPlainText,
+  type EventNoteDocumentV1,
+} from '@/domain/calendar/event-note';
 import {
   createCalendarEvent,
   parseCalendarEvent,
@@ -76,7 +83,10 @@ export type EventEditorState = Readonly<{
   calendarColorId: EventColorId;
   colorId: EventColorId | null;
   location: string;
-  notes: string;
+  noteDocument: EventNoteDocumentV1 | null;
+  noteSummary: string;
+  isNoteEditorOpen: boolean;
+  noteLinkError: string | null;
   recurrenceDraft: RecurrenceDraft;
   reminders: readonly ReminderDraft[];
   titleError: string | null;
@@ -99,7 +109,10 @@ export type EventEditorState = Readonly<{
   selectDefinition(id: string): void;
   setColorId(value: EventColorId | null): void;
   setLocation(value: string): void;
-  setNotes(value: string): void;
+  openNoteEditor(): void;
+  cancelNoteEditor(): void;
+  completeNoteEditor(value: EventNoteDocumentV1 | null): void;
+  openNoteLink(value: string): Promise<void>;
   setRecurrencePreset(value: RecurrencePreset): void;
   setRecurrenceFrequency(value: RecurrenceRuleV1['frequency']): void;
   setRecurrenceIntervalText(value: string): void;
@@ -135,6 +148,7 @@ type UseEventEditorInput = Readonly<{
   createReminderId?: () => string;
   now?: () => string;
   getTimeZoneId?: () => string;
+  openBrowser?: (url: string) => Promise<unknown>;
 }>;
 
 const defaultNow = (): string => new Date().toISOString();
@@ -160,6 +174,7 @@ export function useEventEditor({
   createReminderId = Crypto.randomUUID,
   now = defaultNow,
   getTimeZoneId = defaultTimeZone,
+  openBrowser = openBrowserAsync,
 }: UseEventEditorInput): EventEditorState {
   const [initialValues] = useState(initial);
   const [initialEditorTab] = useState(initialTab);
@@ -190,7 +205,9 @@ export function useEventEditor({
   const [thisWeekDeadlineWeekday, setThisWeekDeadlineWeekday] = useState<ThisWeekDeadlineWeekday>(5);
   const [colorId, setColorIdValue] = useState<EventColorId | null>(null);
   const [location, setLocationValue] = useState('');
-  const [notes, setNotesValue] = useState('');
+  const [noteDocument, setNoteDocument] = useState<EventNoteDocumentV1 | null>(null);
+  const [isNoteEditorOpen, setNoteEditorOpen] = useState(false);
+  const [noteLinkError, setNoteLinkError] = useState<string | null>(null);
   const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrenceDraft>(() =>
     getRecurrenceDraft(null, initialValues.date));
   const [reminders, setReminders] = useState<readonly ReminderDraft[]>([]);
@@ -288,7 +305,7 @@ export function useEventEditor({
           setStartDateValue(event.anchorDate);
           setColorIdValue(event.colorId);
           setLocationValue(event.location ?? '');
-          setNotesValue(event.notes ?? '');
+          setNoteDocument(event.noteDocument);
           setRecurrenceDraft(getRecurrenceDraft(event.recurrenceRule, event.anchorDate));
           setReminders(getReminderDrafts(loadedAggregate.reminders));
           if (event.temporalType === 'fuzzy') {
@@ -349,7 +366,29 @@ export function useEventEditor({
   const selectDefinition = useCallback((value: string) => { setSelectedDefinitionId(value); setSaveError(null); }, []);
   const setColorId = useCallback((value: EventColorId | null) => { setColorIdValue(value); clearErrors(); }, [clearErrors]);
   const setLocation = useCallback((value: string) => { setLocationValue(value); clearErrors(); }, [clearErrors]);
-  const setNotes = useCallback((value: string) => { setNotesValue(value); clearErrors(); }, [clearErrors]);
+  const openNoteEditor = useCallback(() => {
+    setNoteLinkError(null);
+    setNoteEditorOpen(true);
+  }, []);
+  const cancelNoteEditor = useCallback(() => { setNoteEditorOpen(false); }, []);
+  const completeNoteEditor = useCallback((value: EventNoteDocumentV1 | null) => {
+    setNoteDocument(value === null ? null : normalizeEventNoteDocument(value));
+    setNoteEditorOpen(false);
+    clearErrors();
+  }, [clearErrors]);
+  const openNoteLink = useCallback(async (value: string): Promise<void> => {
+    const safeUrl = parseSafeEventNoteUrl(value);
+    if (safeUrl === null) {
+      setNoteLinkError('リンクを開けませんでした。');
+      return;
+    }
+    try {
+      await openBrowser(safeUrl);
+      setNoteLinkError(null);
+    } catch {
+      setNoteLinkError('リンクを開けませんでした。');
+    }
+  }, [openBrowser]);
   const updateRecurrence = useCallback((update: Partial<RecurrenceDraft>) => {
     setRecurrenceDraft((value) => ({ ...value, ...update }));
     setRecurrenceError(null);
@@ -441,7 +480,7 @@ export function useEventEditor({
       anchorDate: isRelative ? relativeResolution?.startDate ?? startDate : startDate,
       createdTimeZoneId: existingEvent?.createdTimeZoneId ?? getTimeZoneId(),
       location: optionalText(location),
-      notes: optionalText(notes),
+      noteDocument,
       colorId,
       recurrenceRule: recurrence.value,
     };
@@ -514,7 +553,7 @@ export function useEventEditor({
       setIsSaving(false);
     }
   }, [calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
-    getTimeZoneId, isAllDay, location, newEventId, notes, now, recurrenceDraft, reminders,
+    getTimeZoneId, isAllDay, location, newEventId, noteDocument, now, recurrenceDraft, reminders,
     definitions, occurrenceEditData, relativeResolution, selectedDefinitionId,
     startDate, startTime, status, title]);
 
@@ -670,7 +709,10 @@ export function useEventEditor({
     calendarColorId,
     colorId,
     location,
-    notes,
+    noteDocument,
+    noteSummary: projectEventNoteToPlainText(noteDocument) ?? '',
+    isNoteEditorOpen,
+    noteLinkError,
     recurrenceDraft,
     reminders,
     titleError,
@@ -693,7 +735,10 @@ export function useEventEditor({
     selectDefinition,
     setColorId,
     setLocation,
-    setNotes,
+    openNoteEditor,
+    cancelNoteEditor,
+    completeNoteEditor,
+    openNoteLink,
     setRecurrencePreset,
     setRecurrenceFrequency,
     setRecurrenceIntervalText,

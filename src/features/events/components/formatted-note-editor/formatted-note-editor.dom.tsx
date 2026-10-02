@@ -40,7 +40,8 @@ type Props = Readonly<{
   theme: EditorTheme;
   onReady(): Promise<void>;
   onStateChange(state: EditorSelectionState): Promise<void>;
-  onComplete(document: EventNoteDocumentV1 | null): Promise<void>;
+  onComplete(document: EventNoteDocumentV1): Promise<void>;
+  onConversionFailure(): Promise<void>;
   onFailure(): Promise<void>;
   dom?: import('expo/dom').DOMProps;
 }>;
@@ -52,6 +53,7 @@ export default function FormattedNoteEditorDOM({
   onReady,
   onStateChange,
   onComplete,
+  onConversionFailure,
   onFailure,
 }: Props) {
   const dirtyRef = useRef(false);
@@ -97,9 +99,14 @@ export default function FormattedNoteEditorDOM({
         void onFailure();
         return;
       }
-      void onComplete(fromTiptapDocument(editor.getJSON()));
+      const result = fromTiptapDocument(editor.getJSON());
+      if (!result.ok) {
+        void onConversionFailure();
+        return;
+      }
+      void onComplete(result.value);
     },
-  }), [editor, onComplete, onFailure]);
+  }), [editor, onComplete, onConversionFailure, onFailure]);
 
   return (
     <main style={{ background: theme.background, color: theme.text, minHeight: '100vh' }}>

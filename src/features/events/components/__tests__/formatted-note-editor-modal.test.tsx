@@ -18,6 +18,7 @@ type MockDomProps = {
   onReady: () => Promise<void>;
   onStateChange: (state: unknown) => Promise<void>;
   onComplete: (document: unknown) => Promise<void>;
+  onConversionFailure: () => Promise<void>;
 };
 
 let mockDomProps: MockDomProps;
@@ -98,6 +99,22 @@ describe('全画面の書式付きメモeditor', () => {
 
     expect(onComplete).not.toHaveBeenCalled();
     expect(view.getByText('メモを更新できませんでした。もう一度お試しください。')).toBeOnTheScreen();
+  });
+
+  test('DOM文書の変換失敗ではdraftを上書きせず同じeditorで再試行できる', async () => {
+    const onComplete = jest.fn();
+    const view = await render(<FormattedNoteEditorModal visible initialDocument={document}
+      disabled={false} linkError={null} onCancel={jest.fn()} onComplete={onComplete}
+      onOpenLink={jest.fn()} />);
+    await act(async () => {
+      await mockDomProps.onReady();
+      await mockDomProps.onConversionFailure();
+    });
+
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(view.getByText('メモを更新できませんでした。もう一度お試しください。')).toBeOnTheScreen();
+    expect(view.getByTestId('formatted-note-dom')).toBeOnTheScreen();
+    expect(view.getByLabelText('完了')).toBeEnabled();
   });
 
   test('変更後のキャンセルは破棄確認を経てから閉じる', async () => {

@@ -14,7 +14,8 @@ type Props = Readonly<{
   theme: EditorTheme;
   onReady(): Promise<void>;
   onStateChange(state: EditorSelectionState): Promise<void>;
-  onComplete(document: EventNoteDocumentV1 | null): Promise<void>;
+  onComplete(document: EventNoteDocumentV1): Promise<void>;
+  onConversionFailure(): Promise<void>;
   onFailure(): Promise<void>;
 }>;
 
@@ -25,6 +26,7 @@ export function FormattedNoteEditor({
   onReady,
   onStateChange,
   onComplete,
+  onConversionFailure,
   onFailure,
 }: Props) {
   const [navigationPolicy] = useState(() =>
@@ -34,7 +36,7 @@ export function FormattedNoteEditor({
       {/* Expo DOM Componentsのimperative APIへrefを渡すため、render時のref受け渡しが必要。 */}
       <FormattedNoteEditorDOM ref={editorRef} initialDocument={initialDocument}
         theme={theme} onReady={onReady} onStateChange={onStateChange}
-        onComplete={onComplete} onFailure={onFailure}
+        onComplete={onComplete} onConversionFailure={onConversionFailure} onFailure={onFailure}
         dom={{
           containerStyle: styles.editor,
           scrollEnabled: true,

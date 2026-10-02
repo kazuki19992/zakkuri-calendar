@@ -20,14 +20,25 @@ const document: EventNoteDocumentV1 = {
 
 describe('Tiptap予定メモadapter', () => {
   test('全対応書式をTiptap JSON経由で同じcanonical文書へ戻す', () => {
-    expect(fromTiptapDocument(toTiptapDocument(document))).toEqual(document);
+    expect(fromTiptapDocument(toTiptapDocument(document))).toEqual({ ok: true, value: document });
   });
 
-  test('空文書と意味のある空段落を区別する', () => {
+  test('正常な空文書を変換失敗と区別できる文書として返す', () => {
     expect(toTiptapDocument(null)).toEqual({
       type: 'doc',
       content: [{ type: 'paragraph' }],
     });
+    expect(fromTiptapDocument(toTiptapDocument(null))).toEqual({
+      ok: true,
+      value: { version: 1, blocks: [{ type: 'paragraph', content: [] }] },
+    });
+    expect(fromTiptapDocument({ type: 'paragraph' })).toEqual({
+      ok: false,
+      error: { message: 'invalid Tiptap event note document' },
+    });
+  });
+
+  test('意味のある空段落を維持する', () => {
     expect(fromTiptapDocument({
       type: 'doc',
       content: [
@@ -36,12 +47,15 @@ describe('Tiptap予定メモadapter', () => {
         { type: 'paragraph', content: [{ type: 'text', text: '後' }] },
       ],
     })).toEqual({
-      version: 1,
-      blocks: [
-        { type: 'paragraph', content: [{ text: '前' }] },
-        { type: 'paragraph', content: [] },
-        { type: 'paragraph', content: [{ text: '後' }] },
-      ],
+      ok: true,
+      value: {
+        version: 1,
+        blocks: [
+          { type: 'paragraph', content: [{ text: '前' }] },
+          { type: 'paragraph', content: [] },
+          { type: 'paragraph', content: [{ text: '後' }] },
+        ],
+      },
     });
   });
 
@@ -63,11 +77,14 @@ describe('Tiptap予定メモadapter', () => {
         },
       ],
     })).toEqual({
-      version: 1,
-      blocks: [
-        { type: 'paragraph', content: [{ text: '# 予定' }] },
-        { type: 'paragraph', content: [{ text: '危険' }] },
-      ],
+      ok: true,
+      value: {
+        version: 1,
+        blocks: [
+          { type: 'paragraph', content: [{ text: '# 予定' }] },
+          { type: 'paragraph', content: [{ text: '危険' }] },
+        ],
+      },
     });
   });
 
@@ -91,8 +108,11 @@ describe('Tiptap予定メモadapter', () => {
         }],
       }],
     })).toEqual({
-      version: 1,
-      blocks: [{ type: 'bulletList', items: [[{ text: '親' }], [{ text: '子' }]] }],
+      ok: true,
+      value: {
+        version: 1,
+        blocks: [{ type: 'bulletList', items: [[{ text: '親' }], [{ text: '子' }]] }],
+      },
     });
   });
 
@@ -118,11 +138,14 @@ describe('Tiptap予定メモadapter', () => {
         }],
       }],
     })).toEqual({
-      version: 1,
-      blocks: [{ type: 'checkList', items: [
-        { checked: false, content: [{ text: '親' }] },
-        { checked: true, content: [{ text: '子' }] },
-      ] }],
+      ok: true,
+      value: {
+        version: 1,
+        blocks: [{ type: 'checkList', items: [
+          { checked: false, content: [{ text: '親' }] },
+          { checked: true, content: [{ text: '子' }] },
+        ] }],
+      },
     });
   });
 

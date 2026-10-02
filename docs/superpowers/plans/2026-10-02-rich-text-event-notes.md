@@ -191,16 +191,16 @@ Expected: package群が同じ3.x minorへ解決され、peer dependency errorが
 - [ ] **Step 2: round trip、unsupported paste、nested list、link protocolの失敗testを書く**
 
 ```ts
-expect(fromTiptapDocument(toTiptapDocument(document))).toEqual(document);
+expect(fromTiptapDocument(toTiptapDocument(document))).toEqual({ ok: true, value: document });
 expect(fromTiptapDocument({ type: 'doc', content: [
   { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: '# 予定' }] },
   { type: 'paragraph', content: [{ type: 'text', text: '危険', marks: [
     { type: 'link', attrs: { href: 'javascript:alert(1)' } },
   ] }] },
-] })).toEqual({ version: 1, blocks: [
+] })).toEqual({ ok: true, value: { version: 1, blocks: [
   { type: 'paragraph', content: [{ text: '# 予定' }] },
   { type: 'paragraph', content: [{ text: '危険' }] },
-] });
+] } });
 ```
 
 bold+italic+link重複、hardBreak、task checked、空段落、nested listの平坦化もliteral expectationで追加する。
@@ -210,7 +210,9 @@ bold+italic+link重複、hardBreak、task checked、空段落、nested listの�
 
 ```ts
 export function toTiptapDocument(document: EventNoteDocumentV1 | null): JSONContent;
-export function fromTiptapDocument(value: unknown): EventNoteDocumentV1 | null;
+export function fromTiptapDocument(value: unknown):
+  | { ok: true; value: EventNoteDocumentV1 }
+  | { ok: false; error: { message: string } };
 
 export const createEventNoteExtensions = () => [
   Document, Paragraph, Text, HardBreak, Bold, Italic,

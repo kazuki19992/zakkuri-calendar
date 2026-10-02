@@ -92,13 +92,7 @@ function FormattedNoteEditorModalContent({
     editorRef.current?.requestComplete();
   }, [disabled, ready]);
 
-  const receiveComplete = useCallback(async (value: EventNoteDocumentV1 | null): Promise<void> => {
-    if (value === null) {
-      completionRef.current = false;
-      setCompleting(false);
-      onComplete(null);
-      return;
-    }
+  const receiveComplete = useCallback(async (value: EventNoteDocumentV1): Promise<void> => {
     const parsed = parseEventNoteDocument(value);
     if (!parsed.ok) {
       completionRef.current = false;
@@ -110,6 +104,12 @@ function FormattedNoteEditorModalContent({
     setCompleting(false);
     onComplete(normalizeEventNoteDocument(parsed.value));
   }, [onComplete]);
+
+  const receiveConversionFailure = useCallback(async (): Promise<void> => {
+    completionRef.current = false;
+    setCompleting(false);
+    setError('メモを更新できませんでした。もう一度お試しください。');
+  }, []);
 
   const receiveFailure = useCallback(async (): Promise<void> => {
     completionRef.current = false;
@@ -154,6 +154,7 @@ function FormattedNoteEditorModalContent({
             onReady={async () => { setReady(true); setError(null); }}
             onStateChange={async (state) => { dirtyRef.current = state.dirty; setSelection(state); }}
             onComplete={receiveComplete}
+            onConversionFailure={receiveConversionFailure}
             onFailure={receiveFailure} />
           {!ready && error === null ? (
             <View style={styles.feedback}>

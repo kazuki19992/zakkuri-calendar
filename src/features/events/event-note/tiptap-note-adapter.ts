@@ -1,6 +1,5 @@
 import type { JSONContent } from '@tiptap/core';
 import {
-  normalizeEventNoteDocument,
   parseEventNoteDocument,
   parseSafeEventNoteUrl,
   type EventNoteBlockV1,
@@ -9,6 +8,15 @@ import {
 } from '@/domain/calendar/event-note';
 
 type JsonRecord = Record<string, unknown>;
+
+export type TiptapDocumentConversionResult =
+  | Readonly<{ ok: true; value: EventNoteDocumentV1 }>
+  | Readonly<{ ok: false; error: Readonly<{ message: string }> }>;
+
+const conversionFailure = (): TiptapDocumentConversionResult => ({
+  ok: false,
+  error: { message: 'invalid Tiptap event note document' },
+});
 
 const isRecord = (value: unknown): value is JsonRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -161,13 +169,15 @@ function parseTopLevelBlock(value: unknown): EventNoteBlockV1 | null {
   return { type: 'paragraph', content: collectInline(value) };
 }
 
-export function fromTiptapDocument(value: unknown): EventNoteDocumentV1 | null {
-  if (!isRecord(value) || value.type !== 'doc' || !Array.isArray(value.content)) return null;
+export function fromTiptapDocument(value: unknown): TiptapDocumentConversionResult {
+  if (!isRecord(value) || value.type !== 'doc' || !Array.isArray(value.content)) {
+    return conversionFailure();
+  }
   const candidate = {
     version: 1,
     blocks: value.content.map(parseTopLevelBlock).filter((block): block is EventNoteBlockV1 =>
       block !== null),
   } as const;
   const parsed = parseEventNoteDocument(candidate);
-  return parsed.ok ? normalizeEventNoteDocument(parsed.value) : null;
+  return parsed.ok ? { ok: true, value: parsed.value } : conversionFailure();
 }

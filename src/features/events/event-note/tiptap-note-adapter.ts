@@ -54,7 +54,7 @@ export function toTiptapDocument(document: EventNoteDocumentV1 | null): JSONCont
           })),
         };
       }
-      return {
+      if (block.type === 'checkList') return {
         type: 'taskList',
         content: block.items.map((item) => ({
           type: 'taskItem',
@@ -62,6 +62,7 @@ export function toTiptapDocument(document: EventNoteDocumentV1 | null): JSONCont
           content: [paragraph(item.content)],
         })),
       };
+      return { type: 'paragraph' };
     }),
   };
 }
@@ -121,17 +122,17 @@ function parseListItemsInOrder(
   return items;
 }
 
-function parseTaskItems(value: JsonRecord): Array<Readonly<{
+function parseTaskItems(value: JsonRecord): Readonly<{
   checked: boolean;
   content: readonly EventNoteInlineV1[];
-}>> {
+}>[] {
   if (!Array.isArray(value.content)) return [];
-  const items: Array<Readonly<{ checked: boolean; content: readonly EventNoteInlineV1[] }>> = [];
+  const items: Readonly<{ checked: boolean; content: readonly EventNoteInlineV1[] }>[] = [];
   for (const item of value.content) {
     if (!isRecord(item) || item.type !== 'taskItem' || !Array.isArray(item.content)) continue;
     const attrs = isRecord(item.attrs) ? item.attrs : {};
     const direct: EventNoteInlineV1[] = [];
-    const nested: Array<Readonly<{ checked: boolean; content: readonly EventNoteInlineV1[] }>> = [];
+    const nested: Readonly<{ checked: boolean; content: readonly EventNoteInlineV1[] }>[] = [];
     for (const child of item.content) {
       if (isRecord(child) && child.type === 'taskList') {
         nested.push(...parseTaskItems(child));

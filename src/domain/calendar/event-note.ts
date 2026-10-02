@@ -101,7 +101,7 @@ function parseBlock(value: unknown): EventNoteBlockV1 | undefined {
   }
   if (value.type === 'checkList') {
     if (!hasOnlyKeys(value, ['type', 'items']) || !Array.isArray(value.items)) return undefined;
-    const items: Array<Readonly<{ checked: boolean; content: readonly EventNoteInlineV1[] }>> = [];
+    const items: Readonly<{ checked: boolean; content: readonly EventNoteInlineV1[] }>[] = [];
     for (const item of value.items) {
       if (!isRecord(item) || !hasOnlyKeys(item, ['checked', 'content']) ||
           typeof item.checked !== 'boolean') return undefined;
@@ -157,7 +157,7 @@ export function projectEventNoteToPlainText(
       lines.push(...block.items.map((item) => `• ${inlineText(item)}`));
     } else if (block.type === 'orderedList') {
       lines.push(...block.items.map((item, index) => `${index + 1}. ${inlineText(item)}`));
-    } else {
+    } else if (block.type === 'checkList') {
       lines.push(...block.items.map((item) => `${item.checked ? '☑' : '☐'} ${inlineText(item.content)}`));
     }
   }

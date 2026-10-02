@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '../event';
+import { eventNoteFromPlainText } from '../event-note';
 import type { EventAggregate } from '../event-reminder';
 import type { RecurrenceException } from '../recurrence-exception';
 import {
@@ -16,7 +17,7 @@ function aggregate(overrides: Partial<CalendarEvent> = {}): EventAggregate {
       id: 'series-1', calendarId: 'personal-default', title: '定例会',
       temporalType: 'exact', anchorDate: '2026-10-05', startTime: '09:00',
       duration: { type: 'fixed', minutes: 30 }, createdTimeZoneId: 'Asia/Tokyo',
-      location: null, notes: null, colorId: 'blue',
+      location: null, noteDocument: null, colorId: 'blue',
       recurrenceRule: { version: 1, frequency: 'weekly', interval: 1,
         weekdays: [1], end: { type: 'never' } },
       createdAt: NOW, updatedAt: NOW, ...overrides,
@@ -42,11 +43,19 @@ describe('繰り返しシリーズの変更計画', () => {
     const series = aggregate();
     const displayed = aggregate({ title: 'この回だけ', anchorDate: '2026-10-12' });
     const submitted = aggregate({
-      title: 'この回だけ', anchorDate: '2026-10-12', notes: '今回追加',
+      title: 'この回だけ', anchorDate: '2026-10-12',
+      noteDocument: eventNoteFromPlainText('今回追加'),
     });
 
     expect(buildSeriesScopedAggregate({ series, occurrenceDate: '2026-10-12', displayed, submitted }))
-      .toMatchObject({ event: { title: '定例会', notes: '今回追加', anchorDate: '2026-10-12' } });
+      .toMatchObject({ event: { title: '定例会', noteDocument: eventNoteFromPlainText('今回追加'), anchorDate: '2026-10-12' } });
+  });
+
+  test('構造的に同じメモ文書を変更扱いにしない', () => {
+    const noteDocument = eventNoteFromPlainText('同じメモ');
+    const before = aggregate({ noteDocument });
+    const after = aggregate({ noteDocument: noteDocument === null ? null : JSON.parse(JSON.stringify(noteDocument)) });
+    expect(getChangedEventFields(before, after)).not.toContain('notes');
   });
 
   test('これ以降では旧シリーズを境界直前で閉じ通常の新シリーズを作る', () => {

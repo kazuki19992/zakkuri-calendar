@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '../event';
+import { eventNoteFromPlainText } from '../event-note';
 import {
   materializeOccurrenceReplacement,
   parseRecurrenceException,
@@ -15,7 +16,7 @@ const seriesEvent: CalendarEvent = {
   endDate: '2026-10-02',
   createdTimeZoneId: 'Asia/Tokyo',
   location: '会議室A',
-  notes: '元のメモ',
+  noteDocument: eventNoteFromPlainText('元のメモ'),
   colorId: 'blue',
   recurrenceRule: {
     version: 1,
@@ -35,7 +36,7 @@ const replacementEvent: CalendarEvent = {
   anchorDate: '2026-10-07',
   endDate: '2026-10-09',
   location: '会議室B',
-  notes: '変更したメモ',
+  noteDocument: eventNoteFromPlainText('変更したメモ'),
   colorId: 'red',
   recurrenceRule: null,
 };
@@ -90,7 +91,7 @@ describe('繰り返し予定の例外', () => {
       anchorDate: '2026-10-05',
       endDate: '2026-10-06',
       location: '会議室A',
-      notes: '元のメモ',
+      noteDocument: eventNoteFromPlainText('元のメモ'),
       colorId: 'blue',
       recurrenceRule: null,
     });
@@ -109,7 +110,7 @@ describe('繰り返し予定の例外', () => {
       anchorDate: '2026-10-07',
       endDate: '2026-10-09',
       location: '会議室B',
-      notes: '変更したメモ',
+      noteDocument: eventNoteFromPlainText('変更したメモ'),
       colorId: 'red',
       recurrenceRule: null,
     });

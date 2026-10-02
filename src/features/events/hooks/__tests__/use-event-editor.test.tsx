@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { Calendar } from '@/domain/calendar/calendar';
 import type { CalendarEvent } from '@/domain/calendar/event';
+import { eventNoteFromPlainText } from '@/domain/calendar/event-note';
 import type { EventAggregate } from '@/domain/calendar/event-reminder';
 import type { CalendarRepository, EventRepository, SettingsRepository, TemporalDefinitionRepository } from '@/domain/calendar/repositories';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
@@ -10,7 +11,7 @@ const calendar: Calendar = { id: 'personal-default', name: 'マイカレンダ�
 const morning: TemporalDefinition = { id: 'personal-default:morning', calendarId: calendar.id, key: 'morning', label: '朝', granularity: 'day', resolverConfig: { kind: 'timeOfDay', startMinute: 360, endMinute: 720 }, fadeInRatio: 0.2, fadeOutRatio: 0.2, isSystem: true, isEnabled: true, sortOrder: 1, createdAt: calendar.createdAt, updatedAt: calendar.updatedAt };
 const nextWeek: TemporalDefinition = { ...morning, id: 'personal-default:next_week_first_half', key: 'next_week_first_half', label: '来週前半', granularity: 'week', resolverConfig: { kind: 'week', selectionWeekOffset: 1, startWeekday: 1, endWeekday: 3 }, sortOrder: 20 };
 const exactEvent: Extract<CalendarEvent, { temporalType: 'exact' }> = {
-  id: 'event-1', calendarId: calendar.id, title: '歯医者', anchorDate: '2026-09-09', temporalType: 'exact', startTime: '23:30', duration: { type: 'fixed', minutes: 2_940 }, createdTimeZoneId: 'Asia/Tokyo', location: '渋谷区', notes: '保険証を持参', colorId: 'teal', recurrenceRule: { version: 1, frequency: 'weekly', interval: 2, weekdays: [3, 5], end: { type: 'count', count: 5 } }, createdAt: calendar.createdAt, updatedAt: calendar.updatedAt,
+  id: 'event-1', calendarId: calendar.id, title: '歯医者', anchorDate: '2026-09-09', temporalType: 'exact', startTime: '23:30', duration: { type: 'fixed', minutes: 2_940 }, createdTimeZoneId: 'Asia/Tokyo', location: '渋谷区', noteDocument: eventNoteFromPlainText('保険証を持参'), colorId: 'teal', recurrenceRule: { version: 1, frequency: 'weekly', interval: 2, weekdays: [3, 5], end: { type: 'count', count: 5 } }, createdAt: calendar.createdAt, updatedAt: calendar.updatedAt,
 };
 const exactAggregate: EventAggregate = { event: exactEvent, reminders: [
   { id: 'reminder-1', eventId: exactEvent.id, minutesBefore: 30, sortOrder: 0 },
@@ -140,13 +141,13 @@ describe('予定編集の主要状態', () => {
       ...repositories, initial, eventId: exactEvent.id, occurrenceDate: '2026-09-23',
     }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
-    await act(async () => { result.current.setNotes('今回追加'); });
+    await act(async () => { result.current.completeNoteEditor(eventNoteFromPlainText('今回追加')); });
     await act(async () => { await result.current.save(); });
     await act(async () => { await result.current.selectScope('following'); });
 
     expect(repositories.events.applyRecurrenceMutation).toHaveBeenCalledWith(expect.objectContaining({
       plan: expect.objectContaining({ nextSeries: expect.objectContaining({
-        event: expect.objectContaining({ title: '歯医者', notes: '今回追加' }),
+        event: expect.objectContaining({ title: '歯医者', noteDocument: eventNoteFromPlainText('今回追加') }),
       }) }),
     }));
   });
@@ -315,19 +316,55 @@ describe('予定編集の追加情報', () => {
     const repositories = createRepositories(); repositories.events.getById.mockResolvedValue(exactAggregate);
     const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: exactEvent.id }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
-    expect(result.current).toMatchObject({ calendarName: 'マイカレンダー', calendarColorId: 'blue', colorId: 'teal', location: '渋谷区', notes: '保険証を持参', recurrenceDraft: { preset: 'custom', frequency: 'weekly', intervalText: '2', weekdays: [3, 5], endType: 'count', countText: '5' }, reminders: [{ id: 'reminder-1', minutesBefore: 30 }, { id: 'reminder-2', minutesBefore: 10 }] });
+    expect(result.current).toMatchObject({ calendarName: 'マイカレンダー', calendarColorId: 'blue', colorId: 'teal', noteSummary: '保険証を持参', recurrenceDraft: { preset: 'custom', frequency: 'weekly', intervalText: '2', weekdays: [3, 5], endType: 'count', countText: '5' }, reminders: [{ id: 'reminder-1', minutesBefore: 30 }, { id: 'reminder-2', minutesBefore: 10 }] });
   });
 
-  it('追加情報と並べ替えた通知を集約で更新する', async () => {
+  it('メモ完了ではdraftだけを更新し予定保存時に文書を永続化する', async () => {
     const repositories = createRepositories(); repositories.events.getById.mockResolvedValue(exactAggregate);
     const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: exactEvent.id }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
-    await act(async () => { result.current.setLocation('  新宿  '); result.current.setNotes('  メモ本文  '); result.current.setColorId('red'); result.current.moveReminder('reminder-2', -1); });
+    const document = eventNoteFromPlainText('メモ本文');
+    await act(async () => { result.current.openNoteEditor(); });
+    expect(result.current.isNoteEditorOpen).toBe(true);
+    await act(async () => { result.current.completeNoteEditor(document); });
+    expect(repositories.events.update).not.toHaveBeenCalled();
+    expect(result.current).toMatchObject({ isNoteEditorOpen: false, noteSummary: 'メモ本文' });
+
+    await act(async () => { result.current.setLocation('  新宿  '); result.current.setColorId('red'); result.current.moveReminder('reminder-2', -1); });
     await act(async () => { await result.current.save(); });
-    expect(repositories.events.update).toHaveBeenCalledWith({ event: expect.objectContaining({ location: '新宿', notes: 'メモ本文', colorId: 'red', recurrenceRule: exactEvent.recurrenceRule }), reminders: [
+    expect(repositories.events.update).toHaveBeenCalledWith({ event: expect.objectContaining({ location: '新宿', noteDocument: document, colorId: 'red', recurrenceRule: exactEvent.recurrenceRule }), reminders: [
       { id: 'reminder-2', eventId: exactEvent.id, minutesBefore: 10, sortOrder: 0 },
       { id: 'reminder-1', eventId: exactEvent.id, minutesBefore: 30, sortOrder: 1 },
     ] });
+  });
+
+  it('メモ編集のキャンセルではdraftを変更しない', async () => {
+    const repositories = createRepositories(); repositories.events.getById.mockResolvedValue(exactAggregate);
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: exactEvent.id }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.openNoteEditor(); result.current.cancelNoteEditor(); });
+    expect(result.current).toMatchObject({ isNoteEditorOpen: false, noteSummary: '保険証を持参' });
+  });
+
+  it('選択linkはhttp系だけを外部browserで開き失敗を固定文言で示す', async () => {
+    const repositories = createRepositories();
+    const openBrowser = jest.fn().mockResolvedValue(undefined);
+    const { result } = await renderHook(() => useEventEditor({
+      ...repositories, initial, openBrowser,
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => { await result.current.openNoteLink('javascript:alert(1)'); });
+    expect(openBrowser).not.toHaveBeenCalled();
+    expect(result.current.noteLinkError).toBe('リンクを開けませんでした。');
+
+    await act(async () => { await result.current.openNoteLink('https://example.com/path'); });
+    expect(openBrowser).toHaveBeenCalledWith('https://example.com/path');
+    expect(result.current.noteLinkError).toBeNull();
+
+    openBrowser.mockRejectedValueOnce(new Error('failed'));
+    await act(async () => { await result.current.openNoteLink('http://example.com/'); });
+    expect(result.current.noteLinkError).toBe('リンクを開けませんでした。');
   });
 
   it('通知の重複を避けて追加・削除し新規IDを保存する', async () => {

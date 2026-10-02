@@ -1,5 +1,6 @@
 import { addDays, addYears, differenceInCalendarDays, format, parse } from 'date-fns';
 import type { CalendarEvent } from './event';
+import { areEventNotesEqual } from './event-note';
 import { expandEventOccurrences } from './event-occurrence';
 import type { EventAggregate } from './event-reminder';
 import type {
@@ -68,7 +69,7 @@ export function getChangedEventFields(
   if (before.event.title !== after.event.title) changed.push('title');
   if (!jsonEqual(temporalValue(before.event), temporalValue(after.event))) changed.push('temporal');
   if (before.event.location !== after.event.location) changed.push('location');
-  if (before.event.notes !== after.event.notes) changed.push('notes');
+  if (!areEventNotesEqual(before.event.noteDocument, after.event.noteDocument)) changed.push('notes');
   if (before.event.colorId !== after.event.colorId) changed.push('color');
   if (!jsonEqual(before.reminders.map(({ minutesBefore }) => minutesBefore),
     after.reminders.map(({ minutesBefore }) => minutesBefore))) changed.push('reminders');

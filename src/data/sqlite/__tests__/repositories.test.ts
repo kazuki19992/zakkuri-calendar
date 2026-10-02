@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
+import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
 import type { EventReminder } from '@/domain/calendar/event-reminder';
 import type { AppDatabase } from '@/data/sqlite/database';
 import { createDatabaseDouble } from '@/test/create-database-double';
@@ -10,6 +11,10 @@ import { SqliteTemporalDefinitionRepository } from '../temporal-definition-repos
 import type { CalendarRow, EventRow, RecurrenceExceptionRow, TemporalDefinitionRow } from '../row-mappers';
 
 const now = '2026-09-08T00:00:00.000Z';
+const noteDocument: EventNoteDocumentV1 = {
+  version: 1,
+  blocks: [{ type: 'checkList', items: [{ checked: false, content: [{ text: '診察券を持参' }] }] }],
+};
 const calendarRow: CalendarRow = {
   id: 'personal-default', name: 'マイカレンダー', time_zone_id: 'Asia/Tokyo', color_id: 'blue', created_at: now, updated_at: now,
 };
@@ -24,11 +29,11 @@ const eventRow: EventRow = {
   created_time_zone_id: 'Asia/Tokyo', created_at: now, updated_at: now,
   end_date: null, location: '東京', notes: '診察券を持参', color_id: 'teal',
   recurrence_rule_json: '{"version":1,"frequency":"weekly","interval":1,"weekdays":[1],"end":{"type":"never"}}',
-  fuzzy_resolution_context_json: null,
+  fuzzy_resolution_context_json: null, notes_document_json: JSON.stringify(noteDocument),
 };
 const exactEvent: CalendarEvent = {
   id: 'event-1', calendarId: 'personal-default', title: '歯医者', temporalType: 'exact', anchorDate: '2026-09-08',
-  startTime: '14:30', duration: { type: 'fixed', minutes: 30 }, location: '東京', notes: '診察券を持参', colorId: 'teal',
+  startTime: '14:30', duration: { type: 'fixed', minutes: 30 }, location: '東京', noteDocument, colorId: 'teal',
   recurrenceRule: { version: 1, frequency: 'weekly', interval: 1, weekdays: [1], end: { type: 'never' } },
   createdTimeZoneId: 'Asia/Tokyo', createdAt: now, updatedAt: now,
 };
@@ -177,7 +182,9 @@ describe('SQLite repositories', () => {
     expect(db.exclusiveTransaction).toHaveBeenCalledTimes(1);
     expect(db.run).not.toHaveBeenCalled();
     expect(db.transactionRun).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO events'), expect.objectContaining({
-      $location: '東京', $notes: '診察券を持参', $colorId: 'teal', $recurrenceRuleJson: expect.any(String),
+      $location: '東京', $notes: '☐ 診察券を持参',
+      $notesDocumentJson: JSON.stringify(noteDocument),
+      $colorId: 'teal', $recurrenceRuleJson: expect.any(String),
     }));
     expect(db.transactionRun).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO event_reminders'), {
       $id: 'reminder-10', $eventId: exactEvent.id, $minutesBefore: 10, $sortOrder: 0,

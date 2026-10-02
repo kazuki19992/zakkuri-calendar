@@ -3,7 +3,7 @@ import { createStandardTemporalDefinitions } from '@/domain/temporal/standard-de
 import type { AppDatabase } from './database';
 
 export const DATABASE_NAME = 'zakkuri-calendar.db';
-export const LATEST_SCHEMA_VERSION = 4;
+export const LATEST_SCHEMA_VERSION = 5;
 
 export type MigrationEnvironment = Readonly<{
   now: () => string;
@@ -138,6 +138,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS recurrence_exceptions_replacement_event_id
   WHERE replacement_event_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS recurrence_exceptions_series_date
   ON recurrence_exceptions(series_event_id, original_occurrence_date);
+`;
+
+const SCHEMA_VERSION_5_SQL = `
+ALTER TABLE events ADD COLUMN notes_document_json TEXT;
 `;
 
 export async function migrateDatabase(
@@ -278,6 +282,16 @@ export async function migrateDatabase(
          VALUES ($version, $appliedAt)
          ON CONFLICT DO NOTHING`,
         { $version: 4, $appliedAt: environment.now() },
+      );
+    }
+
+    if (currentVersion < 5) {
+      await transaction.exec(SCHEMA_VERSION_5_SQL);
+      await transaction.run(
+        `INSERT INTO schema_migrations (version, applied_at)
+         VALUES ($version, $appliedAt)
+         ON CONFLICT DO NOTHING`,
+        { $version: 5, $appliedAt: environment.now() },
       );
     }
     });

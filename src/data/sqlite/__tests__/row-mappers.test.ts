@@ -24,7 +24,7 @@ const eventRow: EventRow = {
   anchor_date: '2026-09-08', temporal_definition_id: null, start_time: '14:30',
   duration_type: 'fixed', duration_minutes: 30, created_time_zone_id: 'Asia/Tokyo',
   end_date: null, location: null, notes: null, color_id: null, recurrence_rule_json: null,
-  fuzzy_resolution_context_json: null,
+  fuzzy_resolution_context_json: null, notes_document_json: null,
   created_at: '2026-09-08T00:00:00.000Z', updated_at: '2026-09-08T00:00:00.000Z',
 };
 
@@ -85,6 +85,36 @@ describe('row mappers', () => {
       ...eventRow,
       recurrence_rule_json: '{"version":2,"frequency":"daily","interval":1,"weekdays":[],"end":{"type":"never"}}',
     }).recurrenceRule).toBeNull();
+  });
+
+  it('書式付きメモJSONを優先して復元する', () => {
+    expect(mapEventRow({
+      ...eventRow,
+      notes: '旧投影',
+      notes_document_json: JSON.stringify({
+        version: 1,
+        blocks: [{ type: 'checkList', items: [{ checked: true, content: [{ text: '完了' }] }] }],
+      }),
+    }).noteDocument).toEqual({
+      version: 1,
+      blocks: [{ type: 'checkList', items: [{ checked: true, content: [{ text: '完了' }] }] }],
+    });
+  });
+
+  it.each(['{broken', '{"version":2,"blocks":[]}'])('不正なJSONでは旧メモへ戻す: %s', (json) => {
+    expect(mapEventRow({
+      ...eventRow,
+      notes: '# 旧メモ',
+      notes_document_json: json,
+    }).noteDocument).toEqual({
+      version: 1,
+      blocks: [{ type: 'paragraph', content: [{ text: '# 旧メモ' }] }],
+    });
+  });
+
+  it('JSONと旧メモが空ならメモなしとして復元する', () => {
+    expect(mapEventRow({ ...eventRow, notes: null, notes_document_json: null }).noteDocument)
+      .toBeNull();
   });
 
   it('開始日より前のuntilを持つ保存済み規則を繰り返しなしとして予定を読み込む', () => {

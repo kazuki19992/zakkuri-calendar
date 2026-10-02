@@ -7,6 +7,10 @@ import type {
 } from '@/domain/calendar/repositories';
 import { parseCalendarEvent, type CalendarEvent } from '@/domain/calendar/event';
 import {
+  normalizeEventNoteDocument,
+  projectEventNoteToPlainText,
+} from '@/domain/calendar/event-note';
+import {
   normalizeEventReminders,
   type EventAggregate,
   type EventReminder,
@@ -48,6 +52,9 @@ function eventParameters(event: CalendarEvent): AppDatabaseParameters {
   } else {
     endDate = event.endDate;
   }
+  const noteDocument = event.noteDocument === null
+    ? null
+    : normalizeEventNoteDocument(event.noteDocument);
   return {
     $id: event.id,
     $calendarId: event.calendarId,
@@ -61,7 +68,8 @@ function eventParameters(event: CalendarEvent): AppDatabaseParameters {
     $endDate: endDate,
     $fuzzyResolutionContextJson: fuzzyResolutionContextJson,
     $location: event.location,
-    $notes: event.notes,
+    $notes: projectEventNoteToPlainText(noteDocument),
+    $notesDocumentJson: noteDocument === null ? null : JSON.stringify(noteDocument),
     $colorId: event.colorId,
     $recurrenceRuleJson: event.recurrenceRule === null ? null : JSON.stringify(event.recurrenceRule),
     $createdTimeZoneId: event.createdTimeZoneId,
@@ -108,11 +116,11 @@ async function assertFuzzyDefinitionConsistency(
 
 const INSERT_EVENT_SQL = `INSERT INTO events (
   id, calendar_id, title, temporal_type, anchor_date, temporal_definition_id,
-  start_time, duration_type, duration_minutes, end_date, location, notes, color_id,
+  start_time, duration_type, duration_minutes, end_date, location, notes, notes_document_json, color_id,
   recurrence_rule_json, fuzzy_resolution_context_json, created_time_zone_id, created_at, updated_at
 ) VALUES (
   $id, $calendarId, $title, $temporalType, $anchorDate, $temporalDefinitionId,
-  $startTime, $durationType, $durationMinutes, $endDate, $location, $notes, $colorId,
+  $startTime, $durationType, $durationMinutes, $endDate, $location, $notes, $notesDocumentJson, $colorId,
   $recurrenceRuleJson, $fuzzyResolutionContextJson, $createdTimeZoneId, $createdAt, $updatedAt
 )`;
 
@@ -164,7 +172,8 @@ async function replaceAggregate(database: AppDatabase, aggregate: EventAggregate
       calendar_id = $calendarId, title = $title, temporal_type = $temporalType,
       anchor_date = $anchorDate, temporal_definition_id = $temporalDefinitionId,
       start_time = $startTime, duration_type = $durationType, duration_minutes = $durationMinutes,
-      end_date = $endDate, location = $location, notes = $notes, color_id = $colorId,
+      end_date = $endDate, location = $location, notes = $notes,
+      notes_document_json = $notesDocumentJson, color_id = $colorId,
       recurrence_rule_json = $recurrenceRuleJson,
       fuzzy_resolution_context_json = $fuzzyResolutionContextJson,
       created_time_zone_id = $createdTimeZoneId, updated_at = $updatedAt
@@ -449,7 +458,8 @@ export class SqliteEventRepository implements EventRepository {
           calendar_id = $calendarId, title = $title, temporal_type = $temporalType,
           anchor_date = $anchorDate, temporal_definition_id = $temporalDefinitionId,
           start_time = $startTime, duration_type = $durationType, duration_minutes = $durationMinutes,
-          end_date = $endDate, location = $location, notes = $notes, color_id = $colorId,
+          end_date = $endDate, location = $location, notes = $notes,
+          notes_document_json = $notesDocumentJson, color_id = $colorId,
           recurrence_rule_json = $recurrenceRuleJson,
           fuzzy_resolution_context_json = $fuzzyResolutionContextJson,
           created_time_zone_id = $createdTimeZoneId,

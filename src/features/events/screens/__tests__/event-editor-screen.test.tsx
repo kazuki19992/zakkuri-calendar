@@ -13,12 +13,14 @@ const state: EventEditorState = {
   isRecurrenceEditable: true, relativeDatePreview: null,
   startDate: '2026-09-25', startTime: '09:30', endDate: '2026-09-26', endTime: '11:45',
   definitions: [], selectedDefinitionId: null, calendarName: 'マイカレンダー', calendarColorId: 'blue',
-  colorId: null, location: '', notes: '',
+  colorId: null, location: '', noteDocument: null, noteSummary: '', isNoteEditorOpen: false,
+  noteLinkError: null,
   recurrenceDraft: { preset: 'none', frequency: 'weekly', intervalText: '1', weekdays: [5], endType: 'never', untilDate: '2026-09-25', countText: '1' },
   reminders: [], titleError: null, dateError: null, endTimeError: null, recurrenceError: null, reminderError: null, saveError: null,
   isSaving: false, isDeleting: false, usesRecurrenceScope: false, scopeRequest: null,
   setTitle: jest.fn(), setEditorTab: jest.fn(), setAllDay: jest.fn(), setStartDate: jest.fn(), setEndDate: jest.fn(),
-  setStartTime: jest.fn(), setEndTime: jest.fn(), selectDefinition: jest.fn(), setColorId: jest.fn(), setLocation: jest.fn(), setNotes: jest.fn(),
+  setStartTime: jest.fn(), setEndTime: jest.fn(), selectDefinition: jest.fn(), setColorId: jest.fn(), setLocation: jest.fn(),
+  openNoteEditor: jest.fn(), cancelNoteEditor: jest.fn(), completeNoteEditor: jest.fn(), openNoteLink: jest.fn(),
   setRecurrencePreset: jest.fn(), setRecurrenceFrequency: jest.fn(), setRecurrenceIntervalText: jest.fn(), toggleRecurrenceWeekday: jest.fn(),
   setRecurrenceEndType: jest.fn(), setRecurrenceUntilDate: jest.fn(), setRecurrenceCountText: jest.fn(),
   addReminder: jest.fn(), removeReminder: jest.fn(), moveReminder: jest.fn(), retry: jest.fn(), save: jest.fn(), remove: jest.fn(),
@@ -34,7 +36,7 @@ describe('予定編集フォーム', () => {
     expect(view.getByText('繰り返し')).toBeOnTheScreen();
     expect(view.getByText('マイカレンダー')).toBeOnTheScreen();
     expect(view.getByText('設定は保存されますが、端末への通知はまだ行われません')).toBeOnTheScreen();
-    expect(view.getByLabelText('メモ').props.multiline).toBe(true);
+    expect(view.getByLabelText('メモを追加')).toBeOnTheScreen();
     expect(view.queryByLabelText('予定を削除')).toBeNull();
   });
 

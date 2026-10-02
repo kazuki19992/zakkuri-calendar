@@ -25,11 +25,27 @@ export function EventReminderEditor({ reminders, disabled, error, onAdd, onRemov
   return (
     <View style={styles.container}>
       <View style={styles.presets}>
-        {PRESETS.map((minutes) => (
-          <Pressable key={minutes} accessibilityRole="button" accessibilityLabel={`${reminderLabel(minutes)}を追加`} disabled={disabled || reminders.some((item) => item.minutesBefore === minutes)} onPress={() => onAdd(minutes)} style={[styles.chip, { backgroundColor: theme.backgroundElement }]}>
-            <Text style={{ color: theme.text }}>{reminderLabel(minutes)}</Text>
-          </Pressable>
-        ))}
+        {PRESETS.map((minutes) => {
+          const label = reminderLabel(minutes);
+          const added = reminders.some((item) => item.minutesBefore === minutes);
+          return (
+            <Pressable key={minutes} accessibilityRole="button"
+              accessibilityLabel={added ? `${label}は追加済み` : `${label}を追加`}
+              accessibilityState={{ disabled: disabled || added, selected: added }}
+              disabled={disabled || added} onPress={() => onAdd(minutes)}
+              style={[styles.chip, {
+                backgroundColor: added ? theme.backgroundSelected : theme.backgroundElement,
+                borderColor: added ? theme.calendarAccent : 'transparent',
+              }]}>
+              <Text style={{ color: added ? theme.calendarAccent : theme.text,
+                fontWeight: added ? '700' : '400' }}>{label}</Text>
+              {added ? <View testID={`event-editor.reminder-preset-${minutes}-check`}
+                style={[styles.checkBadge, { backgroundColor: theme.calendarAccent }]}>
+                <Text style={[styles.checkText, { color: theme.background }]}>✓</Text>
+              </View> : null}
+            </Pressable>
+          );
+        })}
       </View>
       <View style={styles.customRow}>
         <TextInput accessibilityLabel="任意の通知時間（分）" keyboardType="number-pad" editable={!disabled} value={custom} onChangeText={setCustom} placeholder="任意の分数" placeholderTextColor={theme.textSecondary} style={[styles.customInput, { borderColor: theme.calendarBorder, color: theme.text }]} />
@@ -57,7 +73,11 @@ export function EventReminderEditor({ reminders, disabled, error, onAdd, onRemov
 const styles = StyleSheet.create({
   container: { gap: 10 },
   presets: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderRadius: 8, justifyContent: 'center', minHeight: 44, paddingHorizontal: 10 },
+  chip: { borderRadius: 8, borderWidth: 2, justifyContent: 'center', minHeight: 44,
+    paddingHorizontal: 10, position: 'relative' },
+  checkBadge: { alignItems: 'center', borderRadius: 8, height: 16, justifyContent: 'center',
+    position: 'absolute', right: -4, top: -4, width: 16 },
+  checkText: { fontSize: 10, fontWeight: '700', lineHeight: 12 },
   customRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   customInput: { borderRadius: 8, borderWidth: 1, flex: 1, minHeight: 44, paddingHorizontal: 12 },
   addButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 54 },

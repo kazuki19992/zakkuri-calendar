@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { RecurrenceRuleV1 } from '@/domain/calendar/recurrence';
 import { useTheme } from '@/hooks/use-theme';
 import type { RecurrenceDraft, RecurrencePreset } from '../event-editor-model';
+import { EventSingleSelectField } from './event-single-select-field';
 
 const PRESETS: readonly [RecurrencePreset, string][] = [
   ['none', '繰り返しなし'],
@@ -31,28 +32,38 @@ export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFre
   onCountChange(value: string): void;
 }>) {
   const theme = useTheme();
-  const choices = <T extends string,>(items: readonly [T, string][], value: T, onChange: (next: T) => void) => (
-    <View style={styles.choices}>
-      {items.map(([id, label]) => {
-        const selected = id === value;
-        return <Pressable key={id} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, selected }} disabled={disabled} onPress={() => onChange(id)} style={[styles.choice, { backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement }]}><Text style={{ color: selected ? theme.calendarAccent : theme.text }}>{selected ? '✓ ' : ''}{label}</Text></Pressable>;
-      })}
-    </View>
-  );
+  const options = <T extends string,>(items: readonly [T, string][]) =>
+    items.map(([value, label]) => ({ value, label }));
   return (
     <View style={styles.container}>
-      {choices(PRESETS, draft.preset, onPresetChange)}
+      <EventSingleSelectField label="パターン" value={draft.preset} options={options(PRESETS)}
+        disabled={disabled} testID="event-editor.recurrence-preset-picker"
+        onChange={onPresetChange} />
       {draft.preset === 'custom' ? (
         <View style={styles.custom}>
-          <Text style={[styles.caption, { color: theme.textSecondary }]}>単位</Text>
-          {choices(FREQUENCIES, draft.frequency, onFrequencyChange)}
+          <EventSingleSelectField label="単位" value={draft.frequency}
+            options={options(FREQUENCIES)} disabled={disabled}
+            testID="event-editor.recurrence-frequency-picker" onChange={onFrequencyChange} />
           <TextInput accessibilityLabel="繰り返し間隔" keyboardType="number-pad" editable={!disabled} value={draft.intervalText} onChangeText={onIntervalChange} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} />
           {draft.frequency === 'weekly' ? <><Text style={[styles.caption, { color: theme.textSecondary }]}>曜日</Text><View style={styles.choices}>{WEEKDAYS.map(([weekday, label]) => {
             const selected = draft.weekdays.includes(weekday);
-            return <Pressable key={weekday} accessibilityRole="button" accessibilityLabel={`${label}曜日`} accessibilityState={{ disabled, selected }} disabled={disabled} onPress={() => onWeekdayToggle(weekday)} style={[styles.weekday, { backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement }]}><Text style={{ color: selected ? theme.calendarAccent : theme.text }}>{label}</Text></Pressable>;
+            return <Pressable key={weekday} accessibilityRole="button"
+              accessibilityLabel={`${label}曜日`} accessibilityState={{ disabled, selected }}
+              disabled={disabled} onPress={() => onWeekdayToggle(weekday)} style={[styles.weekday, {
+                backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement,
+                borderColor: selected ? theme.calendarAccent : theme.calendarBorder,
+              }]}>
+              <Text style={{ color: selected ? theme.calendarAccent : theme.text,
+                fontWeight: selected ? '700' : '400' }}>{label}</Text>
+              {selected ? <View testID={`event-editor.recurrence-weekday-${weekday}-check`}
+                style={[styles.checkBadge, { backgroundColor: theme.calendarAccent }]}>
+                <Text style={[styles.checkText, { color: theme.background }]}>✓</Text>
+              </View> : null}
+            </Pressable>;
           })}</View></> : null}
-          <Text style={[styles.caption, { color: theme.textSecondary }]}>終了条件</Text>
-          {choices(ENDS, draft.endType, onEndTypeChange)}
+          <EventSingleSelectField label="終了条件" value={draft.endType} options={options(ENDS)}
+            disabled={disabled} testID="event-editor.recurrence-end-picker"
+            onChange={onEndTypeChange} />
           {draft.endType === 'until' ? <TextInput accessibilityLabel="繰り返し終了日" editable={!disabled} value={draft.untilDate} onChangeText={onUntilDateChange} placeholder="YYYY-MM-DD" placeholderTextColor={theme.textSecondary} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} /> : null}
           {draft.endType === 'count' ? <TextInput accessibilityLabel="繰り返し回数" keyboardType="number-pad" editable={!disabled} value={draft.countText} onChangeText={onCountChange} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} /> : null}
         </View>
@@ -65,9 +76,12 @@ export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFre
 const styles = StyleSheet.create({
   container: { gap: 10 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  choice: { borderRadius: 8, justifyContent: 'center', minHeight: 44, paddingHorizontal: 10 },
   custom: { gap: 8 },
   caption: { fontSize: 13, marginTop: 4 },
   input: { borderRadius: 8, borderWidth: 1, fontSize: 16, minHeight: 44, paddingHorizontal: 12 },
-  weekday: { alignItems: 'center', borderRadius: 22, justifyContent: 'center', minHeight: 44, minWidth: 44 },
+  weekday: { alignItems: 'center', borderRadius: 22, borderWidth: 2, height: 44,
+    justifyContent: 'center', position: 'relative', width: 44 },
+  checkBadge: { alignItems: 'center', borderRadius: 8, height: 16, justifyContent: 'center',
+    position: 'absolute', right: -4, top: -4, width: 16 },
+  checkText: { fontSize: 10, fontWeight: '700', lineHeight: 12 },
 });

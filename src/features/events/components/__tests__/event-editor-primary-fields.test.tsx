@@ -10,9 +10,23 @@ jest.mock('@expo/ui/community/datetime-picker', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { __esModule: true, default: View };
 });
+jest.mock('@expo/ui', () => {
+  const ReactModule = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  function Host({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
+    return ReactModule.createElement(View, props, children);
+  }
+  const Picker = Object.assign(
+    function Picker({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
+      return ReactModule.createElement(View, props, children);
+    },
+    { Item: function PickerItem() { return null; } },
+  );
+  return { Host, Picker };
+});
 
 describe('予定編集の基本項目', () => {
-  it('ざっくり定義を日内・週・月でグループ表示する', async () => {
+  it('ざっくり定義を単一選択dropdownで変更する', async () => {
     const base = { calendarId: 'personal-default', fadeInRatio: 0, fadeOutRatio: 0,
       isSystem: true, isEnabled: true, sortOrder: 10,
       createdAt: '2026-09-30T00:00:00.000Z', updatedAt: '2026-09-30T00:00:00.000Z' } as const;
@@ -21,11 +35,12 @@ describe('予定編集の基本項目', () => {
       { ...base, id: 'next-week', key: 'next_week', label: '来週', granularity: 'week', resolverConfig: { kind: 'week', selectionWeekOffset: 1, startWeekday: 1, endWeekday: 7 } },
       { ...base, id: 'month-end', key: 'month_end', label: '月末', granularity: 'month', resolverConfig: { kind: 'monthLastDays', selectionMonthOffset: 0, count: 5 } },
     ];
-    const view = await render(<TemporalDefinitionPicker definitions={definitions} selectedId="next-week" disabled={false} onSelect={jest.fn()} />);
-    expect(view.getByText('日内')).toBeOnTheScreen();
-    expect(view.getByText('週')).toBeOnTheScreen();
-    expect(view.getByText('月')).toBeOnTheScreen();
-    expect(view.getByLabelText('来週').props.accessibilityState.selected).toBe(true);
+    const onSelect = jest.fn();
+    const view = await render(<TemporalDefinitionPicker definitions={definitions} selectedId="next-week" disabled={false} onSelect={onSelect} />);
+    const picker = view.getByTestId('event-editor.temporal-definition-picker');
+    expect(picker.props.selectedValue).toBe('next-week');
+    await act(async () => { fireEvent(picker, 'valueChange', 'morning'); });
+    expect(onSelect).toHaveBeenCalledWith('morning');
   });
   it('中央タイトルと同じ幅の左右操作を表示する', async () => {
     const view = await render(<EventEditorHeader mode="create" busy={false} ready onCancel={jest.fn()} onSave={jest.fn()} />);
@@ -42,7 +57,8 @@ describe('予定編集の基本項目', () => {
     expect(onChange).toHaveBeenCalledWith('exact');
   });
 
-  it('日時を日本語で表示し操作時だけpickerを開く', async () => {
+  it('日本語の日付表示にcompact pickerを重ねて直接選択できる', async () => {
+    const onStartDateChange = jest.fn();
     const view = await render(<EventDateTimeFields
       editorTab="exact"
       isAllDay={false}
@@ -53,15 +69,16 @@ describe('予定編集の基本項目', () => {
       endTime="11:45"
       disabled={false}
       onAllDayChange={jest.fn()}
-      onStartDateChange={jest.fn()}
+      onStartDateChange={onStartDateChange}
       onStartTimeChange={jest.fn()}
       onEndDateChange={jest.fn()}
       onEndTimeChange={jest.fn()}
     />);
     expect(view.getByText('9月25日（金）')).toBeOnTheScreen();
     expect(view.getByText('9月26日（土）')).toBeOnTheScreen();
-    expect(view.queryByTestId('event-editor.start-date-picker')).toBeNull();
-    await act(async () => { fireEvent.press(view.getByLabelText('開始日 9月25日（金）')); });
-    expect(view.getByTestId('event-editor.start-date-picker')).toBeOnTheScreen();
+    const picker = view.getByTestId('event-editor.start-date-picker');
+    expect(picker.props.display).toBe('compact');
+    await act(async () => { fireEvent(picker, 'valueChange', {}, new Date(2026, 9, 2)); });
+    expect(onStartDateChange).toHaveBeenCalledWith('2026-10-02');
   });
 });

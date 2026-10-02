@@ -19,6 +19,12 @@
 - [x] Task 5: 繰り返し、色、場所、通知、メモのUIを追加した。
 - [x] Task 6: route回帰、文書、全体テスト、iOS／Android exportを確認した。
 
+## UI改善（2026-10-02）
+
+- [x] 単一選択の時間帯、繰り返し、予定色をdropdownへ統一した。
+- [x] 整形済みの日付表示を直接タップしてnative pickerを開く構成へ変更した。
+- [x] 複数選択・追加chipのcheck badgeを固定配置し、色、枠、太字、選択状態を併用した。
+
 元のチェックリストはTDDの実施順序と検証commandを残すため、計画時の表記のまま保持する。
 
 ## Global Constraints

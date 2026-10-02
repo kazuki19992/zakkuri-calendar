@@ -5,6 +5,12 @@ import {
 } from '@/domain/calendar/event-color';
 import { parseEventReminder, type EventReminder } from '@/domain/calendar/event-reminder';
 import { parseCalendarEvent, type CalendarEvent } from '@/domain/calendar/event';
+import {
+  eventNoteFromPlainText,
+  normalizeEventNoteDocument,
+  parseEventNoteDocument,
+  type EventNoteDocumentV1,
+} from '@/domain/calendar/event-note';
 import { parseRecurrenceRule, type RecurrenceRuleV1 } from '@/domain/calendar/recurrence';
 import {
   parseRecurrenceException,
@@ -32,6 +38,7 @@ export type EventRow = Readonly<{
   end_date: string | null; location: string | null; notes: string | null; color_id: string | null;
   recurrence_rule_json: string | null;
   fuzzy_resolution_context_json: string | null;
+  notes_document_json: string | null;
 }>;
 
 export type ReminderRow = Readonly<{
@@ -111,6 +118,7 @@ export function mapTemporalDefinitionRow(row: TemporalDefinitionRow): TemporalDe
 
 export function mapEventRow(row: EventRow): CalendarEvent {
   const color = row.color_id === null ? null : parseEventColorId(row.color_id);
+  const noteDocument = parseStoredEventNote(row.notes_document_json, row.notes);
   const base = {
     id: row.id,
     calendarId: row.calendar_id,
@@ -118,7 +126,7 @@ export function mapEventRow(row: EventRow): CalendarEvent {
     temporalType: row.temporal_type,
     anchorDate: row.anchor_date,
     location: row.location,
-    notes: row.notes,
+    noteDocument,
     colorId: color !== null && color.ok ? color.value : null,
     recurrenceRule: null,
     createdTimeZoneId: row.created_time_zone_id,
@@ -160,6 +168,21 @@ export function mapEventRow(row: EventRow): CalendarEvent {
 
   const withRecurrence = parseCalendarEvent({ ...parsed.value, recurrenceRule });
   return withRecurrence.ok ? withRecurrence.value : parsed.value;
+}
+
+function parseStoredEventNote(
+  documentJson: string | null,
+  legacyNotes: string | null,
+): EventNoteDocumentV1 | null {
+  if (documentJson !== null) {
+    try {
+      const parsed = parseEventNoteDocument(JSON.parse(documentJson) as unknown);
+      if (parsed.ok) return normalizeEventNoteDocument(parsed.value);
+    } catch {
+      // 旧プレーンテキストを利用できる場合は、予定全体を読めなくしない。
+    }
+  }
+  return eventNoteFromPlainText(legacyNotes ?? '');
 }
 
 export function mapReminderRow(row: ReminderRow): EventReminder {

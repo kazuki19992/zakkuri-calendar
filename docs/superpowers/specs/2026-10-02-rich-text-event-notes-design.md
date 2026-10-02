@@ -134,7 +134,7 @@ Issue #24として、Markdownを知らない利用者でも予定メモへ基本
 - `TaskList`
 - `TaskItem`
 - `Link`
-- 履歴操作に必要な`History`
+- 履歴操作に必要な`UndoRedo`（Tiptap v3で旧`History`から改名）
 - 空文書の案内に必要な`Placeholder`
 
 汎用presetから未対応extensionを一括導入せず、許可するextensionを明示する。Heading、Code、CodeBlock、Image、Blockquote、Underline、Strikeなどは登録しない。

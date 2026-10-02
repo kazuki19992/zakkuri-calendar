@@ -3,6 +3,11 @@ import { parseEventColorId, type EventColorId } from './event-color';
 import { isCalendarDate } from './month';
 import { parseRecurrenceRule, type RecurrenceRuleV1 } from './recurrence';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
+import {
+  normalizeEventNoteDocument,
+  parseEventNoteDocument,
+  type EventNoteDocumentV1,
+} from './event-note';
 
 export type ExactDuration =
   | Readonly<{ type: 'instant' }>
@@ -22,7 +27,7 @@ type EventDraftBase = Readonly<{
   anchorDate: string;
   createdTimeZoneId: string;
   location: string | null;
-  notes: string | null;
+  noteDocument: EventNoteDocumentV1 | null;
   colorId: EventColorId | null;
   recurrenceRule: RecurrenceRuleV1 | null;
 }>;
@@ -95,8 +100,10 @@ export function parseEventDraft(input: unknown): Result<EventDraft, EventValidat
 
   const location = normalizeOptionalText(input.location);
   if (location === undefined) return fail('location', 'location must be a string or null');
-  const notes = normalizeOptionalText(input.notes);
-  if (notes === undefined) return fail('notes', 'notes must be a string or null');
+  const noteDocument = parseOptionalNoteDocument(input.noteDocument);
+  if (noteDocument === undefined) {
+    return fail('noteDocument', 'invalid event note document');
+  }
   const colorId = parseOptionalColorId(input.colorId);
   if (!colorId.ok) return colorId;
   const recurrenceRule = parseOptionalRecurrenceRule(input.recurrenceRule);
@@ -111,7 +118,7 @@ export function parseEventDraft(input: unknown): Result<EventDraft, EventValidat
     anchorDate: input.anchorDate,
     createdTimeZoneId: input.createdTimeZoneId,
     location,
-    notes,
+    noteDocument,
     colorId: colorId.value,
     recurrenceRule: recurrenceRule.value,
   };
@@ -154,6 +161,13 @@ function normalizeOptionalText(value: unknown): string | null | undefined {
   if (value === null || value === undefined) return null;
   if (typeof value !== 'string') return undefined;
   return value.trim().length === 0 ? null : value;
+}
+
+function parseOptionalNoteDocument(value: unknown): EventNoteDocumentV1 | null | undefined {
+  if (value === null || value === undefined) return null;
+  const parsed = parseEventNoteDocument(value);
+  if (!parsed.ok) return undefined;
+  return normalizeEventNoteDocument(parsed.value);
 }
 
 function parseOptionalColorId(value: unknown): Result<EventColorId | null, EventValidationError> {

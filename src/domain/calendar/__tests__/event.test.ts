@@ -11,7 +11,7 @@ const base = {
   anchorDate: '2026-09-08',
   createdTimeZoneId: 'Asia/Tokyo',
 };
-const metadata = { location: null, notes: null, colorId: null, recurrenceRule: null };
+const metadata = { location: null, noteDocument: null, colorId: null, recurrenceRule: null };
 const validExact = { ...base, ...metadata, temporalType: 'exact' as const, startTime: '14:30', duration: { type: 'fixed' as const, minutes: 30 as const } };
 const validAllDay = { ...base, ...metadata, temporalType: 'allDay' as const, endDate: '2026-09-08' };
 const validFuzzy = { ...base, ...metadata, temporalType: 'fuzzy' as const,
@@ -118,10 +118,24 @@ describe('parseEventDraft', () => {
     expect(parseEventDraft({ ...validAllDay, endDate: '2026-09-07' }).ok).toBe(false);
   });
 
-  it('空白だけの場所とメモをnullへ正規化する', () => {
-    expect(parseEventDraft({ ...validFuzzy, location: '  ', notes: '\t' })).toEqual({
+  it('空白だけの場所と空文書をnullへ正規化する', () => {
+    expect(parseEventDraft({
+      ...validFuzzy,
+      location: '  ',
+      noteDocument: { version: 1, blocks: [{ type: 'paragraph', content: [{ text: '\t' }] }] },
+    })).toEqual({
       ok: true,
       value: validFuzzy,
+    });
+  });
+
+  it('不正なメモ文書を拒否する', () => {
+    expect(parseEventDraft({
+      ...validFuzzy,
+      noteDocument: { version: 2, blocks: [] },
+    })).toEqual({
+      ok: false,
+      error: { field: 'noteDocument', message: 'invalid event note document' },
     });
   });
 

@@ -178,7 +178,7 @@ describe('ざっくり予定作成の状態調整', () => {
         endDate: '2026-09-10',
         resolutionContext: null,
         location: null,
-        notes: null,
+        noteDocument: null,
         colorId: null,
         recurrenceRule: null,
         createdTimeZoneId: 'Asia/Tokyo',

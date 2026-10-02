@@ -134,7 +134,7 @@ export function useQuickCreateEvent({
       resolutionContext: null,
       createdTimeZoneId: getTimeZoneId(),
       location: null,
-      notes: null,
+      noteDocument: null,
       colorId: null,
       recurrenceRule: null,
     };

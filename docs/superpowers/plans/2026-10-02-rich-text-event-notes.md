@@ -260,7 +260,7 @@ fireEvent(domProxy, 'complete', serializedDocument);
 expect(onComplete).toHaveBeenCalledWith(document);
 ```
 
-ready前の完了disabled、完了連打、変換失敗時に閉じない、dirty cancel確認、link操作disabled、44pt style、checkbox state payloadも分ける。DOM componentはbridgeだけをfakeにし、Modal/toolbarの実挙動をassertする。
+ready前の完了disabled、完了連打、変換失敗時に閉じず同じeditorへ完了要求を再送すること、初期化失敗時だけeditorを再マウントすること、dirty cancel確認、link操作disabled、44pt style、checkbox state payloadも分ける。DOM componentはbridgeだけをfakeにし、Modal/toolbarの実挙動をassertする。
 
 - [ ] **Step 2: `npm test -- src/features/events/components/__tests__/formatted-note-toolbar.test.tsx src/features/events/components/__tests__/formatted-note-editor-modal.test.tsx --runInBand`を実行し、component未実装でFAILすることを確認する**
 - [ ] **Step 3: `'use dom'` editorを実装する**

@@ -19,9 +19,11 @@ type MockDomProps = {
   onStateChange: (state: unknown) => Promise<void>;
   onComplete: (document: unknown) => Promise<void>;
   onConversionFailure: () => Promise<void>;
+  onFailure: () => Promise<void>;
 };
 
 let mockDomProps: MockDomProps;
+let mockDomMountCount = 0;
 
 jest.mock('../formatted-note-editor/formatted-note-editor.dom', () => {
   const ReactModule = jest.requireActual<typeof React>('react');
@@ -34,6 +36,7 @@ jest.mock('../formatted-note-editor/formatted-note-editor.dom', () => {
     ) => {
       mockDomProps = props;
       ReactModule.useImperativeHandle(ref, () => mockCommands);
+      ReactModule.useEffect(() => { mockDomMountCount += 1; }, []);
       return ReactModule.createElement(NativeView, { testID: 'formatted-note-dom' });
     }),
   };
@@ -47,6 +50,7 @@ const document: EventNoteDocumentV1 = {
 describe('全画面の書式付きメモeditor', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockDomMountCount = 0;
   });
 
   test('ready後だけ完了要求を1回送りDOMの最新文書を返すまで確定しない', async () => {
@@ -103,6 +107,7 @@ describe('全画面の書式付きメモeditor', () => {
 
   test('DOM文書の変換失敗ではdraftを上書きせず同じeditorで再試行できる', async () => {
     const onComplete = jest.fn();
+    const user = userEvent.setup();
     const view = await render(<FormattedNoteEditorModal visible initialDocument={document}
       disabled={false} linkError={null} onCancel={jest.fn()} onComplete={onComplete}
       onOpenLink={jest.fn()} />);
@@ -115,6 +120,22 @@ describe('全画面の書式付きメモeditor', () => {
     expect(view.getByText('メモを更新できませんでした。もう一度お試しください。')).toBeOnTheScreen();
     expect(view.getByTestId('formatted-note-dom')).toBeOnTheScreen();
     expect(view.getByLabelText('完了')).toBeEnabled();
+
+    await user.press(view.getByLabelText('再試行'));
+    expect(mockCommands.requestComplete).toHaveBeenCalledTimes(1);
+    expect(mockDomMountCount).toBe(1);
+  });
+
+  test('DOMの初期化失敗では再試行時にeditorを再マウントする', async () => {
+    const user = userEvent.setup();
+    const view = await render(<FormattedNoteEditorModal visible initialDocument={document}
+      disabled={false} linkError={null} onCancel={jest.fn()} onComplete={jest.fn()}
+      onOpenLink={jest.fn()} />);
+    await act(async () => { await mockDomProps.onFailure(); });
+
+    await user.press(view.getByLabelText('再試行'));
+    expect(mockCommands.requestComplete).not.toHaveBeenCalled();
+    expect(mockDomMountCount).toBe(2);
   });
 
   test('変更後のキャンセルは破棄確認を経てから閉じる', async () => {

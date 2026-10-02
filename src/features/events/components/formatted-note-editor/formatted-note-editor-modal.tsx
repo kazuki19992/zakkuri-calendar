@@ -118,6 +118,15 @@ function FormattedNoteEditorModalContent({
     setError('メモエディタを読み込めませんでした。');
   }, []);
 
+  const retry = useCallback(() => {
+    if (ready) {
+      requestComplete();
+      return;
+    }
+    setError(null);
+    setRevision((value) => value + 1);
+  }, [ready, requestComplete]);
+
   const busy = disabled || completing;
   return (
     <Modal visible presentationStyle="fullScreen" animationType={reduceMotion ? 'none' : 'slide'}
@@ -164,11 +173,8 @@ function FormattedNoteEditorModalContent({
           {error !== null ? (
             <View style={[styles.feedback, { backgroundColor: theme.background }]}>
               <Text style={[styles.error, { color: theme.calendarHoliday }]}>{error}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="再試行" onPress={() => {
-                setError(null);
-                setReady(false);
-                setRevision((value) => value + 1);
-              }} style={styles.retry}>
+              <Pressable accessibilityRole="button" accessibilityLabel="再試行" onPress={retry}
+                style={styles.retry}>
                 <Text style={{ color: theme.calendarAccent }}>再試行</Text>
               </Pressable>
             </View>

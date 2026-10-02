@@ -45,7 +45,7 @@
 
 対象外の機能は、既存のドメインモデルを置き換えずに追加できる境界を用意する。ただし、未確定の機能本体や抽象化は先回りして実装しない。
 
-### 2.3 予定モデル schema version 3の実装段階
+### 2.3 予定モデル schema version 5の実装段階
 
 予定の保存基盤は、MVPの画面範囲と段階を分けて扱う。
 
@@ -53,6 +53,8 @@
 - Stage 4前半（実装済み）: ざっくり／きっちりの2タブ、複数日、場所、メモ、色、複数通知、繰り返し規則の編集UIを提供し、予定集約へ保存・再編集する。
 - Stage 4後半（実装済み）: 繰り返し予定を個別の発生回へ展開し、2日／月ビューへ表示する。
 - 相対日付（実装済み）: 週・月単位のざっくり予定を作成時に期間へ解決し、schema version 3へ解決済み期間とversion付きcontextを保存する。「今週中」は設定した金・土・日曜日までとし、設定変更は保存済み予定へ遡及しない。
+- 繰り返し例外（実装済み）: schema version 4へ個別発生回の削除・置換とoverride field maskを保存し、「この予定」「これ以降」「すべての予定」の変更範囲を扱う。
+- 書式付きメモ（実装済み）: schema version 5へアプリ所有のversion付き文書を保存する。旧プレーンテキストを保持し、全画面エディタの完了から予定保存まではインメモリdraftとして扱う。
 - 端末通知（未実装）: 保存した通知の権限要求、予約、解除、発火を追加する。schemaへ通知行を保存できても、現時点では端末通知は発火しない。
 
 自動検証はdomain・SQLite・featureのコードと静的exportを対象とし、端末またはシミュレータ上の見た目、ピッカー操作、通知動作を確認済みとは扱わない。
@@ -126,7 +128,7 @@ Expo RouterのStackを使用する。
 - ざっくり予定の時間表現
 - 繰り返し規則
 - カレンダー既定色または予定固有色
-- 場所、複数通知、プレーンテキストメモ
+- 場所、複数通知、書式付きメモ
 
 日付は`9月25日（金）`形式で表示し、内部値は`yyyy-MM-dd`を維持する。保存後はメイン画面の対象期間へ即時反映する。保存が失敗した場合は成功状態へ遷移しない。相対日付を選んだ場合は解決期間をプレビューし、日付入力と繰り返しを無効にする。通知設定は保存するが端末通知は発火しない。
 
@@ -310,6 +312,7 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 - `end_date`: TEXT NULL（schema version 2。schema version 3ではfuzzyも必須とし、既存fuzzyは`anchor_date`から補完）
 - `location`: TEXT NULL（schema version 2）
 - `notes`: TEXT NULL（schema version 2）
+- `notes_document_json`: TEXT NULL（schema version 5。version 1の書式付きメモ文書を保存し、`notes`はプレーンテキスト投影として維持）
 - `color_id`: TEXT NULL（schema version 2）
 - `recurrence_rule_json`: TEXT NULL（schema version 2。version 1の規則を保存）
 - `fuzzy_resolution_context_json`: TEXT NULL（schema version 3。相対fuzzyだけがversion付き解決contextを保存）
@@ -349,7 +352,7 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 
 ### 9.5 migration
 
-migration履歴をテーブルで管理し、各migrationをトランザクション内で一度だけ実行する。schema version 3はfuzzyの期間を補完し、全カレンダーへ`this_week`標準定義を追加する。標準定義と既定カレンダーのseedは再実行しても重複しない。
+migration履歴をテーブルで管理し、各migrationをトランザクション内で一度だけ実行する。schema version 3はfuzzyの期間を補完し、全カレンダーへ`this_week`標準定義を追加する。version 4は繰り返し例外tableを、version 5は`events.notes_document_json`を追加する。version 5への移行時に既存メモを一括変換せず、読み込み時のfallbackと次回保存時のdual-writeで非破壊に移行する。標準定義と既定カレンダーのseedは再実行しても重複しない。
 
 ## 10. データフロー
 

@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   normalizeEventNoteDocument,
   parseEventNoteDocument,
@@ -64,6 +65,7 @@ function FormattedNoteEditorModalContent({
   const reduceMotion = useReduceMotion();
   const editorRef = useRef<FormattedNoteEditorDOMRef>(null);
   const completionRef = useRef(false);
+  const dirtyRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [selection, setSelection] = useState<EditorSelectionState>(EMPTY_SELECTION);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +74,7 @@ function FormattedNoteEditorModalContent({
 
   const handleCancel = useCallback(() => {
     if (disabled || completing) return;
-    if (!selection.dirty) {
+    if (!dirtyRef.current) {
       onCancel();
       return;
     }
@@ -80,7 +82,7 @@ function FormattedNoteEditorModalContent({
       { text: '編集を続ける', style: 'cancel' },
       { text: '破棄', style: 'destructive', onPress: onCancel },
     ]);
-  }, [completing, disabled, onCancel, selection.dirty]);
+  }, [completing, disabled, onCancel]);
 
   const requestComplete = useCallback(() => {
     if (!ready || disabled || completionRef.current) return;
@@ -120,9 +122,10 @@ function FormattedNoteEditorModalContent({
   return (
     <Modal visible presentationStyle="fullScreen" animationType={reduceMotion ? 'none' : 'slide'}
       onRequestClose={handleCancel}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.screen, { backgroundColor: theme.background }]}>
-        <View style={[styles.header, { borderBottomColor: theme.calendarBorder }]}>
+      <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.screen}>
+          <View style={[styles.header, { borderBottomColor: theme.calendarBorder }]}>
           <View style={styles.side}>
             <Pressable accessibilityRole="button" accessibilityLabel="キャンセル"
               accessibilityState={{ disabled: busy }} disabled={busy} onPress={handleCancel}
@@ -149,7 +152,7 @@ function FormattedNoteEditorModalContent({
               accent: theme.calendarAccent,
             }}
             onReady={async () => { setReady(true); setError(null); }}
-            onStateChange={async (state) => { setSelection(state); }}
+            onStateChange={async (state) => { dirtyRef.current = state.dirty; setSelection(state); }}
             onComplete={receiveComplete}
             onFailure={receiveFailure} />
           {!ready && error === null ? (
@@ -183,7 +186,8 @@ function FormattedNoteEditorModalContent({
           onToggleOrderedList={() => editorRef.current?.toggleOrderedList()}
           onToggleTaskList={() => editorRef.current?.toggleTaskList()}
           onOpenLink={onOpenLink} />
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   );
 }

@@ -1,6 +1,7 @@
-import type { RefObject } from 'react';
+import { useState, type RefObject } from 'react';
 import { View, StyleSheet } from 'react-native';
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
+import { createDOMNavigationPolicy } from './dom-navigation-policy';
 import FormattedNoteEditorDOM, {
   type EditorSelectionState,
   type EditorTheme,
@@ -26,6 +27,7 @@ export function FormattedNoteEditor({
   onComplete,
   onFailure,
 }: Props) {
+  const [shouldStartNavigation] = useState(createDOMNavigationPolicy);
   return (
     <View style={styles.editor}>
       {/* Expo DOM Componentsのimperative APIへrefを渡すため、render時のref受け渡しが必要。 */}
@@ -35,9 +37,9 @@ export function FormattedNoteEditor({
         dom={{
           containerStyle: styles.editor,
           scrollEnabled: true,
+          useExpoDOMWebView: false,
           unstable_useExpoModulesBridge: false,
-          onShouldStartLoadWithRequest: (request: { navigationType?: string }) =>
-            request.navigationType !== 'click',
+          onShouldStartLoadWithRequest: shouldStartNavigation,
         }} />
     </View>
   );

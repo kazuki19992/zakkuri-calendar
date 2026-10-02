@@ -392,7 +392,7 @@ build・export成功、unit test成功、実機操作、アクセシビリティ
 
 ## 11. 依存関係とリスク
 
-実装時はExpo SDK 57固定の公式資料とTiptap公式資料を再確認し、現在のReact版と互換性があるTiptap packageを固定する。必要なextensionだけを追加し、初期版では別のReact Native rich-text bridgeや`react-native-webview`を直接追加しない。Expo DOM ComponentsがSDK 57で提供するbridgeを利用する。
+実装時はExpo SDK 57固定の公式資料とTiptap公式資料を再確認し、現在のReact版と互換性があるTiptap packageを固定する。必要なextensionだけを追加し、別のReact Native rich-text bridgeは追加しない。Expo SDK 57既定の`@expo/dom-webview`にはtop-level navigationを判定するnative callbackがないため、公式互換版の`react-native-webview`へopt outし、許可したeditor document以外への遷移をnative境界で拒否する。DOM/native間の機能呼び出しはExpo DOM Componentsのbridgeを利用する。
 
 主なリスクと対応は次のとおり。
 

@@ -114,6 +114,15 @@ describe('全画面の書式付きメモeditor', () => {
         orderedList: false,
         taskList: false,
         linkUrl: null,
+        dirty: false,
+      });
+      await mockDomProps.onStateChange({
+        bold: false,
+        italic: false,
+        bulletList: false,
+        orderedList: false,
+        taskList: false,
+        linkUrl: null,
         dirty: true,
       });
     });

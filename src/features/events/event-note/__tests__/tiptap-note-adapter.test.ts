@@ -1,5 +1,5 @@
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
-import { createEventNoteExtensions } from '../editor-extensions';
+import { createEventNoteExtensions, shouldBlockListNesting } from '../editor-extensions';
 import { fromTiptapDocument, toTiptapDocument } from '../tiptap-note-adapter';
 
 const document: EventNoteDocumentV1 = {
@@ -129,8 +129,16 @@ describe('Tiptap予定メモadapter', () => {
   test('許可したnode・mark・編集補助だけを登録する', () => {
     expect(createEventNoteExtensions().map((extension) => extension.name)).toEqual([
       'doc', 'paragraph', 'text', 'hardBreak', 'bold', 'italic',
-      'bulletList', 'orderedList', 'listItem', 'taskList', 'taskItem', 'listKeymap',
+      'bulletList', 'orderedList', 'listItem', 'taskList', 'taskItem', 'flatListKeyboardGuard',
+      'listKeymap',
       'link', 'undoRedo', 'placeholder',
     ]);
+  });
+
+  test('通常listとchecklistではTabによる入れ子化を遮断する', () => {
+    expect(shouldBlockListNesting((name) => name === 'bulletList')).toBe(true);
+    expect(shouldBlockListNesting((name) => name === 'orderedList')).toBe(true);
+    expect(shouldBlockListNesting((name) => name === 'taskList')).toBe(true);
+    expect(shouldBlockListNesting(() => false)).toBe(false);
   });
 });

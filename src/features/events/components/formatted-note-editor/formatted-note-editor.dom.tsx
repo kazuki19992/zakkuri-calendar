@@ -6,6 +6,7 @@ import { useDOMImperativeHandle, type DOMImperativeFactory } from 'expo/dom';
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
 import { createEventNoteExtensions } from '../../event-note/editor-extensions';
 import { fromTiptapDocument, toTiptapDocument } from '../../event-note/tiptap-note-adapter';
+import { createEditorSelectionState } from './formatted-note-editor-state';
 
 export type EditorTheme = Readonly<{
   background: string;
@@ -62,23 +63,15 @@ export default function FormattedNoteEditorDOM({
       void onReady();
       createdEditor.commands.focus('end');
     },
-    onUpdate: () => {
+    onUpdate: ({ editor: updatedEditor }) => {
       dirtyRef.current = true;
+      void onStateChange(createEditorSelectionState(updatedEditor, true));
     },
   });
 
   const reportState = useCallback((): void => {
     if (editor === null) return;
-    const href = editor.getAttributes('link').href;
-    void onStateChange({
-      bold: editor.isActive('bold'),
-      italic: editor.isActive('italic'),
-      bulletList: editor.isActive('bulletList'),
-      orderedList: editor.isActive('orderedList'),
-      taskList: editor.isActive('taskList'),
-      linkUrl: typeof href === 'string' ? href : null,
-      dirty: dirtyRef.current,
-    });
+    void onStateChange(createEditorSelectionState(editor, dirtyRef.current));
   }, [editor, onStateChange]);
 
   useEffect(() => {
@@ -118,6 +111,8 @@ export default function FormattedNoteEditorDOM({
         .event-note-editor ul, .event-note-editor ol { padding-left: 1.6em; }
         .event-note-editor ul[data-type="taskList"] { list-style: none; padding-left: 0; }
         .event-note-editor ul[data-type="taskList"] li { align-items: flex-start; display: flex; gap: 8px; }
+        .event-note-editor ul[data-type="taskList"] li > label { align-items: center; display: flex;
+          justify-content: center; min-height: 44px; min-width: 44px; }
         .event-note-editor ul[data-type="taskList"] input { height: 22px; width: 22px; }
         .event-note-editor p.is-editor-empty:first-child::before { color: ${theme.textSecondary};
           content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }

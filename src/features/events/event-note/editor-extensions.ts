@@ -1,3 +1,4 @@
+import { Extension } from '@tiptap/core';
 import { Bold } from '@tiptap/extension-bold';
 import { Document } from '@tiptap/extension-document';
 import { HardBreak } from '@tiptap/extension-hard-break';
@@ -16,6 +17,20 @@ import { Text } from '@tiptap/extension-text';
 import { Placeholder, UndoRedo } from '@tiptap/extensions';
 import { parseSafeEventNoteUrl } from '@/domain/calendar/event-note';
 
+export function shouldBlockListNesting(isActive: (name: string) => boolean): boolean {
+  return isActive('bulletList') || isActive('orderedList') || isActive('taskList');
+}
+
+const FlatListKeyboardGuard = Extension.create({
+  name: 'flatListKeyboardGuard',
+  priority: 1_000,
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => shouldBlockListNesting((name) => this.editor.isActive(name)),
+    };
+  },
+});
+
 export const createEventNoteExtensions = () => [
   Document,
   Paragraph,
@@ -28,6 +43,7 @@ export const createEventNoteExtensions = () => [
   ListItem,
   TaskList,
   TaskItem.configure({ nested: false }),
+  FlatListKeyboardGuard,
   ListKeymap,
   Link.configure({
     openOnClick: false,

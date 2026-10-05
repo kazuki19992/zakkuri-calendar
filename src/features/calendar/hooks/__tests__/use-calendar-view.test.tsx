@@ -596,6 +596,26 @@ describe('カレンダー表示の状態調整', () => {
     });
   });
 
+  it('保存失敗後に次の切替先data取得も失敗した場合は両方のerrorを維持する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.setLastCalendarViewMode.mockRejectedValueOnce(new Error('unavailable'));
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => expect(await result.current.selectMode('month')).toBe(true));
+    dependencies.events.listSchedule.mockRejectedValueOnce(new Error('unavailable'));
+
+    await act(async () => expect(await result.current.selectMode('twoDay')).toBe(false));
+
+    expect(result.current).toMatchObject({
+      mode: 'month',
+      periodError: '表示期間を読み込めませんでした',
+      viewModePersistenceError: '表示設定を保存できませんでした',
+    });
+    expect(dependencies.settings.setLastCalendarViewMode).toHaveBeenCalledTimes(1);
+  });
+
   it('保存失敗後のrefreshでも月表示を維持し初期設定を再取得しない', async () => {
     const dependencies = createDependencies();
     dependencies.settings.getLastCalendarViewMode.mockResolvedValue('twoDay');

@@ -387,7 +387,6 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       if (current.mode === mode) return true;
       modeSelectionBusyRef.current = true;
       const operationVersion = ++modeSelectionVersionRef.current;
-      setState((value) => ({ ...value, viewModePersistenceError: null }));
       try {
         const target =
           mode === 'month'
@@ -403,6 +402,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
                 visibleMonth: getMonthStart(current.selectedDate),
               };
         if (!(await transitionTo(target))) return false;
+        setState((value) => ({ ...value, viewModePersistenceError: null }));
         try {
           const now = (inputRef.current.now ?? getSystemTime)().toISOString();
           await inputRef.current.settings.setLastCalendarViewMode(mode, now);

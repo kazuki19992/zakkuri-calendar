@@ -244,9 +244,14 @@ describe('カレンダー画面', () => {
       />,
     );
 
-    expect(screen.getAllByRole('alert').map((item) => item.props.children)).toEqual([
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.map((item) => item.props.children)).toEqual([
       '表示期間を読み込めませんでした',
       '表示設定を保存できませんでした',
+    ]);
+    expect(alerts.map((item) => item.props.accessibilityLiveRegion)).toEqual([
+      'assertive',
+      'assertive',
     ]);
   });
 

@@ -95,6 +95,8 @@ function createDependencies() {
     setCalendarVisible: jest.fn().mockResolvedValue(undefined),
     getLastEventEditorTab: jest.fn(),
     setLastEventEditorTab: jest.fn(),
+    getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'),
+    setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined),
     getThisWeekDeadlineWeekday: jest.fn(),
     setThisWeekDeadlineWeekday: jest.fn(),
   };

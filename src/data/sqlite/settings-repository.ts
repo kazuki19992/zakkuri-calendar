@@ -1,4 +1,9 @@
 import { parseExactDuration, type EventEditorTab, type ExactDuration } from '@/domain/calendar/event';
+import {
+  DEFAULT_CALENDAR_VIEW_MODE,
+  parseCalendarViewMode,
+  type CalendarViewMode,
+} from '@/domain/calendar/calendar-view-mode';
 import type { SettingsRepository } from '@/domain/calendar/repositories';
 import type { AppDatabase } from './database';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
@@ -105,6 +110,29 @@ export class SqliteSettingsRepository implements SettingsRepository {
       {
         $key: 'last_event_editor_tab',
         $valueJson: JSON.stringify(tab),
+        $updatedAt: updatedAt,
+      },
+    );
+  }
+
+  async getLastCalendarViewMode(): Promise<CalendarViewMode> {
+    const row = await this.database.first<SettingRow>(
+      'SELECT value_json FROM app_settings WHERE key = $key',
+      { $key: 'last_calendar_view_mode' },
+    );
+    if (!row) return DEFAULT_CALENDAR_VIEW_MODE;
+    return parseCalendarViewMode(parseJson(row.value_json)) ?? DEFAULT_CALENDAR_VIEW_MODE;
+  }
+
+  async setLastCalendarViewMode(mode: CalendarViewMode, updatedAt: string): Promise<void> {
+    if (parseCalendarViewMode(mode) === null) throw new Error('Invalid calendar view mode');
+    await this.database.run(
+      `INSERT INTO app_settings (key, value_json, updated_at)
+       VALUES ($key, $valueJson, $updatedAt)
+       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+      {
+        $key: 'last_calendar_view_mode',
+        $valueJson: JSON.stringify(mode),
         $updatedAt: updatedAt,
       },
     );

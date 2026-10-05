@@ -24,7 +24,7 @@ function createRepositories(): Readonly<{ calendars: jest.Mocked<CalendarReposit
     events: { create: jest.fn(), getById: jest.fn().mockResolvedValue(null), listByAnchorRange: jest.fn(),
       listSchedule: jest.fn(), getOccurrenceEditData: jest.fn(), saveOccurrenceException: jest.fn(),
       deleteOccurrenceException: jest.fn(), applyRecurrenceMutation: jest.fn(), update: jest.fn(), delete: jest.fn() },
-    settings: { getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
+    settings: { getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
     temporalDefinitions: { listEnabled: jest.fn().mockResolvedValue([morning]), getById: jest.fn(), disable: jest.fn() },
   };
 }

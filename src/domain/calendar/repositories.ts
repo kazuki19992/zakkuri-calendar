@@ -1,5 +1,6 @@
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import type { Calendar } from './calendar';
+import type { CalendarViewMode } from './calendar-view-mode';
 import type { CalendarEvent, EventEditorTab, ExactDuration } from './event';
 import type { EventColorId } from './event-color';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
@@ -71,6 +72,8 @@ export interface SettingsRepository {
   setCalendarVisible(calendarId: string, visible: boolean, updatedAt: string): Promise<void>;
   getLastEventEditorTab(): Promise<EventEditorTab>;
   setLastEventEditorTab(tab: EventEditorTab, updatedAt: string): Promise<void>;
+  getLastCalendarViewMode(): Promise<CalendarViewMode>;
+  setLastCalendarViewMode(mode: CalendarViewMode, updatedAt: string): Promise<void>;
   getThisWeekDeadlineWeekday(): Promise<ThisWeekDeadlineWeekday>;
   setThisWeekDeadlineWeekday(value: ThisWeekDeadlineWeekday, updatedAt: string): Promise<void>;
 }

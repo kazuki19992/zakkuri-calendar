@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { Calendar } from '@/domain/calendar/calendar';
+import type { CalendarViewMode } from '@/domain/calendar/calendar-view-mode';
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { HolidayProvider } from '@/domain/calendar/holiday';
 import type {
@@ -183,6 +184,82 @@ describe('カレンダー表示の状態調整', () => {
     expect(dependencies.settings.getUndeterminedFadeMinutes).toHaveBeenCalledTimes(1);
     expect(dependencies.settings.getCalendarVisible).toHaveBeenCalledWith(calendar.id);
     expect(dependencies.temporalDefinitions.getById).toHaveBeenCalledWith(event.temporalDefinitionId);
+  });
+
+  it('保存済み月表示を初回snapshotから直接読み込む', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('month');
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current).toMatchObject({
+      mode: 'month', selectedDate: '2026-09-08', visibleMonth: '2026-09-01',
+    });
+    expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(1);
+    expect(dependencies.events.listSchedule).toHaveBeenCalledWith(
+      calendar.id, '2026-08-31', '2026-10-11',
+    );
+  });
+
+  it('表示設定の取得失敗では2日表示を読み込みalertを出さない', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockRejectedValue(new Error('unavailable'));
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current).toMatchObject({ mode: 'twoDay', periodError: null });
+  });
+
+  it('初期mode取得中のrefreshでも保存済み月表示を一度だけ適用する', async () => {
+    const dependencies = createDependencies();
+    const mode = createDeferred<CalendarViewMode>();
+    dependencies.settings.getLastCalendarViewMode.mockReturnValue(mode.promise);
+    const { result, rerender } = await renderHook(
+      ({ revision }: { revision: number }) => useCalendarView({
+        ...dependencies,
+        refreshRevision: revision,
+        weekStartsOn: 1,
+        now: () => new Date(2026, 8, 8, 12),
+      }),
+      { initialProps: { revision: 0 } },
+    );
+
+    await rerender({ revision: 1 });
+    await act(async () => mode.resolve('month'));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    expect(result.current.mode).toBe('month');
+    expect(dependencies.settings.getLastCalendarViewMode).toHaveBeenCalledTimes(1);
+    expect(dependencies.events.listSchedule).toHaveBeenLastCalledWith(
+      calendar.id, '2026-08-31', '2026-10-11',
+    );
+  });
+
+  it('初回snapshot失敗後のretryでは復元済みmodeを使い設定を再取得しない', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('month');
+    dependencies.events.listSchedule
+      .mockRejectedValueOnce(new Error('database unavailable'))
+      .mockResolvedValueOnce({ events: [event], exceptions: [], replacementEvents: [] });
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.mode).toBe('month');
+    await act(async () => expect(await result.current.retry()).toBe(true));
+
+    expect(result.current.mode).toBe('month');
+    expect(dependencies.settings.getLastCalendarViewMode).toHaveBeenCalledTimes(1);
+    expect(dependencies.events.listSchedule).toHaveBeenLastCalledWith(
+      calendar.id, '2026-08-31', '2026-10-11',
+    );
   });
 
   it('マイカレンダー非表示では利用者予定だけを隠して祝日を残す', async () => {

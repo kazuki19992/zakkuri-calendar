@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EventColorId } from '@/constants/event-colors';
 import { DEFAULT_CALENDAR_ID } from '@/domain/calendar/calendar';
 import {
+  DEFAULT_CALENDAR_VIEW_MODE,
+  type CalendarViewMode,
+} from '@/domain/calendar/calendar-view-mode';
+import {
   expandEventOccurrences,
   type EventOccurrence,
 } from '@/domain/calendar/event-occurrence';
@@ -40,7 +44,6 @@ import {
   type TwoDayViewModel,
 } from '../two-day-view-model';
 
-export type CalendarViewMode = 'twoDay' | 'month';
 export type CalendarViewStatus = 'loading' | 'ready' | 'error';
 
 export type UseCalendarViewInput = Readonly<{
@@ -169,6 +172,18 @@ function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): reado
   return [...new Set(dates.map(getMonthStart))];
 }
 
+function withViewMode(target: ViewTarget, mode: CalendarViewMode): ViewTarget {
+  return mode === 'month'
+    ? { ...target, mode, visibleMonth: getMonthStart(target.today), selectedDate: target.today }
+    : {
+        ...target,
+        mode,
+        anchorDate: target.today,
+        visibleMonth: getMonthStart(target.today),
+        selectedDate: target.today,
+      };
+}
+
 async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Promise<CalendarSnapshot> {
   const calendar = await input.calendars.getDefault();
   const range = getTargetRange(target, input.weekStartsOn);
@@ -221,8 +236,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     const today = toCalendarDate((input.now ?? getSystemTime)());
     return {
       status: 'loading',
-      // TODO(v1, #16): 最後に開いた表示モードを設定として永続化する。
-      mode: 'twoDay',
+      mode: DEFAULT_CALENDAR_VIEW_MODE,
       today,
       anchorDate: today,
       visibleMonth: getMonthStart(today),
@@ -236,6 +250,8 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   });
   const stateRef = useRef(state);
   const requestIdRef = useRef(0);
+  const initialModePromiseRef = useRef<Promise<CalendarViewMode> | null>(null);
+  const initialModeAppliedRef = useRef(false);
   const datePickerRequestIdRef = useRef(0);
   const calendarVisibilityBusyRef = useRef(false);
   const calendarVisibilityVersionRef = useRef(0);
@@ -276,25 +292,40 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     [],
   );
 
+  const getInitialMode = useCallback((): Promise<CalendarViewMode> => {
+    initialModePromiseRef.current ??= inputRef.current.settings
+      .getLastCalendarViewMode()
+      .catch(() => DEFAULT_CALENDAR_VIEW_MODE);
+    return initialModePromiseRef.current;
+  }, []);
+
   useEffect(() => {
     const requestId = ++requestIdRef.current;
     const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
-    const target = stateRef.current;
-    if (target.status === 'error') {
+    if (stateRef.current.status === 'error') {
       setState((current) => ({ ...current, status: 'loading', periodError: null }));
     }
-    void loadSnapshot(inputRef.current, target)
-      .then((snapshot) => {
+    void (async () => {
+      let target = stateRef.current;
+      if (!initialModeAppliedRef.current) {
+        const mode = await getInitialMode();
+        if (!mountedRef.current || requestId !== requestIdRef.current) return;
+        target = withViewMode(stateRef.current, mode);
+        initialModeAppliedRef.current = true;
+        setState((current) => ({ ...current, ...target }));
+      }
+      try {
+        const snapshot = await loadSnapshot(inputRef.current, target);
         if (!mountedRef.current || requestId !== requestIdRef.current) return;
         setState((current) => ({
           ...current,
+          ...target,
           status: 'ready',
           snapshot: resolveCalendarVisibility(snapshot, calendarVisibilityVersion),
           isPeriodLoading: false,
           periodError: null,
         }));
-      })
-      .catch(() => {
+      } catch {
         if (!mountedRef.current || requestId !== requestIdRef.current) return;
         setState((current) => ({
           ...current,
@@ -302,7 +333,8 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
           snapshot: emptySnapshot,
           isPeriodLoading: false,
         }));
-      });
+      }
+    })();
   }, [
     input.calendars,
     input.events,
@@ -311,6 +343,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     input.settings,
     input.temporalDefinitions,
     input.weekStartsOn,
+    getInitialMode,
     resolveCalendarVisibility,
   ]);
 

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { getEventColor, getEventColorLabel, type EventColorId } from '@/constants/event-colors';
+import type { CalendarViewMode } from '@/domain/calendar/calendar-view-mode';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
-import type { CalendarViewMode } from '../hooks/use-calendar-view';
 
 const viewOptions = [['twoDay', '2日'], ['month', '月']] as const;
 const CLOSED_TRANSLATE_X = -360;

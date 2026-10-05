@@ -16,8 +16,8 @@
 - [x] hook初期化時だけ保存済みmodeを解決し、最初のsnapshotから2日／月ビューを直接復元した。
 - [x] 切替先dataの取得成功後だけmodeを保存し、保存だけ失敗した場合は切替後の表示を維持した。
 - [x] 設定保存errorを期間取得errorと独立した`alert`としてtop bar直下へ表示した。
-- [x] focused test: 6 suites、117 tests PASS。
-- [x] `npm run typecheck`、`npm run lint`、全61 suites／555 tests、`git diff --check`がPASS。
+- [x] focused test: 6 suites、118 tests PASS。
+- [x] `npm run typecheck`、`npm run lint`、全61 suites／556 tests、`git diff --check`がPASS。
 - [x] Metroの旧worktree参照cacheを`--clear`で再構築し、iOS／AndroidのExpo exportが成功した。
 - [ ] 実機での初回起動・再起動後のSQLite永続化、保存失敗表示、VoiceOver／TalkBackは未確認。
 

@@ -78,6 +78,7 @@ export type CalendarViewState = Readonly<{
   holidaySupport: HolidaySupport;
   isPeriodLoading: boolean;
   periodError: string | null;
+  viewModePersistenceError: string | null;
   isDatePickerLoading: boolean;
   datePickerError: string | null;
   calendarName: string;
@@ -121,6 +122,7 @@ type InternalState = ViewTarget &
     snapshot: CalendarSnapshot;
     isPeriodLoading: boolean;
     periodError: string | null;
+    viewModePersistenceError: string | null;
     isCalendarVisibilityUpdating: boolean;
     calendarVisibilityError: string | null;
   }>;
@@ -244,6 +246,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       snapshot: emptySnapshot,
       isPeriodLoading: false,
       periodError: null,
+      viewModePersistenceError: null,
       isCalendarVisibilityUpdating: false,
       calendarVisibilityError: null,
     };
@@ -252,6 +255,8 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   const requestIdRef = useRef(0);
   const initialModePromiseRef = useRef<Promise<CalendarViewMode> | null>(null);
   const initialModeAppliedRef = useRef(false);
+  const modeSelectionBusyRef = useRef(false);
+  const modeSelectionVersionRef = useRef(0);
   const datePickerRequestIdRef = useRef(0);
   const calendarVisibilityBusyRef = useRef(false);
   const calendarVisibilityVersionRef = useRef(0);
@@ -278,6 +283,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       mountedRef.current = false;
       requestIdRef.current += 1;
       datePickerRequestIdRef.current += 1;
+      modeSelectionVersionRef.current += 1;
     };
   }, []);
 
@@ -306,7 +312,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       setState((current) => ({ ...current, status: 'loading', periodError: null }));
     }
     void (async () => {
-      let target = stateRef.current;
+      let target: ViewTarget = stateRef.current;
       if (!initialModeAppliedRef.current) {
         const mode = await getInitialMode();
         if (!mountedRef.current || requestId !== requestIdRef.current) return;
@@ -376,22 +382,45 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
 
   const selectMode = useCallback(
     async (mode: CalendarViewMode): Promise<boolean> => {
+      if (modeSelectionBusyRef.current) return false;
       const current = stateRef.current;
       if (current.mode === mode) return true;
-      const target =
-        mode === 'month'
-          ? {
-              ...current,
-              mode,
-              visibleMonth: getMonthStart(current.selectedDate),
-            }
-          : {
-              ...current,
-              mode,
-              anchorDate: current.selectedDate,
-              visibleMonth: getMonthStart(current.selectedDate),
-            };
-      return transitionTo(target);
+      modeSelectionBusyRef.current = true;
+      const operationVersion = ++modeSelectionVersionRef.current;
+      setState((value) => ({ ...value, viewModePersistenceError: null }));
+      try {
+        const target =
+          mode === 'month'
+            ? {
+                ...current,
+                mode,
+                visibleMonth: getMonthStart(current.selectedDate),
+              }
+            : {
+                ...current,
+                mode,
+                anchorDate: current.selectedDate,
+                visibleMonth: getMonthStart(current.selectedDate),
+              };
+        if (!(await transitionTo(target))) return false;
+        try {
+          const now = (inputRef.current.now ?? getSystemTime)().toISOString();
+          await inputRef.current.settings.setLastCalendarViewMode(mode, now);
+          if (mountedRef.current && operationVersion === modeSelectionVersionRef.current) {
+            setState((value) => ({ ...value, viewModePersistenceError: null }));
+          }
+        } catch {
+          if (mountedRef.current && operationVersion === modeSelectionVersionRef.current) {
+            setState((value) => ({
+              ...value,
+              viewModePersistenceError: '表示設定を保存できませんでした',
+            }));
+          }
+        }
+        return true;
+      } finally {
+        modeSelectionBusyRef.current = false;
+      }
     },
     [transitionTo],
   );
@@ -631,6 +660,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     holidaySupport: selectedDay?.holidaySupport ?? 'unsupported',
     isPeriodLoading: state.isPeriodLoading,
     periodError: state.periodError,
+    viewModePersistenceError: state.viewModePersistenceError,
     isDatePickerLoading: datePickerState.isLoading,
     datePickerError: datePickerState.error,
     calendarName: state.snapshot.calendarName,

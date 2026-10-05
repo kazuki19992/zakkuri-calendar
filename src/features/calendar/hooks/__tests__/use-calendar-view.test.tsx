@@ -40,10 +40,12 @@ const event: CalendarEvent = {
 
 function createDeferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
     resolve = resolvePromise;
+    reject = rejectPromise;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 function createDependencies() {
@@ -547,6 +549,152 @@ describe('カレンダー表示の状態調整', () => {
     await act(async () => expect(await result.current.selectDate('2026-09-09')).toBe(true));
     await act(async () => expect(await result.current.selectMode('twoDay')).toBe(true));
     expect(result.current).toMatchObject({ mode: 'twoDay', anchorDate: '2026-09-09' });
+  });
+
+  it('表示data取得成功後にだけ最後のmodeを保存する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => expect(await result.current.selectMode('month')).toBe(true));
+
+    expect(dependencies.settings.setLastCalendarViewMode).toHaveBeenCalledWith(
+      'month', '2026-09-08T03:00:00.000Z',
+    );
+    expect(dependencies.events.listSchedule.mock.invocationCallOrder.at(-1))
+      .toBeLessThan(dependencies.settings.setLastCalendarViewMode.mock.invocationCallOrder[0]);
+  });
+
+  it('切替先data取得失敗時はmodeと保存設定を変更しない', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    dependencies.events.listSchedule.mockRejectedValueOnce(new Error('unavailable'));
+
+    await act(async () => expect(await result.current.selectMode('month')).toBe(false));
+
+    expect(result.current.mode).toBe('twoDay');
+    expect(dependencies.settings.setLastCalendarViewMode).not.toHaveBeenCalled();
+  });
+
+  it('mode保存だけ失敗しても月表示を維持して成功を返す', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.setLastCalendarViewMode.mockRejectedValue(new Error('unavailable'));
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => expect(await result.current.selectMode('month')).toBe(true));
+
+    expect(result.current).toMatchObject({
+      mode: 'month', viewModePersistenceError: '表示設定を保存できませんでした',
+    });
+  });
+
+  it('保存失敗後のrefreshでも月表示を維持し初期設定を再取得しない', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('twoDay');
+    dependencies.settings.setLastCalendarViewMode.mockRejectedValue(new Error('unavailable'));
+    const { result, rerender } = await renderHook(
+      ({ revision }: { revision: number }) => useCalendarView({
+        ...dependencies,
+        refreshRevision: revision,
+        weekStartsOn: 1,
+        now: () => new Date(2026, 8, 8, 12),
+      }),
+      { initialProps: { revision: 0 } },
+    );
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => expect(await result.current.selectMode('month')).toBe(true));
+
+    await rerender({ revision: 1 });
+    await waitFor(() => expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(3));
+
+    expect(result.current.mode).toBe('month');
+    expect(dependencies.settings.getLastCalendarViewMode).toHaveBeenCalledTimes(1);
+  });
+
+  it('mode切替中は同期的に二重実行を防ぐ', async () => {
+    const dependencies = createDependencies();
+    const pending = createDeferred<{ events: CalendarEvent[]; exceptions: []; replacementEvents: [] }>();
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    dependencies.events.listSchedule.mockReturnValueOnce(pending.promise);
+    let first!: Promise<boolean>;
+    let second!: Promise<boolean>;
+
+    await act(async () => {
+      first = result.current.selectMode('month');
+      second = result.current.selectMode('month');
+      await Promise.resolve();
+    });
+
+    await expect(second).resolves.toBe(false);
+    expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(2);
+    expect(dependencies.settings.setLastCalendarViewMode).not.toHaveBeenCalled();
+    await act(async () => pending.resolve({ events: [event], exceptions: [], replacementEvents: [] }));
+    await expect(first).resolves.toBe(true);
+    expect(dependencies.settings.setLastCalendarViewMode).toHaveBeenCalledTimes(1);
+  });
+
+  it('unmount後のmode保存失敗ではstateを更新しない', async () => {
+    const dependencies = createDependencies();
+    const pending = createDeferred<void>();
+    dependencies.settings.setLastCalendarViewMode.mockReturnValue(pending.promise);
+    const { result, unmount } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    let operation!: Promise<boolean>;
+    await act(async () => {
+      operation = result.current.selectMode('month');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(dependencies.settings.setLastCalendarViewMode).toHaveBeenCalled());
+
+    unmount();
+    pending.reject(new Error('unavailable'));
+    await expect(operation).resolves.toBe(true);
+  });
+
+  it('次のmode保存成功で保存errorを消す', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.setLastCalendarViewMode
+      .mockRejectedValueOnce(new Error('unavailable'))
+      .mockResolvedValueOnce(undefined);
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => expect(await result.current.selectMode('month')).toBe(true));
+    expect(result.current.viewModePersistenceError).not.toBeNull();
+
+    await act(async () => expect(await result.current.selectMode('twoDay')).toBe(true));
+
+    expect(result.current.viewModePersistenceError).toBeNull();
+    expect(dependencies.settings.setLastCalendarViewMode.mock.calls.map(([mode]) => mode))
+      .toEqual(['month', 'twoDay']);
+  });
+
+  it('同じmodeの再選択では再取得も保存もしない', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() => useCalendarView({
+      ...dependencies, weekStartsOn: 1, now: () => new Date(2026, 8, 8, 12),
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const snapshotCalls = dependencies.events.listSchedule.mock.calls.length;
+
+    await act(async () => expect(await result.current.selectMode('twoDay')).toBe(true));
+
+    expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(snapshotCalls);
+    expect(dependencies.settings.setLastCalendarViewMode).not.toHaveBeenCalled();
   });
 
   it('期間取得に失敗すると元の期間と表示を維持してエラーを返す', async () => {

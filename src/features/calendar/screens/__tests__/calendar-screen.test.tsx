@@ -93,6 +93,7 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
     monthDays: [], datePickerMonth: '2026-09-01', datePickerDays: [],
     selectedAgendaItems: [], selectedHolidayName: null,
     holidaySupport: 'available', isPeriodLoading: false, periodError: null,
+    viewModePersistenceError: null,
     isDatePickerLoading: false, datePickerError: null,
     calendarName: 'マイカレンダー', calendarColorId: 'blue', isCalendarVisible: true,
     isCalendarVisibilityUpdating: false, calendarVisibilityError: null,

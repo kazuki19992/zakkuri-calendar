@@ -1,5 +1,5 @@
 import { Stack, useIsPreview, useLocalSearchParams, useRouter } from 'expo-router';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { JapaneseHolidayProvider } from '@/data/holidays/japanese-holiday-provider';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { isCalendarDate } from '@/domain/calendar/month';
@@ -9,8 +9,16 @@ import { DayCalendarScreen } from '@/features/calendar/screens/day-calendar-scre
 const holidayProvider = new JapaneseHolidayProvider();
 export default function DayRoute() {
   const { date } = useLocalSearchParams<{ date?: string }>();
-  if (!isCalendarDate(date)) return <View><Text>日付が正しくありません</Text></View>;
+  if (!isCalendarDate(date)) return <InvalidDayRoute />;
   return <ValidDayRoute date={date} />;
+}
+
+function InvalidDayRoute() {
+  const router = useRouter();
+  return <View><Stack.Screen options={{ headerShown: true, title: '予定' }} />
+    <Text>日付が正しくありません</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel="カレンダーへ戻る" onPress={() => router.back()}><Text>カレンダーへ戻る</Text></Pressable>
+  </View>;
 }
 
 function ValidDayRoute({ date }: Readonly<{ date: string }>) {

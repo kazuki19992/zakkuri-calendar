@@ -1,5 +1,5 @@
 import { render, userEvent } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import type { ReactNode } from 'react';
 import { Colors } from '@/constants/theme';
 import type { MonthDayViewModel, MonthWeekViewModel } from '../../month-view-model';
@@ -59,6 +59,8 @@ describe('独自月カレンダー表示', () => {
     const onOpenDay = jest.fn();
     const onEditEvent = jest.fn();
     const user = userEvent.setup();
+    const platform = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
     const view = await render(<MonthGrid days={days} weekModels={createWeeks(days)} onSelectDate={jest.fn()} onOpenDay={onOpenDay} onEditEvent={onEditEvent} />);
 
     await user.press(view.getByRole('button', { name: '2026年9月21日を開く' }));
@@ -68,6 +70,7 @@ describe('独自月カレンダー表示', () => {
     expect(onOpenDay).toHaveBeenNthCalledWith(1, '2026-09-21');
     expect(onOpenDay).toHaveBeenNthCalledWith(2, '2026-09-21');
     expect(onEditEvent).toHaveBeenCalledWith('series-1', '2026-09-21');
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
   });
 
   it('選択日の発生回をタップすると表示keyではなく元シリーズIDを渡す', async () => {

@@ -20,7 +20,10 @@ export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: Mon
       accessibilityRole="button"
       accessibilityLabel={onOpenDay === undefined ? day.accessibilityLabel : `${formatDateLabel(day.date)}を開く`}
       accessibilityState={{ selected: day.isSelected }}
-      onPress={() => onOpenDay?.(day.date) ?? onPress(day.date)}
+      onPress={() => {
+        onPress(day.date);
+        if (Platform.OS !== 'ios') onOpenDay?.(day.date);
+      }}
       style={({ pressed }) => [
         styles.cell,
         variant === 'picker' && styles.pickerCell,

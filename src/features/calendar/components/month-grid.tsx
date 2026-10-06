@@ -19,7 +19,7 @@ export function MonthGrid({ days, onSelectDate, weekModels, onOpenDay, onEditEve
   const theme = useTheme();
   const dayWeeks = Array.from({ length: 6 }, (_, index) => days.slice(index * 7, index * 7 + 7));
   return (
-    <View testID="month-calendar">
+    <View testID="month-calendar" style={variant === 'month' ? styles.monthGrid : undefined}>
       <View style={[styles.weekdays, { borderBottomColor: theme.calendarBorder }] }>
         {weekdayLabels.map((label, index) => (
           <Text key={label} testID="month-calendar.weekday" accessibilityLabel={`${label}曜日`}
@@ -43,5 +43,6 @@ const styles = StyleSheet.create({
   weekday: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '500' },
   pickerWeekday: { fontSize: 11 },
   week: { flexDirection: 'row' },
-  monthWeek: { flex: 1, minHeight: 130, position: 'relative' },
+  monthGrid: { flex: 1 },
+  monthWeek: { flex: 1, position: 'relative' },
 });

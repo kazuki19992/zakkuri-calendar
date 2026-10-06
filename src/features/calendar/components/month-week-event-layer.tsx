@@ -30,6 +30,7 @@ export function MonthWeekEventLayer({ week, onOpenDay, onEditEvent }: Readonly<{
       return <Pressable key={item.id} testID={`month-calendar.event-block.${item.id}`}
         accessibilityRole="button" accessibilityLabel={item.accessibilityLabel}
         onPress={() => item.originalOccurrenceDate === undefined ? onEditEvent?.(item.eventId) : onEditEvent?.(item.eventId, item.originalOccurrenceDate)}
+        hitSlop={11}
         style={[styles.block, blockStyle(item), item.startsInWeek ? styles.start : null, item.endsInWeek ? styles.end : null]}>
         <LinearGradient accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
           colors={item.continuesFromPreviousWeek || item.continuesToNextWeek ? [color, color, `${color}99`] : [color, color]}
@@ -39,7 +40,7 @@ export function MonthWeekEventLayer({ week, onOpenDay, onEditEvent }: Readonly<{
     })}
     {week.days.map((day) => day.hiddenEventCount > 0 ? <Pressable key={day.date}
       accessibilityRole="button" accessibilityLabel={`他${day.hiddenEventCount}件、${formatJapaneseDate(day.date)}の予定を開く`}
-      onPress={() => onOpenDay(day.date)} style={[styles.more, { left: `${(week.days.indexOf(day) / 7) * 100}%` }] }>
+      onPress={() => onOpenDay(day.date)} hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }} style={[styles.more, { left: `${(week.days.indexOf(day) / 7) * 100}%` }] }>
       <Text numberOfLines={1} style={[styles.moreText, { color: theme.textSecondary }]}>他{day.hiddenEventCount}件</Text>
     </Pressable> : null)}
   </View>;

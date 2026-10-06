@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMonthStart, moveMonth } from '@/domain/calendar/month';
 import { useTheme } from '@/hooks/use-theme';
@@ -118,20 +118,16 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
             <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
           </>
         ) : (
-          // 月表示は縦スクロールも行うため、横スワイプの受付(panHandlers)をScrollViewの
-          // 祖先に置く。ScrollViewの内側に置くと、内容が縦スクロール可能になった際に
-          // ScrollView自身のジェスチャーへ奪われ、横スワイプを受け付けなくなる。
+          // 月表示は利用可能な高さを6週で配分する。縦スクロールを置かず、横スワイプだけを受け付ける。
           <View testID="calendar.swipe-area" style={styles.fill} {...transition.panHandlers}
             onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}>
-            <ScrollView testID="calendar.scroll" style={styles.scroll} contentContainerStyle={styles.content}>
-              <Animated.View testID="calendar.animated-content"
-                style={{
-                  transform: [{ translateX: transition.translateX }],
-                  opacity: transition.contentOpacity,
-                }}>
+            <Animated.View testID="calendar.animated-content"
+              style={[styles.monthContent, {
+                transform: [{ translateX: transition.translateX }],
+                opacity: transition.contentOpacity,
+              }]}>
               {swipeContent}
             </Animated.View>
-            </ScrollView>
             <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
           </View>
         )}
@@ -143,7 +139,6 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
 const styles = StyleSheet.create({
   root: { flex: 1 },
   fill: { flex: 1 },
-  scroll: { flex: 1 },
-  content: { flexGrow: 1, paddingTop: 8 },
+  monthContent: { flex: 1, paddingTop: 8 },
   error: { fontSize: 13, paddingHorizontal: 16, paddingBottom: 8 },
 });

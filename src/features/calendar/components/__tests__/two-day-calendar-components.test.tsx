@@ -508,6 +508,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getByTestId('timeline-event.event-1.gradient', { includeHiddenElements: true }).props.colors).toContain(
       'rgba(179, 38, 30, 1)',
     );
+    expect(StyleSheet.flatten(view.getByText('歯医者').props.style).backgroundColor).toBe('#B3261E');
   });
 
   it('補助時刻を倍率に合わせてフェードし、現在時刻と重なる定時を隠す', async () => {

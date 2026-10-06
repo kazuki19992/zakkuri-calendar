@@ -69,8 +69,8 @@ export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
         />
         {item.isInstant ? <View style={[styles.instantLine, { backgroundColor: eventColor }]} /> : null}
         <View testID={`timeline-event.${item.id}.text`} style={[styles.text, { justifyContent: textAnchor }]}>
-          <Text numberOfLines={2} style={[styles.title, { color: theme.background }]}>{item.title}</Text>
-          <Text numberOfLines={1} style={[styles.time, { color: theme.background }]}>{item.temporalLabel}</Text>
+          <Text numberOfLines={2} style={[styles.title, { color: theme.background, backgroundColor: eventColor }]}>{item.title}</Text>
+          <Text numberOfLines={1} style={[styles.time, { color: theme.background, backgroundColor: eventColor }]}>{item.temporalLabel}</Text>
         </View>
       </View>
     </Pressable>

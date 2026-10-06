@@ -106,7 +106,7 @@ function createDayViewModel(
       ...item,
       kind: isFuzzyRange ? 'fuzzyRange' : 'event',
       eventId: item.eventId,
-      colorId: occurrence.event.colorId ?? input.calendarColorId,
+      colorId: occurrence?.event.colorId ?? input.calendarColorId,
       isInteractive: true,
       ...(rangePosition === null ? {} : { rangePosition }),
       accessibilityLabel: positionLabel === null

@@ -11,6 +11,7 @@ import {
 import type { TwoDayViewModel } from '../../two-day-view-model';
 import { CalendarAddEventButton } from '../calendar-add-event-button';
 import { TwoDayView } from '../two-day-view';
+import { TimelineAxis } from '../timeline-axis';
 
 jest.mock('@/global.css', () => ({}));
 jest.mock('expo-linear-gradient', () => {
@@ -20,7 +21,7 @@ jest.mock('expo-linear-gradient', () => {
 });
 
 const timelineItem = {
-  id: 'event-1', eventId: 'event-1', title: '歯医者', temporalLabel: '14:30・30分',
+  id: 'event-1', eventId: 'event-1', colorId: 'red', title: '歯医者', temporalLabel: '14:30・30分',
   accessibilityLabel: '歯医者、14:30・30分', startMinute: 870, endMinute: 900,
   top: 812, height: 36, overlapIndex: 0, overlapCount: 1,
   opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
@@ -483,8 +484,8 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(PixelRatio.roundToNearestPixel(style.top)).toBe(style.top);
   });
 
-  it('罫線を予定ブロックより手前に描画し、予定と重なる時間帯でも罫線が見えるようにする', async () => {
-    const view = await renderTwoDayView();
+  it('時間線を予定の背後、現在時刻線を予定の前面に描画する', async () => {
+    const view = await renderTwoDayView({ now: () => new Date(2026, 8, 8, 14, 30) });
 
     const hourLineZIndex = StyleSheet.flatten(
       view.getAllByTestId('two-day-calendar.hour-line')[0].props.style,
@@ -492,9 +493,28 @@ describe('2日カレンダー表示コンポーネント', () => {
     const eventZIndex = StyleSheet.flatten(
       view.getByTestId('timeline-event.event-1').props.style,
     ).zIndex;
-    expect(hourLineZIndex).toBeGreaterThan(eventZIndex);
+    const nowLineZIndex = StyleSheet.flatten(
+      view.getByTestId('two-day-calendar.now-line').props.style,
+    ).zIndex;
+    expect(hourLineZIndex).toBeLessThan(eventZIndex);
+    expect(eventZIndex).toBeLessThan(nowLineZIndex);
     // 罫線は表示のみが目的で、下にある予定へのタップ操作を妨げてはならない。
     expect(view.getAllByTestId('two-day-calendar.hour-line')[0].props.pointerEvents).toBe('none');
+  });
+
+  it('固定色を時間軸予定のグラデーションへ反映する', async () => {
+    const view = await renderTwoDayView();
+    expect(view.getByTestId('timeline-event.event-1.gradient', { includeHiddenElements: true }).props.colors).toContain(
+      'rgba(179, 38, 30, 1)',
+    );
+  });
+
+  it('補助時刻を倍率に合わせてフェードし、現在時刻と重なる定時を隠す', async () => {
+    const view = await render(
+      <TimelineAxis scale={0.72} now={{ top: computeHourLineTop(14, 0.72), label: '14:00' }} />,
+    );
+    expect(StyleSheet.flatten(view.getByText('13:00').props.style).opacity).toBeCloseTo(0.5, 10);
+    expect(view.getAllByText('14:00')).toHaveLength(1);
   });
 
   it('表示中の2日に今日を含む列にだけ現在時刻の赤線を引き、時間軸に現在時刻を表示する', async () => {

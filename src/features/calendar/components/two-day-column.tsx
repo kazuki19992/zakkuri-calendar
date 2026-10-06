@@ -1,6 +1,8 @@
 import { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getEventColor } from '@/constants/event-colors';
 import { NOW_LINE_HEIGHT, TIMELINE_HEIGHT, computeHourLineTop } from '../timeline-layout';
 import { resolveNearestTimelineHour } from '../timeline-tap-time';
 import type { TwoDayViewModel } from '../two-day-view-model';
@@ -21,6 +23,7 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
   onCreateExactAt?(date: string, startTime: string): void;
 }>) {
   const theme = useTheme();
+  const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const lastTap = useRef<number | null>(null);
   if (variant === 'timeline') {
     return (
@@ -112,15 +115,15 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
                 : onEditEvent?.(item.eventId, item.originalOccurrenceDate)}
             style={[
               styles.item,
-              { backgroundColor: theme.calendarEvent },
+              { backgroundColor: getEventColor(item.colorId as Exclude<typeof item.colorId, 'holiday'>, colorScheme) },
               item.kind === 'fuzzyRange' && styles.fuzzyRangeItem,
-              item.kind === 'fuzzyRange' && { borderColor: theme.calendarEventText },
+              item.kind === 'fuzzyRange' && { borderColor: theme.background },
               item.kind === 'fuzzyRange' && item.rangePosition === 'start' && styles.rangeStart,
               item.kind === 'fuzzyRange' && item.rangePosition === 'middle' && styles.rangeMiddle,
               item.kind === 'fuzzyRange' && item.rangePosition === 'end' && styles.rangeEnd,
             ] }>
-            <Text numberOfLines={1} style={[styles.itemTitle, { color: theme.calendarEventText }]}>{item.title}</Text>
-            <Text numberOfLines={1} style={[styles.itemTime, { color: theme.calendarEventText }]}>{item.temporalLabel}</Text>
+            <Text numberOfLines={1} style={[styles.itemTitle, { color: theme.background }]}>{item.title}</Text>
+            <Text numberOfLines={1} style={[styles.itemTime, { color: theme.background }]}>{item.temporalLabel}</Text>
           </Pressable>
         ))}
         {hiddenAllDayItemCount > 0 ? (
@@ -173,14 +176,14 @@ const styles = StyleSheet.create({
     // 高さ0 + borderTopWidthではなく、実体のある背景色付きの線として描画する。
     // 前者は端末によって描画が不安定になりやすい。
     height: HOUR_LINE_THICKNESS,
-    zIndex: 2,
+    zIndex: 0,
   },
   nowLine: {
     position: 'absolute',
     left: 0,
     right: 0,
     height: NOW_LINE_HEIGHT,
-    zIndex: 3,
+    zIndex: 2,
   },
   nowDot: {
     position: 'absolute',
@@ -188,6 +191,6 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 3.5,
-    zIndex: 4,
+    zIndex: 3,
   },
 });

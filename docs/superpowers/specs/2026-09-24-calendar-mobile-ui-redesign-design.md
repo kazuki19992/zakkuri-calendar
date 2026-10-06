@@ -54,7 +54,9 @@ CalendarScreen
 │  ├─ TwoDayColumn
 │  └─ TimelineEventBlock
 ├─ MonthGrid
-├─ SelectedDayAgenda
+│  └─ MonthWeekEventLayer
+├─ DayCalendarScreen
+│  └─ SelectedDayAgenda
 └─ CalendarAddEventButton
 ```
 
@@ -176,15 +178,17 @@ exact予定と同じタイポグラフィ、padding、radiusを基礎とし、�
 
 ## 11. 月ビュー
 
-7列×6行、月曜始まり、前後月の日付、今日、選択日、予定あり、土日祝、`SelectedDayAgenda`を維持する。
+7列×6行、月曜始まり、前後月の日付、今日、選択日、予定あり、土日祝を全画面の月グリッドへ表示する。月ビューに選択日の予定一覧は常設しない。
 
 - セルごとのカード状borderと角丸をなくす
 - 連続した薄いgridとして見せる
 - 日付数字と余白を小さくする
 - 今日を円形accentで示す
 - 選択日は淡い面またはringと読み上げ状態で区別する
-- 予定ありは小さなdotで示す
-- `SelectedDayAgenda`の余白と文字階層をcompactにする
+- 予定は週行ごとに最大3レーンの色付きblockで示し、複数日は週境界で連続帯にする
+- レーン優先度は複数日、終日、当日予定の順とし、超過分は対象日ごとの`他N件`へ畳む
+- 日付数字・セル余白・`他N件`は仮の1日ビューを開き、予定blockは編集フォームを開く
+- iOSでは日付セルの長押しで`Link.Preview`による1日ビューのプレビューを提供する。Android/Webへ代替UIは追加しない
 
 月ビューも2日ビューと同じTop Bar、view menu、date picker、FABを使用する。月ビューの横スワイプは既存の`useHorizontalSwipeTransition`を継続し、縦ScrollViewの祖先にPanResponderを置く。
 
@@ -277,8 +281,8 @@ featureとbug fixは失敗するテストを先に追加し、期待した理由
 ### 15.5 月ビュー
 
 - 7列×6行
-- 日付選択、今日、選択日、予定dot、土日祝
-- `SelectedDayAgenda`連携
+- 日付選択、今日、選択日、予定block、土日祝
+- 1日ビュー導線とiOS長押しプレビュー
 - 月横スワイプと縦スクロール
 
 ## 16. 検証と完了条件

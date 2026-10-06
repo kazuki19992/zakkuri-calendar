@@ -1,25 +1,32 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Link } from 'expo-router';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MonthDayViewModel } from '../month-view-model';
 import { useTheme } from '@/hooks/use-theme';
 
 export type MonthDayCellProps = Readonly<{
   day: MonthDayViewModel;
   onPress(date: string): void;
+  onOpenDay?(date: string): void;
   variant?: 'month' | 'picker';
 }>;
 
-export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellProps) {
+export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: MonthDayCellProps) {
   const theme = useTheme();
   const isHoliday = day.holidayName !== null || day.weekday === 0;
   const isSaturday = day.weekday === 6;
   const hasFixedEvents = day.hasFixedEvents ?? day.hasEvents;
 
-  return (
-    <Pressable
+  const content = <Pressable
       accessibilityRole="button"
-      accessibilityLabel={day.accessibilityLabel}
+      accessibilityLabel={onOpenDay === undefined ? day.accessibilityLabel : `${day.accessibilityLabel}を開く`}
       accessibilityState={{ selected: day.isSelected }}
-      onPress={() => onPress(day.date)}
+      onPress={() => {
+        if (Platform.OS !== 'ios' && onOpenDay !== undefined) {
+          onOpenDay(day.date);
+          return;
+        }
+        onPress(day.date);
+      }}
       style={({ pressed }) => [
         styles.cell,
         variant === 'picker' && styles.pickerCell,
@@ -28,7 +35,7 @@ export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellPr
         pressed && styles.pressed,
       ]}
     >
-      <View
+      <View pointerEvents="none"
         testID={`month-calendar.day-circle.${day.date}`}
         style={[styles.dayCircle, day.isToday && { backgroundColor: theme.calendarAccent }]}
       >
@@ -64,8 +71,12 @@ export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellPr
           !day.hasFuzzyRangeEvents && styles.hidden,
         ]}
       />
-    </Pressable>
-  );
+    </Pressable>;
+  if (onOpenDay === undefined || Platform.OS !== 'ios') return content;
+  return <Link href={{ pathname: '/calendar/day/[date]', params: { date: day.date } }}>
+    <Link.Trigger>{content}</Link.Trigger>
+    <Link.Preview />
+  </Link>;
 }
 
 const styles = StyleSheet.create({

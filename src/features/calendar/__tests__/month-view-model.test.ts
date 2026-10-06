@@ -1,7 +1,11 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { MonthGridDate } from '@/domain/calendar/month';
-import { createAgendaItems, createMonthDayViewModels } from '../month-view-model';
+import {
+  createAgendaItems,
+  createMonthDayViewModels,
+  createMonthWeekViewModels,
+} from '../month-view-model';
 
 const baseEvent = {
   id: 'event-1',
@@ -42,6 +46,27 @@ function asOccurrence(
 }
 
 describe('月表示の表示用モデル', () => {
+  it('複数日、終日、当日予定の順で3レーンへ配置し、残りを日別hidden countへ入れる', () => {
+    const grid = Array.from({ length: 7 }, (_, index): MonthGridDate => ({
+      date: `2026-09-${String(index + 21).padStart(2, '0')}`,
+      dayNumber: index + 21,
+      weekday: index + 1,
+      isCurrentMonth: true,
+    }));
+    const allDay = asOccurrence({ ...baseEvent, id: 'all-day', temporalType: 'allDay', endDate: '2026-09-21' });
+    const single = asOccurrence({ ...baseEvent, id: 'single', temporalType: 'exact', startTime: '09:00', duration: { type: 'fixed', minutes: 30 } });
+    const spanning = asOccurrence({ ...baseEvent, id: 'spanning', temporalType: 'allDay', endDate: '2026-09-23' });
+    const overflow = asOccurrence({ ...baseEvent, id: 'overflow', temporalType: 'exact', startTime: '10:00', duration: { type: 'fixed', minutes: 30 } });
+
+    const [week] = createMonthWeekViewModels({ grid, occurrences: [single, allDay, spanning, overflow], definitionLabels: new Map(), calendarColorId: 'blue' });
+
+    expect(week.segments.map((item) => [item.id, item.lane])).toEqual([
+      ['spanning', 0], ['all-day', 1], ['single', 2],
+    ]);
+    expect(week.segments[0]).toMatchObject({ startsInWeek: true, endsInWeek: true });
+    expect(week.days[0].hiddenEventCount).toBe(1);
+  });
+
   it('繰り返し発生回の継続日へ予定点を出し元シリーズIDをagendaへ渡す', () => {
     const event: CalendarEvent = {
       ...baseEvent,

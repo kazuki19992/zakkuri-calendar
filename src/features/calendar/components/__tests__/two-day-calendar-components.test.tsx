@@ -113,7 +113,8 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
     expect(view.getAllByTestId('two-day-calendar.column')).toHaveLength(strip.length);
     expect(view.getByTestId('two-day-calendar.timeline')).toBeOnTheScreen();
-    expect(view.getByText('0:00')).toBeOnTheScreen();
+    // 現在時刻が0:00の場合は時間軸と現在時刻ラベルの両方が存在し得る。
+    expect(view.getAllByText('0:00').length).toBeGreaterThanOrEqual(1);
     expect(view.getAllByText('21:00').length).toBeGreaterThanOrEqual(1);
     expect(view.getByText('24:00')).toBeOnTheScreen();
     // 現在時刻と重なる定時ラベルは、現在時刻を読みやすくするため非表示になる。

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMonthStart, moveMonth } from '@/domain/calendar/month';
 import { useTheme } from '@/hooks/use-theme';
@@ -11,19 +11,19 @@ import { CalendarDatePicker } from '../components/calendar-date-picker';
 import { CALENDAR_TOP_BAR_HEIGHT, CalendarTopBar } from '../components/calendar-top-bar';
 import { CalendarSideMenu } from '../components/calendar-side-menu';
 import { MonthGrid } from '../components/month-grid';
-import { SelectedDayAgenda } from '../components/selected-day-agenda';
 import { TwoDayView } from '../components/two-day-view';
 import { useHorizontalSwipeTransition } from '../hooks/use-horizontal-swipe-transition';
 import { useTwoDayCarousel } from '../hooks/use-two-day-carousel';
 import type { CalendarViewState } from '../hooks/use-calendar-view';
 import { TWO_DAY_SWIPE_BUFFER_DAYS } from '../two-day-view-model';
 
-export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt, onOpenSettings }: Readonly<{
+export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt, onOpenSettings, onOpenDay }: Readonly<{
   state: CalendarViewState;
   onAddEvent(date: string): void;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
   onOpenSettings?(): void;
+  onOpenDay?(date: string): void;
 }>) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -60,12 +60,9 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
   };
 
   const swipeContent = (
-    <>
-      <MonthGrid days={state.monthDays} onSelectDate={(date) => void state.selectDate(date)} />
-      <SelectedDayAgenda selectedDate={state.selectedDate}
-        holidayName={state.selectedHolidayName} holidaySupport={state.holidaySupport}
-        items={state.selectedAgendaItems} onEditEvent={onEditEvent} />
-    </>
+    <MonthGrid days={state.monthDays} weekModels={state.monthWeeks} onSelectDate={(date) => void state.selectDate(date)}
+      onOpenDay={(date) => void state.selectDate(date).then((opened) => opened && onOpenDay?.(date))}
+      onEditEvent={onEditEvent} />
   );
 
   return (
@@ -121,20 +118,16 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
             <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
           </>
         ) : (
-          // 月表示は縦スクロールも行うため、横スワイプの受付(panHandlers)をScrollViewの
-          // 祖先に置く。ScrollViewの内側に置くと、内容が縦スクロール可能になった際に
-          // ScrollView自身のジェスチャーへ奪われ、横スワイプを受け付けなくなる。
+          // 月表示は利用可能な高さを6週で配分する。縦スクロールを置かず、横スワイプだけを受け付ける。
           <View testID="calendar.swipe-area" style={styles.fill} {...transition.panHandlers}
             onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}>
-            <ScrollView testID="calendar.scroll" style={styles.scroll} contentContainerStyle={styles.content}>
-              <Animated.View testID="calendar.animated-content"
-                style={{
-                  transform: [{ translateX: transition.translateX }],
-                  opacity: transition.contentOpacity,
-                }}>
+            <Animated.View testID="calendar.animated-content"
+              style={[styles.monthContent, {
+                transform: [{ translateX: transition.translateX }],
+                opacity: transition.contentOpacity,
+              }]}>
               {swipeContent}
             </Animated.View>
-            </ScrollView>
             <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
           </View>
         )}
@@ -146,7 +139,6 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
 const styles = StyleSheet.create({
   root: { flex: 1 },
   fill: { flex: 1 },
-  scroll: { flex: 1 },
-  content: { flexGrow: 1, paddingTop: 8 },
+  monthContent: { flex: 1, paddingTop: 8 },
   error: { fontSize: 13, paddingHorizontal: 16, paddingBottom: 8 },
 });

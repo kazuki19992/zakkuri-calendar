@@ -1,13 +1,21 @@
 import { render, userEvent } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+import type { ReactNode } from 'react';
 import { Colors } from '@/constants/theme';
-import type { MonthDayViewModel } from '../../month-view-model';
+import type { MonthDayViewModel, MonthWeekViewModel } from '../../month-view-model';
 import { CalendarLoadState } from '../calendar-load-state';
 import { MonthDayCell } from '../month-day-cell';
 import { MonthGrid } from '../month-grid';
 import { SelectedDayAgenda } from '../selected-day-agenda';
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('expo-router', () => ({
+  // Link Preview is iOS only. The unit test verifies the cell action independently.
+  Link: Object.assign(({ children }: { children: ReactNode }) => children, {
+    Trigger: ({ children }: { children: ReactNode }) => children,
+    Preview: () => null,
+  }),
+}));
 
 function createDays(): readonly MonthDayViewModel[] {
   const start = new Date(Date.UTC(2026, 7, 31));
@@ -33,7 +41,38 @@ function createDays(): readonly MonthDayViewModel[] {
   });
 }
 
+function createWeeks(days: readonly MonthDayViewModel[]): readonly MonthWeekViewModel[] {
+  return Array.from({ length: 6 }, (_, weekIndex) => ({
+    days: days.slice(weekIndex * 7, weekIndex * 7 + 7).map((day) => ({ ...day, hiddenEventCount: day.date === '2026-09-21' ? 1 : 0 })),
+    segments: weekIndex === 3 ? [{
+      id: 'series-1:recurrence:2026-09-21', eventId: 'series-1', originalOccurrenceDate: '2026-09-21',
+      weekIndex, lane: 0, startWeekday: 0, spanDays: 3, position: 'start' as const, startsInWeek: true, endsInWeek: true,
+      continuesFromPreviousWeek: false, continuesToNextWeek: false, colorId: 'red' as const,
+      title: '通院', temporalLabel: '10:00', accessibilityLabel: '通院、10:00、繰り返し予定',
+    }] : [],
+  }));
+}
+
 describe('独自月カレンダー表示', () => {
+  it('日付数字と他N件は1日ビューを開き、予定blockは発生回を編集する', async () => {
+    const days = createDays();
+    const onOpenDay = jest.fn();
+    const onEditEvent = jest.fn();
+    const user = userEvent.setup();
+    const platform = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
+    const view = await render(<MonthGrid days={days} weekModels={createWeeks(days)} onSelectDate={jest.fn()} onOpenDay={onOpenDay} onEditEvent={onEditEvent} />);
+
+    await user.press(view.getByRole('button', { name: '2026年9月21日、敬老の日、選択中、予定ありを開く' }));
+    await user.press(view.getByRole('button', { name: '他1件、2026年9月21日の予定を開く' }));
+    await user.press(view.getByRole('button', { name: '通院、10:00、繰り返し予定' }));
+
+    expect(onOpenDay).toHaveBeenNthCalledWith(1, '2026-09-21');
+    expect(onOpenDay).toHaveBeenNthCalledWith(2, '2026-09-21');
+    expect(onEditEvent).toHaveBeenCalledWith('series-1', '2026-09-21');
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
+  });
+
   it('選択日の発生回をタップすると表示keyではなく元シリーズIDを渡す', async () => {
     const onEditEvent = jest.fn();
     const user = userEvent.setup();

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, userEvent, waitFor, within } from '@testing-library/react-native';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
@@ -20,6 +20,13 @@ function renderWithSafeArea(element: ReactElement) {
 }
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('expo-router', () => {
+  function MockLink({ children }: { children: ReactNode }) { return <>{children}</>; }
+  function MockLinkTrigger({ children }: { children: ReactNode }) { return <>{children}</>; }
+  function MockLinkPreview() { return null; }
+  const Link = Object.assign(MockLink, { Trigger: MockLinkTrigger, Preview: MockLinkPreview });
+  return { Link };
+});
 jest.mock('@/hooks/use-reduce-motion', () => ({ useReduceMotion: () => false }));
 jest.mock('../../hooks/use-horizontal-swipe-transition', () => {
   const { Animated } = jest.requireActual<typeof import('react-native')>('react-native');
@@ -90,7 +97,7 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
     status: 'ready', mode: 'twoDay', today: '2026-09-08', anchorDate: '2026-09-08',
     visibleMonth: '2026-09-01', selectedDate: '2026-09-08',
     twoDayDays, twoDayStrip,
-    monthDays: [], datePickerMonth: '2026-09-01', datePickerDays: [],
+    monthDays: [], monthWeeks: [], datePickerMonth: '2026-09-01', datePickerDays: [],
     selectedAgendaItems: [], selectedHolidayName: null,
     holidaySupport: 'available', isPeriodLoading: false, periodError: null,
     viewModePersistenceError: null,
@@ -284,20 +291,20 @@ describe('カレンダー画面', () => {
     expect(screen.getByTestId('two-day-calendar')).toBeOnTheScreen();
   });
 
-  it('月表示では従来通りページ全体をスクロール領域にする', async () => {
+  it('月表示ではスクロール領域を持たず、残り高さいっぱいにグリッドを表示する', async () => {
     await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
 
-    expect(screen.getByTestId('calendar.scroll')).toBeOnTheScreen();
+    expect(screen.queryByTestId('calendar.scroll')).toBeNull();
     expect(StyleSheet.flatten(screen.getByTestId('calendar.animated-content').props.style).flex)
-      .toBeUndefined();
+      .toBe(1);
   });
 
-  it('月表示では横スワイプの受付領域をスクロール領域の祖先にし、縦スクロールと競合しない', async () => {
+  it('月表示では横スワイプの受付領域で全画面グリッドを操作する', async () => {
     await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'month' })} onAddEvent={jest.fn()} />);
 
     const swipeArea = screen.getByTestId('calendar.swipe-area');
     expect(swipeArea.props.onStartShouldSetResponder).toBeDefined();
-    expect(within(swipeArea).getByTestId('calendar.scroll')).toBeOnTheScreen();
+    expect(within(swipeArea).getByTestId('month-calendar')).toBeOnTheScreen();
   });
 
   it('月表示では入場時の瞬間移動を隠す不透明度をスワイプ内容へ適用する', async () => {

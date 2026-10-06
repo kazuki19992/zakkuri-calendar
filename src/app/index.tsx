@@ -32,6 +32,7 @@ export default function IndexRoute() {
       })}
       onCreateExactAt={(date, startTime) => router.push({ pathname: '/events/new', params: { date, startTime, temporalType: 'exact' } })}
       onOpenSettings={() => router.push('/settings')}
+      onOpenDay={(date) => router.push({ pathname: '/calendar/day/[date]', params: { date } })}
     />
   );
 }

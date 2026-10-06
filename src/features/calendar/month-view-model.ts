@@ -1,4 +1,5 @@
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
+import type { EventColorId } from '@/constants/event-colors';
 import type { MonthGridDate } from '@/domain/calendar/month';
 import {
   getHolidayInfo,
@@ -28,6 +29,105 @@ export type MonthDayViewModel = Readonly<{
   holidayName: string | null;
   accessibilityLabel: string;
 }>;
+
+export type MonthEventSegmentViewModel = Readonly<{
+  id: string;
+  eventId: string;
+  originalOccurrenceDate?: string;
+  weekIndex: number;
+  lane: number;
+  startWeekday: number;
+  spanDays: number;
+  position: 'start' | 'middle' | 'end' | 'single';
+  continuesFromPreviousWeek: boolean;
+  continuesToNextWeek: boolean;
+  colorId: EventColorId;
+  title: string;
+  temporalLabel: string;
+  accessibilityLabel: string;
+}>;
+
+export type MonthWeekViewModel = Readonly<{
+  days: readonly (MonthGridDate & Readonly<{ hiddenEventCount: number }>)[];
+  segments: readonly MonthEventSegmentViewModel[];
+}>;
+
+function getOccurrenceTemporalLabel(occurrence: EventOccurrence, labels: ReadonlyMap<string, string>): string {
+  const { event } = occurrence;
+  if (event.temporalType === 'exact') return event.startTime;
+  if (event.temporalType === 'allDay') return '終日';
+  return labels.get(event.temporalDefinitionId) ?? 'ざっくり';
+}
+
+function getSegmentPriority(occurrence: EventOccurrence): number {
+  if (occurrence.occurrenceStartDate < occurrence.occurrenceThroughDate) return 0;
+  return occurrence.event.temporalType === 'allDay' ? 1 : 2;
+}
+
+export function createMonthWeekViewModels(input: Readonly<{
+  grid: readonly MonthGridDate[];
+  occurrences: readonly EventOccurrence[];
+  definitionLabels: ReadonlyMap<string, string>;
+  calendarColorId: EventColorId;
+}>): readonly MonthWeekViewModel[] {
+  return Array.from({ length: Math.ceil(input.grid.length / 7) }, (_, weekIndex) => {
+    const days = input.grid.slice(weekIndex * 7, weekIndex * 7 + 7);
+    const from = days[0]?.date;
+    const through = days.at(-1)?.date;
+    if (from === undefined || through === undefined) return { days: [], segments: [] };
+    const hiddenEventCount = new Map(days.map((day) => [day.date, 0]));
+    const candidates = input.occurrences
+      .filter((occurrence) => occurrence.occurrenceStartDate <= through && occurrence.occurrenceThroughDate >= from)
+      .sort((first, second) =>
+        getSegmentPriority(first) - getSegmentPriority(second)
+        || (first.occurrenceStartDate < from ? from : first.occurrenceStartDate)
+          .localeCompare(second.occurrenceStartDate < from ? from : second.occurrenceStartDate)
+        || getOccurrenceTemporalLabel(first, input.definitionLabels).localeCompare(getOccurrenceTemporalLabel(second, input.definitionLabels))
+        || first.key.localeCompare(second.key));
+    const laneEnds = Array.from({ length: 3 }, () => '');
+    const segments: MonthEventSegmentViewModel[] = [];
+    for (const occurrence of candidates) {
+      const segmentFrom = occurrence.occurrenceStartDate < from ? from : occurrence.occurrenceStartDate;
+      const segmentThrough = occurrence.occurrenceThroughDate > through ? through : occurrence.occurrenceThroughDate;
+      const startWeekday = days.findIndex((day) => day.date === segmentFrom);
+      const endWeekday = days.findIndex((day) => day.date === segmentThrough);
+      const lane = laneEnds.findIndex((end) => end < segmentFrom);
+      if (lane < 0) {
+        days.filter((day) => day.date >= segmentFrom && day.date <= segmentThrough)
+          .forEach((day) => hiddenEventCount.set(day.date, (hiddenEventCount.get(day.date) ?? 0) + 1));
+        continue;
+      }
+      laneEnds[lane] = segmentThrough;
+      const continuesFromPreviousWeek = occurrence.occurrenceStartDate < from;
+      const continuesToNextWeek = occurrence.occurrenceThroughDate > through;
+      const position = continuesFromPreviousWeek
+        ? continuesToNextWeek ? 'middle' : 'end'
+        : continuesToNextWeek ? 'start' : startWeekday === endWeekday ? 'single' : 'start';
+      const eventId = occurrence.occurrenceIdentity?.seriesEventId ?? occurrence.eventId;
+      const temporalLabel = getOccurrenceTemporalLabel(occurrence, input.definitionLabels);
+      segments.push({
+        id: occurrence.key,
+        eventId,
+        ...(occurrence.occurrenceIdentity === null ? {} : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),
+        weekIndex,
+        lane,
+        startWeekday,
+        spanDays: endWeekday - startWeekday + 1,
+        position,
+        continuesFromPreviousWeek,
+        continuesToNextWeek,
+        colorId: occurrence.event.colorId ?? input.calendarColorId,
+        title: occurrence.event.title,
+        temporalLabel,
+        accessibilityLabel: [occurrence.event.title, temporalLabel, occurrence.occurrenceStartDate < occurrence.occurrenceThroughDate ? '複数日にまたがる予定' : null, occurrence.isRecurring ? '繰り返し予定' : null].filter((value): value is string => value !== null).join('、'),
+      });
+    }
+    return {
+      days: days.map((day) => ({ ...day, hiddenEventCount: hiddenEventCount.get(day.date) ?? 0 })),
+      segments,
+    };
+  });
+}
 
 function formatJapaneseDate(date: string): string {
   const [year, month, day] = date.split('-').map(Number);

@@ -162,7 +162,7 @@ describe('2日表示の表示用モデル', () => {
   it('終日予定と未解決予定を時間軸外に残す', () => {
     const events: readonly CalendarEvent[] = [
       {
-        ...baseEvent, id: 'all-day', title: '休暇', anchorDate: '2026-09-30',
+        ...baseEvent, id: 'all-day', title: '休暇', anchorDate: '2026-09-30', colorId: 'purple',
         temporalType: 'allDay', endDate: '2026-09-30',
       },
       {
@@ -179,7 +179,7 @@ describe('2日表示の表示用モデル', () => {
 
     expect(result[0].allDayItems).toEqual([
       {
-        kind: 'event', id: 'all-day', eventId: 'all-day', colorId: 'blue', isInteractive: true, title: '休暇',
+        kind: 'event', id: 'all-day', eventId: 'all-day', colorId: 'purple', isInteractive: true, title: '休暇',
         temporalLabel: '終日', accessibilityLabel: '休暇、終日',
       },
       {

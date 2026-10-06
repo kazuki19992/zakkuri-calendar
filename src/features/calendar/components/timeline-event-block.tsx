@@ -1,6 +1,8 @@
 import { LinearGradient, type LinearGradientProps } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getEventColor } from '@/constants/event-colors';
 import {
   MIN_EVENT_HEIGHT,
   TIMELINE_HEIGHT,
@@ -22,6 +24,8 @@ export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
   onPress?(id: string, originalOccurrenceDate?: string): void;
 }>) {
   const theme = useTheme();
+  const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const eventColor = getEventColor(item.colorId, colorScheme);
   const width = `${100 / item.overlapCount}%` as const;
   const left = `${item.overlapIndex * (100 / item.overlapCount)}%` as const;
   // 縮小後も最小表示高(MIN_EVENT_HEIGHT)を下回らせず、極端な縮尺でも予定を視認・タップできるようにする。
@@ -31,7 +35,7 @@ export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
   // 削ると残り高さが1pt未満になり、最小表示高を設けた意味がなくなる。
   const top = Math.min(item.top * scale, Math.max(0, TIMELINE_HEIGHT * scale - height));
   const colors = item.opacityStops.map((stop) =>
-    withOpacity(theme.calendarEvent, stop.opacity),
+    withOpacity(eventColor, stop.opacity),
   ) as unknown as LinearGradientProps['colors'];
   const locations = item.opacityStops.map((stop) => stop.offset) as unknown as readonly [
     number,
@@ -63,10 +67,10 @@ export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
           end={{ x: 0.5, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        {item.isInstant ? <View style={[styles.instantLine, { backgroundColor: theme.calendarEventBorder }]} /> : null}
+        {item.isInstant ? <View style={[styles.instantLine, { backgroundColor: eventColor }]} /> : null}
         <View testID={`timeline-event.${item.id}.text`} style={[styles.text, { justifyContent: textAnchor }]}>
-          <Text numberOfLines={2} style={[styles.title, { color: theme.calendarEventText }]}>{item.title}</Text>
-          <Text numberOfLines={1} style={[styles.time, { color: theme.calendarEventText }]}>{item.temporalLabel}</Text>
+          <Text numberOfLines={2} style={[styles.title, { color: theme.background, backgroundColor: eventColor }]}>{item.title}</Text>
+          <Text numberOfLines={1} style={[styles.time, { color: theme.background, backgroundColor: eventColor }]}>{item.temporalLabel}</Text>
         </View>
       </View>
     </Pressable>

@@ -8,6 +8,8 @@ import {
   NOW_LINE_HEIGHT,
   TIMELINE_HEIGHT,
   computeHourLineTop,
+  doesTimelineLabelOverlap,
+  getTimelineHourLabelOpacity,
   computeNowLineTop,
   computePeakOpacityOffset,
   computeTimelineScale,
@@ -123,7 +125,7 @@ describe('日別タイムライン配置', () => {
   it('14時30分の30分予定を時間軸上の位置と高さへ変換する', () => {
     const [item] = createDayTimelineItems({
       date: '2026-09-09',
-      occurrences: asOccurrences([exact('会議', '14:30', { type: 'fixed', minutes: 30 })]),
+      occurrences: asOccurrences([{ ...exact('会議', '14:30', { type: 'fixed', minutes: 30 }), colorId: 'red' }]),
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
     });
@@ -134,9 +136,20 @@ describe('日別タイムライン配置', () => {
       top: 870 * HOUR_HEIGHT / 60,
       height: MIN_EVENT_HEIGHT,
       temporalLabel: '14:30・30分',
+      colorId: 'red',
       opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
     });
     expect(TIMELINE_HEIGHT).toBe(24 * HOUR_HEIGHT);
+  });
+
+  it('予定色が未指定ならカレンダー既定色を時間軸予定へ引き継ぐ', () => {
+    const [item] = createDayTimelineItems({
+      date: '2026-09-09',
+      occurrences: asOccurrences([exact('色未指定', '09:00', { type: 'fixed', minutes: 30 })]),
+      definitions: new Map(), undeterminedFadeMinutes: 120, calendarColorId: 'blue',
+    });
+
+    expect(item.colorId).toBe('blue');
   });
 
   it('瞬間予定は最小表示高を持ち、時刻の位置を保持する', () => {
@@ -321,6 +334,27 @@ describe('現在時刻の位置計算', () => {
     expect(computeNowLineTop(0, 1)).toBe(0);
     expect(computeNowLineTop(90, 1)).toBe(84); // 1時間30分 * 56pt/時
     expect(computeNowLineTop(90, 0.5)).toBe(42);
+  });
+});
+
+describe('時間軸ラベルの表示計算', () => {
+  it('奇数時ラベルを0.66から0.78の倍率でフェード表示する', () => {
+    expect(getTimelineHourLabelOpacity(2, 0.4)).toBe(1);
+    expect(getTimelineHourLabelOpacity(1, 0.66)).toBe(0);
+    expect(getTimelineHourLabelOpacity(1, 0.72)).toBeCloseTo(0.5, 10);
+    expect(getTimelineHourLabelOpacity(1, 0.78)).toBe(1);
+  });
+
+  it('不正な倍率でも補助ラベルの不透明度を制限する', () => {
+    expect(getTimelineHourLabelOpacity(1, Number.NaN)).toBe(0);
+    expect(getTimelineHourLabelOpacity(1, -1)).toBe(0);
+    expect(getTimelineHourLabelOpacity(1, 2)).toBe(1);
+  });
+
+  it('現在時刻ラベルと交差する定時ラベルだけを判定する', () => {
+    expect(doesTimelineLabelOverlap(100, 100, 13)).toBe(true);
+    expect(doesTimelineLabelOverlap(100, 110, 13)).toBe(true);
+    expect(doesTimelineLabelOverlap(100, 113, 13)).toBe(false);
   });
 });
 

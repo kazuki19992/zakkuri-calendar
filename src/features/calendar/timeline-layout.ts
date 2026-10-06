@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { PixelRatio } from 'react-native';
 import type { CalendarEvent } from '@/domain/calendar/event';
+import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/domain/calendar/event-color';
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
@@ -11,6 +12,8 @@ export const TIMELINE_HEIGHT = 24 * HOUR_HEIGHT;
 export const MIN_EVENT_HEIGHT = 36;
 /** 現在時刻線の太さ。位置を下端内へ収める計算にも使う。 */
 export const NOW_LINE_HEIGHT = 2;
+export const TIMELINE_ODD_HOUR_LABEL_FADE_START = 0.66;
+export const TIMELINE_ODD_HOUR_LABEL_FADE_END = 0.78;
 
 const PIXELS_PER_MINUTE = HOUR_HEIGHT / 60;
 
@@ -61,6 +64,30 @@ export function computeHourLineTop(hour: number, scale: number): number {
   return PixelRatio.roundToNearestPixel(hour * HOUR_HEIGHT * scale);
 }
 
+/**
+ * 偶数時の基準ラベルは常に表示し、奇数時の補助ラベルだけを拡大率に合わせて表示する。
+ * ピンチ中に数値が唐突に現れないよう、通常倍率と拡大倍率の間で線形に補間する。
+ */
+export function getTimelineHourLabelOpacity(hour: number, scale: number): number {
+  if (hour % 2 === 0) return 1;
+  if (!Number.isFinite(scale) || scale <= TIMELINE_ODD_HOUR_LABEL_FADE_START) return 0;
+  if (scale >= TIMELINE_ODD_HOUR_LABEL_FADE_END) return 1;
+  return (scale - TIMELINE_ODD_HOUR_LABEL_FADE_START)
+    / (TIMELINE_ODD_HOUR_LABEL_FADE_END - TIMELINE_ODD_HOUR_LABEL_FADE_START);
+}
+
+/**
+ * 同じ行高で並べる二つのラベルが、縦方向に重なるかを判定する。
+ * 境界で接するだけなら両方を読めるため、重なりとは扱わない。
+ */
+export function doesTimelineLabelOverlap(
+  firstTop: number,
+  secondTop: number,
+  lineHeight: number,
+): boolean {
+  return Math.abs(firstTop - secondTop) < lineHeight;
+}
+
 export type TimelineOpacityStop = Readonly<{ offset: number; opacity: number }>;
 
 export type TimelineTextAnchor = 'flex-start' | 'center' | 'flex-end';
@@ -91,6 +118,7 @@ export type TimelineItemViewModel = Readonly<{
   eventId: string;
   originalOccurrenceDate?: string;
   title: string;
+  colorId: EventColorId;
   temporalLabel: string;
   accessibilityLabel: string;
   startMinute: number;
@@ -205,6 +233,7 @@ export function createDayTimelineItems(input: Readonly<{
   occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
+  calendarColorId?: EventColorId;
 }>): readonly TimelineItemViewModel[] {
   const items: MutableTimelineItem[] = [];
   for (const occurrence of input.occurrences) {
@@ -250,6 +279,7 @@ export function createDayTimelineItems(input: Readonly<{
         ? {}
         : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),
       title: event.title,
+      colorId: event.colorId ?? input.calendarColorId ?? DEFAULT_EVENT_COLOR_ID,
       temporalLabel,
       accessibilityLabel: [
         event.title,

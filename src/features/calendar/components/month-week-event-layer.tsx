@@ -8,7 +8,7 @@ function blockStyle(item: MonthEventSegmentViewModel) {
   return {
     left: `${(item.startWeekday / 7) * 100}%` as const,
     width: `${(item.spanDays / 7) * 100}%` as const,
-    top: 30 + item.lane * 24,
+    top: `${20 + item.lane * 19}%` as const,
   };
 }
 
@@ -59,6 +59,6 @@ const styles = StyleSheet.create({
   start: { borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
   end: { borderTopRightRadius: 4, borderBottomRightRadius: 4 },
   label: { fontSize: 10, fontWeight: '600', lineHeight: 14 },
-  more: { position: 'absolute', top: 94, width: '14.285714%', minHeight: 36, justifyContent: 'center', alignItems: 'center' },
+  more: { position: 'absolute', top: '77%', bottom: 0, width: '14.285714%', justifyContent: 'center', alignItems: 'center' },
   moreText: { fontSize: 10, lineHeight: 12 },
 });

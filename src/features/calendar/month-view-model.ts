@@ -86,20 +86,21 @@ export function createMonthWeekViewModels(input: Readonly<{
           .localeCompare(second.occurrenceStartDate < from ? from : second.occurrenceStartDate)
         || getOccurrenceTemporalLabel(first, input.definitionLabels).localeCompare(getOccurrenceTemporalLabel(second, input.definitionLabels))
         || first.key.localeCompare(second.key));
-    const laneEnds = Array.from({ length: 3 }, () => '');
+    const laneOccupancies: Readonly<{ from: string; through: string }>[][] = [[], [], []];
     const segments: MonthEventSegmentViewModel[] = [];
     for (const occurrence of candidates) {
       const segmentFrom = occurrence.occurrenceStartDate < from ? from : occurrence.occurrenceStartDate;
       const segmentThrough = occurrence.occurrenceThroughDate > through ? through : occurrence.occurrenceThroughDate;
       const startWeekday = days.findIndex((day) => day.date === segmentFrom);
       const endWeekday = days.findIndex((day) => day.date === segmentThrough);
-      const lane = laneEnds.findIndex((end) => end < segmentFrom);
+      const lane = laneOccupancies.findIndex((occupancies) => occupancies.every((occupied) =>
+        occupied.through < segmentFrom || segmentThrough < occupied.from));
       if (lane < 0) {
         days.filter((day) => day.date >= segmentFrom && day.date <= segmentThrough)
           .forEach((day) => hiddenEventCount.set(day.date, (hiddenEventCount.get(day.date) ?? 0) + 1));
         continue;
       }
-      laneEnds[lane] = segmentThrough;
+      laneOccupancies[lane].push({ from: segmentFrom, through: segmentThrough });
       const continuesFromPreviousWeek = occurrence.occurrenceStartDate < from;
       const continuesToNextWeek = occurrence.occurrenceThroughDate > through;
       const startsInWeek = !continuesFromPreviousWeek;

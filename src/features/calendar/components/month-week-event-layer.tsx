@@ -17,6 +17,14 @@ function formatJapaneseDate(date: string): string {
   return `${year}年${month}月${day}日`;
 }
 
+function getGradientColors(item: MonthEventSegmentViewModel, color: string): readonly [string, string, string] | readonly [string, string] {
+  const faded = `${color}99`;
+  if (item.continuesFromPreviousWeek && item.continuesToNextWeek) return [faded, color, faded];
+  if (item.continuesFromPreviousWeek) return [faded, color];
+  if (item.continuesToNextWeek) return [color, faded];
+  return [color, color];
+}
+
 export function MonthWeekEventLayer({ week, onOpenDay, onEditEvent }: Readonly<{
   week: MonthWeekViewModel;
   onOpenDay(date: string): void;
@@ -33,7 +41,7 @@ export function MonthWeekEventLayer({ week, onOpenDay, onEditEvent }: Readonly<{
         hitSlop={11}
         style={[styles.block, blockStyle(item), item.startsInWeek ? styles.start : null, item.endsInWeek ? styles.end : null]}>
         <LinearGradient accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-          colors={item.continuesFromPreviousWeek || item.continuesToNextWeek ? [color, color, `${color}99`] : [color, color]}
+          colors={getGradientColors(item, color)}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
         <Text numberOfLines={1} style={[styles.label, { color: theme.background }]}>{item.temporalLabel} {item.title}</Text>
       </Pressable>;

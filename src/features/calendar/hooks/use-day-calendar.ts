@@ -17,6 +17,7 @@ export function useDayCalendar(input: Readonly<{
   events: EventRepository;
   temporalDefinitions: TemporalDefinitionRepository;
   holidayProvider: HolidayProvider;
+  refreshRevision?: number;
 }>): DayCalendarState {
   const [state, setState] = useState<Readonly<{ status: DayCalendarState['status']; items: readonly AgendaItemViewModel[]; holidayName: string | null }>>({ status: 'loading', items: [], holidayName: null });
   const retryRevision = useRef(0);
@@ -46,6 +47,6 @@ export function useDayCalendar(input: Readonly<{
       }
     })();
     return () => { request.current += 1; };
-  }, [input.calendars, input.date, input.events, input.holidayProvider, input.temporalDefinitions, retry]);
+  }, [input.calendars, input.date, input.events, input.holidayProvider, input.refreshRevision, input.temporalDefinitions, retry]);
   return { ...state, retry: reload };
 }

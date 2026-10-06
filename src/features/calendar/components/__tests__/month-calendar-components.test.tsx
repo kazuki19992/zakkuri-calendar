@@ -63,7 +63,7 @@ describe('独自月カレンダー表示', () => {
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'android' });
     const view = await render(<MonthGrid days={days} weekModels={createWeeks(days)} onSelectDate={jest.fn()} onOpenDay={onOpenDay} onEditEvent={onEditEvent} />);
 
-    await user.press(view.getByRole('button', { name: '2026年9月21日を開く' }));
+    await user.press(view.getByRole('button', { name: '2026年9月21日、敬老の日、選択中、予定ありを開く' }));
     await user.press(view.getByRole('button', { name: '他1件、2026年9月21日の予定を開く' }));
     await user.press(view.getByRole('button', { name: '通院、10:00、繰り返し予定' }));
 

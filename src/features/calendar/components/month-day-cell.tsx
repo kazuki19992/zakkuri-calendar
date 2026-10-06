@@ -18,11 +18,14 @@ export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: Mon
 
   const content = <Pressable
       accessibilityRole="button"
-      accessibilityLabel={onOpenDay === undefined ? day.accessibilityLabel : `${formatDateLabel(day.date)}を開く`}
+      accessibilityLabel={onOpenDay === undefined ? day.accessibilityLabel : `${day.accessibilityLabel}を開く`}
       accessibilityState={{ selected: day.isSelected }}
       onPress={() => {
+        if (Platform.OS !== 'ios' && onOpenDay !== undefined) {
+          onOpenDay(day.date);
+          return;
+        }
         onPress(day.date);
-        if (Platform.OS !== 'ios') onOpenDay?.(day.date);
       }}
       style={({ pressed }) => [
         styles.cell,
@@ -74,11 +77,6 @@ export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: Mon
     <Link.Trigger>{content}</Link.Trigger>
     <Link.Preview />
   </Link>;
-}
-
-function formatDateLabel(date: string): string {
-  const [year, month, day] = date.split('-').map(Number);
-  return `${year}年${month}月${day}日`;
 }
 
 const styles = StyleSheet.create({

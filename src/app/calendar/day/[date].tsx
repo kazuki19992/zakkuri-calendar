@@ -5,6 +5,7 @@ import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { isCalendarDate } from '@/domain/calendar/month';
 import { useDayCalendar } from '@/features/calendar/hooks/use-day-calendar';
 import { DayCalendarScreen } from '@/features/calendar/screens/day-calendar-screen';
+import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
 
 const holidayProvider = new JapaneseHolidayProvider();
 export default function DayRoute() {
@@ -17,15 +18,16 @@ function InvalidDayRoute() {
   const router = useRouter();
   return <View><Stack.Screen options={{ headerShown: true, title: '予定' }} />
     <Text>日付が正しくありません</Text>
-    <Pressable accessibilityRole="button" accessibilityLabel="カレンダーへ戻る" onPress={() => router.back()}><Text>カレンダーへ戻る</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="カレンダーへ戻る" onPress={() => router.canGoBack() ? router.back() : router.replace('/')}><Text>カレンダーへ戻る</Text></Pressable>
   </View>;
 }
 
 function ValidDayRoute({ date }: Readonly<{ date: string }>) {
   const router = useRouter();
   const isPreview = useIsPreview();
+  const { revision } = useCalendarRefresh();
   const repositories = useRepositories();
-  const state = useDayCalendar({ date, ...repositories, holidayProvider });
+  const state = useDayCalendar({ date, ...repositories, holidayProvider, refreshRevision: revision });
   return <><Stack.Screen options={{ headerShown: !isPreview, title: `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日` }} />
     <DayCalendarScreen date={date} state={state} isPreview={isPreview} onEditEvent={(id, occurrenceDate) => router.push({ pathname: '/events/[id]', params: occurrenceDate === undefined ? { id } : { id, occurrenceDate } })} /></>;
 }

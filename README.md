@@ -39,6 +39,8 @@ EASのdevelopment profileでiOSとAndroidを順番にローカルビルドしま
 ./scripts/build-local.sh development android
 ```
 
+`react-native-webview` のようにネイティブバイナリへ組み込まれる依存を追加・更新した場合、`npm ci` の後にdevelopment buildを作り直してください。JavaScriptの更新だけであれば開発サーバーの再読み込みで反映されますが、既存のdevelopment buildには新しいネイティブモジュールを後から読み込めません。書式付きメモエディタは外部リンク遷移を制御するため、このWebViewを利用します。
+
 第1引数には`development`、`preview`、`production`を指定できます。成果物は`builds/<profile>/<platform>/`へ保存され、Gitの追跡対象にはなりません。
 
 スクリプトは`.env.local`があれば`KEY=value`または`export KEY=value`形式の環境変数を展開してビルドへ渡します。ファイルがない場合は警告を表示して続行します。`eas-cli`をローカルへインストールし、`eas login`を済ませてください。ビルドは`--non-interactive`で実行するため、認証情報・署名用証明書・プロビジョニングプロファイルなどの入力が必要な場合は、事前にEASへ登録してください。iOSのローカルビルドにはmacOS、Xcode、CocoaPodsが、AndroidにはAndroid SDKとNDKが必要です。

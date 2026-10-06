@@ -578,9 +578,10 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         occurrences: visibleOccurrences,
         definitions: state.snapshot.definitions,
         undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes,
+        calendarColorId: state.snapshot.calendarColorId,
         holidayCoverage: state.snapshot.holidayCoverage,
       }),
-    [state.anchorDate, state.snapshot.definitions, state.snapshot.holidayCoverage,
+    [state.anchorDate, state.snapshot.calendarColorId, state.snapshot.definitions, state.snapshot.holidayCoverage,
       state.snapshot.undeterminedFadeMinutes, state.today, visibleOccurrences],
   );
   const twoDayStrip = useMemo(
@@ -592,9 +593,10 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         occurrences: visibleOccurrences,
         definitions: state.snapshot.definitions,
         undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes,
+        calendarColorId: state.snapshot.calendarColorId,
         holidayCoverage: state.snapshot.holidayCoverage,
       }),
-    [state.anchorDate, state.snapshot.definitions, state.snapshot.holidayCoverage,
+    [state.anchorDate, state.snapshot.calendarColorId, state.snapshot.definitions, state.snapshot.holidayCoverage,
       state.snapshot.undeterminedFadeMinutes, state.today, visibleOccurrences],
   );
   const monthDays = useMemo(

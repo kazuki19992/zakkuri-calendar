@@ -63,6 +63,7 @@ function createDayViewModel(
     occurrences: readonly EventOccurrence[];
     definitions: ReadonlyMap<string, TemporalDefinition>;
     undeterminedFadeMinutes: number;
+    calendarColorId: EventColorId;
     holidayCoverage: readonly HolidayRangeCoverage[];
   }>,
 ): TwoDayViewModel {
@@ -105,7 +106,7 @@ function createDayViewModel(
       ...item,
       kind: isFuzzyRange ? 'fuzzyRange' : 'event',
       eventId: item.eventId,
-      colorId: DEFAULT_EVENT_COLOR_ID,
+      colorId: occurrence.event.colorId ?? input.calendarColorId,
       isInteractive: true,
       ...(rangePosition === null ? {} : { rangePosition }),
       accessibilityLabel: positionLabel === null
@@ -129,6 +130,7 @@ function createDayViewModel(
     occurrences: input.occurrences,
     definitions: input.definitions,
     undeterminedFadeMinutes: input.undeterminedFadeMinutes,
+    calendarColorId: input.calendarColorId,
   });
   const itemCount = new Set([...eventAllDayItems, ...timelineItems].map((item) => item.id)).size;
   const labels = [`${year}年${month}月${day}日`, `${weekdayLabel}曜日`];
@@ -156,9 +158,11 @@ export function createTwoDayViewModels(input: Readonly<{
   occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
+  calendarColorId?: EventColorId;
   holidayCoverage: readonly HolidayRangeCoverage[];
 }>): readonly [TwoDayViewModel, TwoDayViewModel] {
-  return [createDayViewModel(input.range.from, input), createDayViewModel(input.range.through, input)];
+  const inputWithColor = { ...input, calendarColorId: input.calendarColorId ?? DEFAULT_EVENT_COLOR_ID };
+  return [createDayViewModel(input.range.from, inputWithColor), createDayViewModel(input.range.through, inputWithColor)];
 }
 
 /**
@@ -192,7 +196,10 @@ export function createTwoDayStripViewModels(input: Readonly<{
   occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
+  calendarColorId?: EventColorId;
   holidayCoverage: readonly HolidayRangeCoverage[];
 }>): readonly TwoDayViewModel[] {
-  return createTwoDayStripDates(input.range, input.bufferDays).map((date) => createDayViewModel(date, input));
+  const inputWithColor = { ...input, calendarColorId: input.calendarColorId ?? DEFAULT_EVENT_COLOR_ID };
+  return createTwoDayStripDates(input.range, input.bufferDays)
+    .map((date) => createDayViewModel(date, inputWithColor));
 }

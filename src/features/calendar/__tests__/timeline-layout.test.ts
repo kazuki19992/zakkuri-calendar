@@ -125,7 +125,7 @@ describe('日別タイムライン配置', () => {
   it('14時30分の30分予定を時間軸上の位置と高さへ変換する', () => {
     const [item] = createDayTimelineItems({
       date: '2026-09-09',
-      occurrences: asOccurrences([exact('会議', '14:30', { type: 'fixed', minutes: 30 })]),
+      occurrences: asOccurrences([{ ...exact('会議', '14:30', { type: 'fixed', minutes: 30 }), colorId: 'red' }]),
       definitions: new Map(),
       undeterminedFadeMinutes: 120,
     });
@@ -136,6 +136,7 @@ describe('日別タイムライン配置', () => {
       top: 870 * HOUR_HEIGHT / 60,
       height: MIN_EVENT_HEIGHT,
       temporalLabel: '14:30・30分',
+      colorId: 'red',
       opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
     });
     expect(TIMELINE_HEIGHT).toBe(24 * HOUR_HEIGHT);

@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { PixelRatio } from 'react-native';
 import type { CalendarEvent } from '@/domain/calendar/event';
+import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/domain/calendar/event-color';
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
@@ -117,6 +118,7 @@ export type TimelineItemViewModel = Readonly<{
   eventId: string;
   originalOccurrenceDate?: string;
   title: string;
+  colorId: EventColorId;
   temporalLabel: string;
   accessibilityLabel: string;
   startMinute: number;
@@ -231,6 +233,7 @@ export function createDayTimelineItems(input: Readonly<{
   occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
+  calendarColorId?: EventColorId;
 }>): readonly TimelineItemViewModel[] {
   const items: MutableTimelineItem[] = [];
   for (const occurrence of input.occurrences) {
@@ -276,6 +279,7 @@ export function createDayTimelineItems(input: Readonly<{
         ? {}
         : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),
       title: event.title,
+      colorId: event.colorId ?? input.calendarColorId ?? DEFAULT_EVENT_COLOR_ID,
       temporalLabel,
       accessibilityLabel: [
         event.title,

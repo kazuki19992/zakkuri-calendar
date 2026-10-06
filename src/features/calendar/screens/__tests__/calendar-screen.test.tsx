@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, userEvent, waitFor, within } from '@testing-library/react-native';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
@@ -21,10 +21,10 @@ function renderWithSafeArea(element: ReactElement) {
 
 jest.mock('@/global.css', () => ({}));
 jest.mock('expo-router', () => {
-  const React = require('react');
-  const Link = ({ children }: { children: React.ReactNode }) => <>{children}</>;
-  Link.Trigger = ({ children }: { children: React.ReactNode }) => <>{children}</>;
-  Link.Preview = () => null;
+  function MockLink({ children }: { children: ReactNode }) { return <>{children}</>; }
+  function MockLinkTrigger({ children }: { children: ReactNode }) { return <>{children}</>; }
+  function MockLinkPreview() { return null; }
+  const Link = Object.assign(MockLink, { Trigger: MockLinkTrigger, Preview: MockLinkPreview });
   return { Link };
 });
 jest.mock('@/hooks/use-reduce-motion', () => ({ useReduceMotion: () => false }));

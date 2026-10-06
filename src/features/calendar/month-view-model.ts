@@ -39,6 +39,8 @@ export type MonthEventSegmentViewModel = Readonly<{
   startWeekday: number;
   spanDays: number;
   position: 'start' | 'middle' | 'end' | 'single';
+  startsInWeek: boolean;
+  endsInWeek: boolean;
   continuesFromPreviousWeek: boolean;
   continuesToNextWeek: boolean;
   colorId: EventColorId;
@@ -100,6 +102,8 @@ export function createMonthWeekViewModels(input: Readonly<{
       laneEnds[lane] = segmentThrough;
       const continuesFromPreviousWeek = occurrence.occurrenceStartDate < from;
       const continuesToNextWeek = occurrence.occurrenceThroughDate > through;
+      const startsInWeek = !continuesFromPreviousWeek;
+      const endsInWeek = !continuesToNextWeek;
       const position = continuesFromPreviousWeek
         ? continuesToNextWeek ? 'middle' : 'end'
         : continuesToNextWeek ? 'start' : startWeekday === endWeekday ? 'single' : 'start';
@@ -114,6 +118,8 @@ export function createMonthWeekViewModels(input: Readonly<{
         startWeekday,
         spanDays: endWeekday - startWeekday + 1,
         position,
+        startsInWeek,
+        endsInWeek,
         continuesFromPreviousWeek,
         continuesToNextWeek,
         colorId: occurrence.event.colorId ?? input.calendarColorId,

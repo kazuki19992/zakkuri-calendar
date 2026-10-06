@@ -25,7 +25,6 @@ export function useDayCalendar(input: Readonly<{
   const reload = useCallback(() => { retryRevision.current += 1; setRetry(retryRevision.current); }, []);
   useEffect(() => {
     const requestId = ++request.current;
-    setState((current) => ({ ...current, status: 'loading' }));
     void (async () => {
       try {
         const calendar = await input.calendars.getDefault();
@@ -46,6 +45,7 @@ export function useDayCalendar(input: Readonly<{
         if (requestId === request.current) setState({ status: 'error', items: [], holidayName: null });
       }
     })();
+    return () => { request.current += 1; };
   }, [input.calendars, input.date, input.events, input.holidayProvider, input.temporalDefinitions, retry]);
   return { ...state, retry: reload };
 }

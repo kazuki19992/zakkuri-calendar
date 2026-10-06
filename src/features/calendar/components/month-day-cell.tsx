@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Link } from 'expo-router';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MonthDayViewModel } from '../month-view-model';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -15,8 +16,7 @@ export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: Mon
   const isSaturday = day.weekday === 6;
   const hasFixedEvents = day.hasFixedEvents ?? day.hasEvents;
 
-  return (
-    <Pressable
+  const content = <Pressable
       accessibilityRole="button"
       accessibilityLabel={onOpenDay === undefined ? day.accessibilityLabel : `${formatDateLabel(day.date)}を開く`}
       accessibilityState={{ selected: day.isSelected }}
@@ -65,8 +65,12 @@ export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: Mon
           !day.hasFuzzyRangeEvents && styles.hidden,
         ]}
       />
-    </Pressable>
-  );
+    </Pressable>;
+  if (onOpenDay === undefined || Platform.OS !== 'ios') return content;
+  return <Link href={{ pathname: '/calendar/day/[date]', params: { date: day.date } }}>
+    <Link.Trigger>{content}</Link.Trigger>
+    <Link.Preview />
+  </Link>;
 }
 
 function formatDateLabel(date: string): string {

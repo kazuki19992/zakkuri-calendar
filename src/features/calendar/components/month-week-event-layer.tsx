@@ -30,7 +30,7 @@ export function MonthWeekEventLayer({ week, onOpenDay, onEditEvent }: Readonly<{
       return <Pressable key={item.id} testID={`month-calendar.event-block.${item.id}`}
         accessibilityRole="button" accessibilityLabel={item.accessibilityLabel}
         onPress={() => item.originalOccurrenceDate === undefined ? onEditEvent?.(item.eventId) : onEditEvent?.(item.eventId, item.originalOccurrenceDate)}
-        style={[styles.block, blockStyle(item), item.position === 'start' || item.position === 'single' ? styles.start : null, item.position === 'end' || item.position === 'single' ? styles.end : null]}>
+        style={[styles.block, blockStyle(item), item.startsInWeek ? styles.start : null, item.endsInWeek ? styles.end : null]}>
         <LinearGradient accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
           colors={item.continuesFromPreviousWeek || item.continuesToNextWeek ? [color, color, `${color}99`] : [color, color]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
@@ -50,6 +50,6 @@ const styles = StyleSheet.create({
   start: { borderTopLeftRadius: 4, borderBottomLeftRadius: 4 },
   end: { borderTopRightRadius: 4, borderBottomRightRadius: 4 },
   label: { fontSize: 10, fontWeight: '600', lineHeight: 14 },
-  more: { position: 'absolute', top: 102, width: '14.285714%', minHeight: 22, justifyContent: 'center', alignItems: 'center' },
+  more: { position: 'absolute', top: 94, width: '14.285714%', minHeight: 36, justifyContent: 'center', alignItems: 'center' },
   moreText: { fontSize: 10, lineHeight: 12 },
 });

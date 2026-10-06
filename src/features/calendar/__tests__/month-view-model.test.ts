@@ -63,6 +63,7 @@ describe('月表示の表示用モデル', () => {
     expect(week.segments.map((item) => [item.id, item.lane])).toEqual([
       ['spanning', 0], ['all-day', 1], ['single', 2],
     ]);
+    expect(week.segments[0]).toMatchObject({ startsInWeek: true, endsInWeek: true });
     expect(week.days[0].hiddenEventCount).toBe(1);
   });
 

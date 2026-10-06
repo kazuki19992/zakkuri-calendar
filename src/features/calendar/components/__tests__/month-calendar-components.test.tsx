@@ -1,5 +1,6 @@
 import { render, userEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
+import type { ReactNode } from 'react';
 import { Colors } from '@/constants/theme';
 import type { MonthDayViewModel, MonthWeekViewModel } from '../../month-view-model';
 import { CalendarLoadState } from '../calendar-load-state';
@@ -8,6 +9,13 @@ import { MonthGrid } from '../month-grid';
 import { SelectedDayAgenda } from '../selected-day-agenda';
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('expo-router', () => ({
+  // Link Preview is iOS only. The unit test verifies the cell action independently.
+  Link: Object.assign(({ children }: { children: ReactNode }) => children, {
+    Trigger: ({ children }: { children: ReactNode }) => children,
+    Preview: () => null,
+  }),
+}));
 
 function createDays(): readonly MonthDayViewModel[] {
   const start = new Date(Date.UTC(2026, 7, 31));
@@ -38,7 +46,7 @@ function createWeeks(days: readonly MonthDayViewModel[]): readonly MonthWeekView
     days: days.slice(weekIndex * 7, weekIndex * 7 + 7).map((day) => ({ ...day, hiddenEventCount: day.date === '2026-09-21' ? 1 : 0 })),
     segments: weekIndex === 3 ? [{
       id: 'series-1:recurrence:2026-09-21', eventId: 'series-1', originalOccurrenceDate: '2026-09-21',
-      weekIndex, lane: 0, startWeekday: 0, spanDays: 3, position: 'start' as const,
+      weekIndex, lane: 0, startWeekday: 0, spanDays: 3, position: 'start' as const, startsInWeek: true, endsInWeek: true,
       continuesFromPreviousWeek: false, continuesToNextWeek: false, colorId: 'red' as const,
       title: '通院', temporalLabel: '10:00', accessibilityLabel: '通院、10:00、繰り返し予定',
     }] : [],

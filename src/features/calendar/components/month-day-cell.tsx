@@ -5,10 +5,11 @@ import { useTheme } from '@/hooks/use-theme';
 export type MonthDayCellProps = Readonly<{
   day: MonthDayViewModel;
   onPress(date: string): void;
+  onOpenDay?(date: string): void;
   variant?: 'month' | 'picker';
 }>;
 
-export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellProps) {
+export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: MonthDayCellProps) {
   const theme = useTheme();
   const isHoliday = day.holidayName !== null || day.weekday === 0;
   const isSaturday = day.weekday === 6;
@@ -17,9 +18,9 @@ export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellPr
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={day.accessibilityLabel}
+      accessibilityLabel={onOpenDay === undefined ? day.accessibilityLabel : `${formatDateLabel(day.date)}を開く`}
       accessibilityState={{ selected: day.isSelected }}
-      onPress={() => onPress(day.date)}
+      onPress={() => onOpenDay?.(day.date) ?? onPress(day.date)}
       style={({ pressed }) => [
         styles.cell,
         variant === 'picker' && styles.pickerCell,
@@ -28,7 +29,7 @@ export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellPr
         pressed && styles.pressed,
       ]}
     >
-      <View
+      <View pointerEvents="none"
         testID={`month-calendar.day-circle.${day.date}`}
         style={[styles.dayCircle, day.isToday && { backgroundColor: theme.calendarAccent }]}
       >
@@ -66,6 +67,11 @@ export function MonthDayCell({ day, onPress, variant = 'month' }: MonthDayCellPr
       />
     </Pressable>
   );
+}
+
+function formatDateLabel(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return `${year}年${month}月${day}日`;
 }
 
 const styles = StyleSheet.create({

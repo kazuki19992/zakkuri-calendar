@@ -8,6 +8,8 @@ import {
   NOW_LINE_HEIGHT,
   TIMELINE_HEIGHT,
   computeHourLineTop,
+  doesTimelineLabelOverlap,
+  getTimelineHourLabelOpacity,
   computeNowLineTop,
   computePeakOpacityOffset,
   computeTimelineScale,
@@ -321,6 +323,27 @@ describe('現在時刻の位置計算', () => {
     expect(computeNowLineTop(0, 1)).toBe(0);
     expect(computeNowLineTop(90, 1)).toBe(84); // 1時間30分 * 56pt/時
     expect(computeNowLineTop(90, 0.5)).toBe(42);
+  });
+});
+
+describe('時間軸ラベルの表示計算', () => {
+  it('奇数時ラベルを0.66から0.78の倍率でフェード表示する', () => {
+    expect(getTimelineHourLabelOpacity(2, 0.4)).toBe(1);
+    expect(getTimelineHourLabelOpacity(1, 0.66)).toBe(0);
+    expect(getTimelineHourLabelOpacity(1, 0.72)).toBeCloseTo(0.5, 10);
+    expect(getTimelineHourLabelOpacity(1, 0.78)).toBe(1);
+  });
+
+  it('不正な倍率でも補助ラベルの不透明度を制限する', () => {
+    expect(getTimelineHourLabelOpacity(1, Number.NaN)).toBe(0);
+    expect(getTimelineHourLabelOpacity(1, -1)).toBe(0);
+    expect(getTimelineHourLabelOpacity(1, 2)).toBe(1);
+  });
+
+  it('現在時刻ラベルと交差する定時ラベルだけを判定する', () => {
+    expect(doesTimelineLabelOverlap(100, 100, 13)).toBe(true);
+    expect(doesTimelineLabelOverlap(100, 110, 13)).toBe(true);
+    expect(doesTimelineLabelOverlap(100, 113, 13)).toBe(false);
   });
 });
 

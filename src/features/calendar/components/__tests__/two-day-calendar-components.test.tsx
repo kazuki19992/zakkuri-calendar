@@ -557,7 +557,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(StyleSheet.flatten(card.props.style).borderWidth).toBeFalsy();
   });
 
-  it('予定を小さい角丸とcalendar event本文色で表示する', async () => {
+  it('予定を小さい角丸と背景色の本文色で表示する', async () => {
     const view = await renderTwoDayView();
 
     expect(StyleSheet.flatten(view.getByTestId('timeline-event.event-1.card').props.style)).toMatchObject({
@@ -565,10 +565,10 @@ describe('2日カレンダー表示コンポーネント', () => {
       overflow: 'hidden',
     });
     expect(StyleSheet.flatten(view.getByText('歯医者').props.style)).toMatchObject({
-      color: Colors.light.calendarEventText,
+      color: Colors.light.background,
     });
     expect(StyleSheet.flatten(view.getByText('14:30・30分').props.style)).toMatchObject({
-      color: Colors.light.calendarEventText,
+      color: Colors.light.background,
     });
   });
 

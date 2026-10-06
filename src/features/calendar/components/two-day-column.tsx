@@ -43,8 +43,8 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
           <View
             key={hour}
             testID="two-day-calendar.hour-line"
-            // 予定ブロック(zIndex 1)より手前に描画し、予定の背景に隠れて
-            // 罫線が見えなくなったり間隔が不揃いに見えたりしないようにする。
+            // 予定ブロック(zIndex 1)の背後に描画し、予定の範囲・色・文字を
+            // 罫線より優先して読み取れるようにする。
             // 表示のみが目的のため、下にある予定へのタップは妨げない。
             pointerEvents="none"
             style={[

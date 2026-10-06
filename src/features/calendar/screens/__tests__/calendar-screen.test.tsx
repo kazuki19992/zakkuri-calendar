@@ -93,6 +93,7 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
     monthDays: [], datePickerMonth: '2026-09-01', datePickerDays: [],
     selectedAgendaItems: [], selectedHolidayName: null,
     holidaySupport: 'available', isPeriodLoading: false, periodError: null,
+    viewModePersistenceError: null,
     isDatePickerLoading: false, datePickerError: null,
     calendarName: 'マイカレンダー', calendarColorId: 'blue', isCalendarVisible: true,
     isCalendarVisibilityUpdating: false, calendarVisibilityError: null,
@@ -219,6 +220,39 @@ describe('カレンダー画面', () => {
     await user.press(screen.getByRole('button', { name: '2026年9月、日付を選択' }));
     expect(within(screen.getByTestId('calendar-date-picker.panel')).getByRole('alert'))
       .toHaveTextContent('表示期間を読み込めませんでした');
+  });
+
+  it('表示設定の保存失敗をtop bar直下のalertとして表示する', async () => {
+    await renderWithSafeArea(
+      <CalendarScreen
+        state={createState({ viewModePersistenceError: '表示設定を保存できませんでした' })}
+        onAddEvent={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('表示設定を保存できませんでした');
+  });
+
+  it('期間取得と表示設定保存のerrorを独立して表示する', async () => {
+    await renderWithSafeArea(
+      <CalendarScreen
+        state={createState({
+          periodError: '表示期間を読み込めませんでした',
+          viewModePersistenceError: '表示設定を保存できませんでした',
+        })}
+        onAddEvent={jest.fn()}
+      />,
+    );
+
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.map((item) => item.props.children)).toEqual([
+      '表示期間を読み込めませんでした',
+      '表示設定を保存できませんでした',
+    ]);
+    expect(alerts.map((item) => item.props.accessibilityLiveRegion)).toEqual([
+      'assertive',
+      'assertive',
+    ]);
   });
 
   it('2日表示で画面全体にセーフエリア分の余白を確保する', async () => {

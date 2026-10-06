@@ -89,6 +89,28 @@ describe('カレンダーのトップナビゲーション', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('表示dataの取得に失敗した場合はサイドメニューを閉じない', async () => {
+    const user = userEvent.setup();
+    const onSelectMode = jest.fn().mockResolvedValue(false);
+    const onClose = jest.fn();
+    const view = await render(
+      <CalendarSideMenu
+        visible mode="twoDay" calendarName="マイカレンダー" calendarColorId="blue"
+        isCalendarVisible isCalendarVisibilityUpdating={false} calendarVisibilityError={null}
+        topInset={0} bottomInset={0}
+        reduceMotion onSelectMode={onSelectMode}
+        onSetCalendarVisible={jest.fn().mockResolvedValue(true)}
+        onOpenSettings={jest.fn()} onClose={onClose}
+      />,
+    );
+
+    await user.press(view.getByRole('menuitem', { name: '月表示' }));
+
+    expect(onSelectMode).toHaveBeenCalledWith('month');
+    expect(onClose).not.toHaveBeenCalled();
+    expect(view.getByTestId('calendar-side-menu.panel')).toBeOnTheScreen();
+  });
+
   it('カレンダー表示の保存成功時は閉じ、失敗時はalertを残す', async () => {
     const onSetCalendarVisible = jest.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     const onClose = jest.fn();

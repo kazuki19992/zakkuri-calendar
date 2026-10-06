@@ -82,7 +82,10 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
           onOpenMenu={() => setViewMenuVisible(true)} onToggleDatePicker={toggleDatePicker}
           onToday={() => void state.showToday()} />
         {state.periodError !== null ? (
-          <Text accessibilityRole="alert" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
+          <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
+        ) : null}
+        {state.viewModePersistenceError !== null ? (
+          <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.error, { color: theme.calendarHoliday }]}>{state.viewModePersistenceError}</Text>
         ) : null}
         <CalendarSideMenu visible={isViewMenuVisible} mode={state.mode}
           calendarName={state.calendarName} calendarColorId={state.calendarColorId}

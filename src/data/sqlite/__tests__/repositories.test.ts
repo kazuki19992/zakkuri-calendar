@@ -326,6 +326,34 @@ describe('SQLite repositories', () => {
     await expect(settings.setLastEventEditorTab('allDay' as never, now)).rejects.toThrow('Invalid event editor tab');
   });
 
+  it.each([
+    [null, 'twoDay'],
+    [{ value_json: '"twoDay"' }, 'twoDay'],
+    [{ value_json: '"month"' }, 'month'],
+    [{ value_json: '"week"' }, 'twoDay'],
+    [{ value_json: '2' }, 'twoDay'],
+    [{ value_json: 'broken' }, 'twoDay'],
+  ] as const)('最後の表示モードを安全に読み込む', async (row, expected) => {
+    const db = createDatabaseDouble();
+    db.first.mockResolvedValue(row);
+    await expect(new SqliteSettingsRepository(db.database).getLastCalendarViewMode())
+      .resolves.toBe(expected);
+    expect(db.first).toHaveBeenCalledWith(expect.stringContaining('WHERE key = $key'), {
+      $key: 'last_calendar_view_mode',
+    });
+  });
+
+  it('最後の表示モードを検証してbound parameterでupsertする', async () => {
+    const db = createDatabaseDouble();
+    const settings = new SqliteSettingsRepository(db.database);
+    await settings.setLastCalendarViewMode('month', now);
+    expect(db.run).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(key) DO UPDATE'), {
+      $key: 'last_calendar_view_mode', $valueJson: '"month"', $updatedAt: now,
+    });
+    await expect(settings.setLastCalendarViewMode('week' as never, now))
+      .rejects.toThrow('Invalid calendar view mode');
+  });
+
   it.each([null, { value_json: '4' }, { value_json: '"5"' }, { value_json: 'broken' }])(
     '今週中の締切曜日が欠損または不正なら金曜日へfallbackする', async (row) => {
       const db = createDatabaseDouble();

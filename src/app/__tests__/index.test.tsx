@@ -110,6 +110,8 @@ describe('ホームルート', () => {
         setCalendarVisible: jest.fn(),
         getLastEventEditorTab: jest.fn(),
         setLastEventEditorTab: jest.fn(),
+        getLastCalendarViewMode: jest.fn(),
+        setLastCalendarViewMode: jest.fn(),
         getThisWeekDeadlineWeekday: jest.fn(),
         setThisWeekDeadlineWeekday: jest.fn(),
       },

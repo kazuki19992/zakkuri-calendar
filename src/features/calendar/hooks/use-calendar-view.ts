@@ -35,7 +35,7 @@ import {
   type HolidayRangeCoverage,
   type HolidaySupport,
 } from '../calendar-view-model';
-import { createMonthDayViewModels, type MonthDayViewModel } from '../month-view-model';
+import { createMonthDayViewModels, createMonthWeekViewModels, type MonthDayViewModel, type MonthWeekViewModel } from '../month-view-model';
 import {
   TWO_DAY_SWIPE_BUFFER_DAYS,
   createTwoDayStripDates,
@@ -71,6 +71,7 @@ export type CalendarViewState = Readonly<{
    */
   twoDayStrip: readonly TwoDayViewModel[];
   monthDays: readonly MonthDayViewModel[];
+  monthWeeks: readonly MonthWeekViewModel[];
   datePickerMonth: string;
   datePickerDays: readonly MonthDayViewModel[];
   selectedAgendaItems: readonly AgendaItemViewModel[];
@@ -626,6 +627,16 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       datePickerState.snapshot.holidayCoverage, datePickerVisibleOccurrences, input.weekStartsOn,
       state.selectedDate, state.today],
   );
+  const monthWeeks = useMemo(
+    () => createMonthWeekViewModels({
+      grid: getMonthGrid(state.visibleMonth, input.weekStartsOn),
+      occurrences: visibleOccurrences,
+      definitionLabels: new Map([...state.snapshot.definitions.values()]
+        .map((definition) => [definition.id, definition.label] as const)),
+      calendarColorId: state.snapshot.calendarColorId,
+    }),
+    [input.weekStartsOn, state.snapshot.calendarColorId, state.snapshot.definitions, state.visibleMonth, visibleOccurrences],
+  );
   const selectedAgendaItems = useMemo(
     () =>
       createAgendaItems(
@@ -653,6 +664,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     twoDayDays,
     twoDayStrip,
     monthDays,
+    monthWeeks,
     datePickerMonth: datePickerState.month,
     datePickerDays,
     selectedAgendaItems,

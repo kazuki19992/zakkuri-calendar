@@ -11,19 +11,19 @@ import { CalendarDatePicker } from '../components/calendar-date-picker';
 import { CALENDAR_TOP_BAR_HEIGHT, CalendarTopBar } from '../components/calendar-top-bar';
 import { CalendarSideMenu } from '../components/calendar-side-menu';
 import { MonthGrid } from '../components/month-grid';
-import { SelectedDayAgenda } from '../components/selected-day-agenda';
 import { TwoDayView } from '../components/two-day-view';
 import { useHorizontalSwipeTransition } from '../hooks/use-horizontal-swipe-transition';
 import { useTwoDayCarousel } from '../hooks/use-two-day-carousel';
 import type { CalendarViewState } from '../hooks/use-calendar-view';
 import { TWO_DAY_SWIPE_BUFFER_DAYS } from '../two-day-view-model';
 
-export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt, onOpenSettings }: Readonly<{
+export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt, onOpenSettings, onOpenDay }: Readonly<{
   state: CalendarViewState;
   onAddEvent(date: string): void;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
   onOpenSettings?(): void;
+  onOpenDay?(date: string): void;
 }>) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -60,12 +60,9 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
   };
 
   const swipeContent = (
-    <>
-      <MonthGrid days={state.monthDays} onSelectDate={(date) => void state.selectDate(date)} />
-      <SelectedDayAgenda selectedDate={state.selectedDate}
-        holidayName={state.selectedHolidayName} holidaySupport={state.holidaySupport}
-        items={state.selectedAgendaItems} onEditEvent={onEditEvent} />
-    </>
+    <MonthGrid days={state.monthDays} weekModels={state.monthWeeks} onSelectDate={(date) => void state.selectDate(date)}
+      onOpenDay={(date) => void state.selectDate(date).then((opened) => opened && onOpenDay?.(date))}
+      onEditEvent={onEditEvent} />
   );
 
   return (

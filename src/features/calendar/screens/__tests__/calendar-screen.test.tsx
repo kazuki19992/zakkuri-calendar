@@ -20,6 +20,13 @@ function renderWithSafeArea(element: ReactElement) {
 }
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('expo-router', () => {
+  const React = require('react');
+  const Link = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+  Link.Trigger = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+  Link.Preview = () => null;
+  return { Link };
+});
 jest.mock('@/hooks/use-reduce-motion', () => ({ useReduceMotion: () => false }));
 jest.mock('../../hooks/use-horizontal-swipe-transition', () => {
   const { Animated } = jest.requireActual<typeof import('react-native')>('react-native');
@@ -90,7 +97,7 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
     status: 'ready', mode: 'twoDay', today: '2026-09-08', anchorDate: '2026-09-08',
     visibleMonth: '2026-09-01', selectedDate: '2026-09-08',
     twoDayDays, twoDayStrip,
-    monthDays: [], datePickerMonth: '2026-09-01', datePickerDays: [],
+    monthDays: [], monthWeeks: [], datePickerMonth: '2026-09-01', datePickerDays: [],
     selectedAgendaItems: [], selectedHolidayName: null,
     holidaySupport: 'available', isPeriodLoading: false, periodError: null,
     viewModePersistenceError: null,

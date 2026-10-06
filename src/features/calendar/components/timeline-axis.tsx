@@ -30,6 +30,7 @@ export function TimelineAxis({ scale = 1, now = null }: Readonly<{
           <Text
             key={hour}
             testID="two-day-calendar.hour-label"
+            accessible={false}
             style={[styles.label, {
             // 24:00は軸の下端と同じ位置になり、そのまま上端基準で置くとラベルが
             // はみ出して見切れるため、行の高さ分だけ上げて下端に揃える。

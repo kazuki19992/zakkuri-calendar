@@ -116,7 +116,8 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getByText('0:00')).toBeOnTheScreen();
     expect(view.getAllByText('21:00').length).toBeGreaterThanOrEqual(1);
     expect(view.getByText('24:00')).toBeOnTheScreen();
-    expect(view.getAllByTestId('two-day-calendar.hour-label')).toHaveLength(25);
+    // 現在時刻と重なる定時ラベルは、現在時刻を読みやすくするため非表示になる。
+    expect(view.getAllByTestId('two-day-calendar.hour-label')).toHaveLength(24);
     expect(view.getByLabelText('歯医者、14:30・30分')).toBeOnTheScreen();
     // 予備列(前日・翌々日)もday2と同じく予定なしのため、3列分表示される。
     expect(view.getAllByText('予定はありません')).toHaveLength(3);

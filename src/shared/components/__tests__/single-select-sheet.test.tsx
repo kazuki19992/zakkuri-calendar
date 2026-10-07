@@ -1,5 +1,6 @@
 import { fireEvent, render, userEvent } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { Animated, StyleSheet } from 'react-native';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { SingleSelectSheet } from '../single-select-sheet';
 
 jest.mock('@/global.css', () => ({}));
@@ -11,7 +12,12 @@ const options = [
 ] as const;
 
 describe('共通の単一選択シート', () => {
+  afterEach(() => {
+    jest.mocked(useReduceMotion).mockReturnValue(false);
+  });
+
   it('groupと現在値を示し、選択した値を返して閉じる', async () => {
+    jest.mocked(useReduceMotion).mockReturnValue(true);
     const user = userEvent.setup();
     const onSelect = jest.fn();
     const onClose = jest.fn();
@@ -33,6 +39,7 @@ describe('共通の単一選択シート', () => {
   });
 
   it('背景、取消、Android backは値を変えず一度だけ閉じる', async () => {
+    jest.mocked(useReduceMotion).mockReturnValue(true);
     const user = userEvent.setup();
     const onSelect = jest.fn();
     const onClose = jest.fn();
@@ -95,5 +102,51 @@ describe('共通の単一選択シート', () => {
 
     expect(view.getByLabelText('後半、この日').props.accessibilityState.selected).toBe(false);
     expect(view.getByLabelText('後半、週単位、選択中').props.accessibilityState.selected).toBe(true);
+  });
+
+  it('背景はフェードし、シートだけを短い距離で上下させる', async () => {
+    const onClose = jest.fn();
+    const timing = jest.spyOn(Animated, 'timing').mockImplementation((_value, config) => ({
+      start: (callback?: Animated.EndCallback) => callback?.({ finished: true }),
+      stop: jest.fn(),
+      reset: jest.fn(),
+      _config: config,
+    }) as unknown as Animated.CompositeAnimation);
+    const view = await render(
+      <SingleSelectSheet visible title="時間帯" value="morning" options={options}
+        onSelect={jest.fn()} onClose={onClose} />,
+    );
+
+    expect(view.getByTestId('single-select-sheet.modal').props.animationType).toBe('none');
+    expect(StyleSheet.flatten(view.getByTestId('single-select-sheet.backdrop-shade', {
+      includeHiddenElements: true,
+    }).props.style)
+      .opacity).toBe(0);
+    expect(StyleSheet.flatten(view.getByTestId('single-select-sheet.sheet', {
+      includeHiddenElements: true,
+    }).props.style)
+      .transform).toEqual([{ translateY: 16 }]);
+    expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }));
+
+    timing.mockClear();
+    fireEvent.press(view.getByTestId('single-select-sheet.backdrop', {
+      includeHiddenElements: true,
+    }));
+    expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }));
+    expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      toValue: 16,
+      duration: 180,
+      useNativeDriver: true,
+    }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    timing.mockRestore();
   });
 });

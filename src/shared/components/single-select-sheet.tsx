@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Animated, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -24,6 +24,9 @@ type SingleSelectSheetProps<T extends string | number> = Readonly<{
 type SheetItem<T extends string | number> =
   | Readonly<{ kind: 'group'; label: string; key: string }>
   | Readonly<{ kind: 'option'; option: SingleSelectOption<T>; key: string }>;
+
+const ANIMATION_DURATION_MS = 180;
+const SHEET_OFFSET = 16;
 
 function buildSheetItems<T extends string | number>(
   options: readonly SingleSelectOption<T>[],
@@ -54,18 +57,74 @@ export function SingleSelectSheet<T extends string | number>({
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
   const items = buildSheetItems(options);
+  const [backdropOpacity] = useState(() => new Animated.Value(0));
+  const [sheetTranslateY] = useState(() => new Animated.Value(SHEET_OFFSET));
+
+  useEffect(() => {
+    if (!visible) return;
+    backdropOpacity.stopAnimation();
+    sheetTranslateY.stopAnimation();
+    if (reduceMotion) {
+      backdropOpacity.setValue(1);
+      sheetTranslateY.setValue(0);
+      return;
+    }
+    backdropOpacity.setValue(0);
+    sheetTranslateY.setValue(SHEET_OFFSET);
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: ANIMATION_DURATION_MS,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: ANIMATION_DURATION_MS,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [backdropOpacity, reduceMotion, sheetTranslateY, visible]);
+
+  const requestClose = () => {
+    backdropOpacity.stopAnimation();
+    sheetTranslateY.stopAnimation();
+    if (reduceMotion) {
+      onClose();
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: ANIMATION_DURATION_MS,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetTranslateY, {
+        toValue: SHEET_OFFSET,
+        duration: ANIMATION_DURATION_MS,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) onClose();
+    });
+  };
 
   return (
     <Modal testID="single-select-sheet.modal" transparent visible={visible}
-      animationType={reduceMotion ? 'none' : 'slide'}
-      statusBarTranslucent onRequestClose={onClose}>
-      <View style={[styles.overlay, { backgroundColor: theme.calendarBackdrop }]}>
+      animationType="none" statusBarTranslucent onRequestClose={requestClose}>
+      <View style={styles.overlay}>
+        <Animated.View testID="single-select-sheet.backdrop-shade" pointerEvents="none"
+          style={[StyleSheet.absoluteFill, {
+            backgroundColor: theme.calendarBackdrop,
+            opacity: backdropOpacity,
+          }]} />
         <Pressable testID="single-select-sheet.backdrop" accessible={false}
-          importantForAccessibility="no" focusable={false} onPress={onClose}
+          importantForAccessibility="no" focusable={false} onPress={requestClose}
           style={StyleSheet.absoluteFill} />
-        <View accessibilityViewIsModal style={[styles.sheet, {
+        <Animated.View testID="single-select-sheet.sheet" accessibilityViewIsModal
+          style={[styles.sheet, {
           backgroundColor: theme.background,
           borderColor: theme.calendarBorder,
+          transform: [{ translateY: sheetTranslateY }],
         }]}>
           <View style={[styles.header, { borderBottomColor: theme.calendarBorder }]}>
             <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>{title}</Text>
@@ -90,7 +149,7 @@ export function SingleSelectSheet<T extends string | number>({
               return (
                 <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel}
                   accessibilityState={{ disabled, selected }} disabled={disabled}
-                  onPress={() => { onSelect(option.value); onClose(); }}
+                  onPress={() => { onSelect(option.value); requestClose(); }}
                   style={[styles.option, { borderBottomColor: theme.calendarBorder }]}>
                   {option.accessory}
                   <Text style={[styles.optionLabel, { color: theme.text }]}>{option.label}</Text>
@@ -99,11 +158,11 @@ export function SingleSelectSheet<T extends string | number>({
                 </Pressable>
               );
             }} />
-          <Pressable accessibilityRole="button" accessibilityLabel="キャンセル" onPress={onClose}
+          <Pressable accessibilityRole="button" accessibilityLabel="キャンセル" onPress={requestClose}
             style={[styles.cancel, { borderTopColor: theme.calendarBorder }]}>
             <Text style={{ color: theme.calendarAccent }}>キャンセル</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

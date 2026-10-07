@@ -1,7 +1,10 @@
-import { Host, Picker } from '@expo/ui';
-import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  SingleSelectSheet,
+  type SingleSelectOption,
+} from '@/shared/components/single-select-sheet';
 
 type PickerValue = string | number;
 
@@ -16,27 +19,32 @@ export function EventSingleSelectField<T extends PickerValue>({
 }: Readonly<{
   label: string;
   value: T;
-  options: readonly Readonly<{ label: string; value: T }>[];
+  options: readonly SingleSelectOption<T>[];
   disabled: boolean;
   testID: string;
   leading?: ReactNode;
   onChange(value: T): void;
 }>) {
   const theme = useTheme();
+  const [open, setOpen] = useState(false);
+  const selectedOption = options.find((option) => option.value === value);
+  const selectionDisabled = disabled || options.length === 0;
+  const selectedLabel = selectedOption?.label ?? '未選択';
+
   return (
     <View style={[styles.row, { borderBottomColor: theme.calendarBorder }]}>
       <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
-      <View style={styles.control}>
+      <Pressable testID={testID} accessibilityRole="button"
+        accessibilityLabel={`${label}、${selectedLabel}、選択する`}
+        accessibilityState={{ disabled: selectionDisabled }} disabled={selectionDisabled}
+        onPress={() => setOpen(true)} style={styles.control}>
         {leading}
-        <Host matchContents={{ vertical: true }} style={styles.host}>
-          <Picker appearance="menu" enabled={!disabled} selectedValue={value}
-            onValueChange={onChange} testID={testID}>
-            {options.map((option) => (
-              <Picker.Item key={String(option.value)} label={option.label} value={option.value} />
-            ))}
-          </Picker>
-        </Host>
-      </View>
+        <Text numberOfLines={1} style={[styles.value, { color: theme.text }]}>{selectedLabel}</Text>
+        <Text accessibilityElementsHidden importantForAccessibility="no"
+          style={[styles.chevron, { color: theme.textSecondary }]}>⌄</Text>
+      </Pressable>
+      <SingleSelectSheet visible={open} title={label} value={value} options={options}
+        disabled={disabled} onSelect={onChange} onClose={() => setOpen(false)} />
     </View>
   );
 }
@@ -51,6 +59,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   label: { fontSize: 15 },
-  control: { alignItems: 'center', flex: 1, flexDirection: 'row', justifyContent: 'flex-end' },
-  host: { minWidth: 136 },
+  control: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    minHeight: 44,
+    minWidth: 136,
+  },
+  value: { flexShrink: 1, fontSize: 15 },
+  chevron: { fontSize: 18, marginLeft: 8 },
 });

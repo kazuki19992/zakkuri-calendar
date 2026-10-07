@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { act, fireEvent, render, userEvent } from '@testing-library/react-native';
 import { EventDateTimeFields } from '../event-date-time-fields';
 import { EventEditorHeader } from '../event-editor-header';
 import { EventEditorTabs } from '../event-editor-tabs';
@@ -10,23 +10,10 @@ jest.mock('@expo/ui/community/datetime-picker', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { __esModule: true, default: View };
 });
-jest.mock('@expo/ui', () => {
-  const ReactModule = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-  function Host({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
-    return ReactModule.createElement(View, props, children);
-  }
-  const Picker = Object.assign(
-    function Picker({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
-      return ReactModule.createElement(View, props, children);
-    },
-    { Item: function PickerItem() { return null; } },
-  );
-  return { Host, Picker };
-});
 
 describe('予定編集の基本項目', () => {
   it('ざっくり定義を単一選択dropdownで変更する', async () => {
+    const user = userEvent.setup();
     const base = { calendarId: 'personal-default', fadeInRatio: 0, fadeOutRatio: 0,
       isSystem: true, isEnabled: true, sortOrder: 10,
       createdAt: '2026-09-30T00:00:00.000Z', updatedAt: '2026-09-30T00:00:00.000Z' } as const;
@@ -37,10 +24,28 @@ describe('予定編集の基本項目', () => {
     ];
     const onSelect = jest.fn();
     const view = await render(<TemporalDefinitionPicker definitions={definitions} selectedId="next-week" disabled={false} onSelect={onSelect} />);
-    const picker = view.getByTestId('event-editor.temporal-definition-picker');
-    expect(picker.props.selectedValue).toBe('next-week');
-    await act(async () => { fireEvent(picker, 'valueChange', 'morning'); });
+    await user.press(view.getByLabelText('時間帯、来週、選択する'));
+    expect(view.getByText('この日')).toBeOnTheScreen();
+    expect(view.getByText('週単位')).toBeOnTheScreen();
+    expect(view.getByText('月単位')).toBeOnTheScreen();
+    await user.press(view.getByLabelText('朝、この日'));
     expect(onSelect).toHaveBeenCalledWith('morning');
+  });
+
+  it('時間帯が空なら説明し、未知の現在値は先頭候補へfallbackする', async () => {
+    const base = { calendarId: 'personal-default', fadeInRatio: 0, fadeOutRatio: 0,
+      isSystem: true, isEnabled: true, sortOrder: 10,
+      createdAt: '2026-09-30T00:00:00.000Z', updatedAt: '2026-09-30T00:00:00.000Z' } as const;
+    const definitions: TemporalDefinition[] = [
+      { ...base, id: 'morning', key: 'morning', label: '朝', granularity: 'day', resolverConfig: { kind: 'timeOfDay', startMinute: 360, endMinute: 600 } },
+    ];
+    const view = await render(<TemporalDefinitionPicker definitions={[]} selectedId={null}
+      disabled={false} onSelect={jest.fn()} />);
+    expect(view.getByText('利用できる時間帯がありません')).toBeOnTheScreen();
+
+    await view.rerender(<TemporalDefinitionPicker definitions={definitions} selectedId="missing"
+      disabled={false} onSelect={jest.fn()} />);
+    expect(view.getByLabelText('時間帯、朝、選択する')).toBeOnTheScreen();
   });
   it('中央タイトルと同じ幅の左右操作を表示する', async () => {
     const view = await render(<EventEditorHeader mode="create" busy={false} ready onCancel={jest.fn()} onSave={jest.fn()} />);

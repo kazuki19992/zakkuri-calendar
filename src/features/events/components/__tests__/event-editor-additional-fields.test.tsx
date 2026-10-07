@@ -1,4 +1,4 @@
-import { render, userEvent } from '@testing-library/react-native';
+import { fireEvent, render, userEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { EventColorPicker } from '../event-color-picker';
@@ -110,5 +110,24 @@ describe('予定編集の追加項目', () => {
     expect(view.getByLabelText('30分前を削除')).toBeOnTheScreen();
     expect(view.getByTestId('event-editor.reminder-preset-30-check')).toBeOnTheScreen();
     expect(view.queryByTestId('event-editor.reminder-preset-10-check')).toBeNull();
+  });
+
+  it('任意の通知時間を時・分ドラムから追加する', async () => {
+    const user = userEvent.setup();
+    const onAdd = jest.fn();
+    const view = await render(<EventReminderEditor reminders={[]} disabled={false} error={null}
+      onAdd={onAdd} onRemove={jest.fn()} onMove={jest.fn()} />);
+
+    await user.press(view.getByLabelText('任意の通知時間を追加'));
+    expect(view.getByLabelText('通知時間、予定時刻')).toBeOnTheScreen();
+    await fireEvent(view.getByTestId('duration-wheel.hours'), 'momentumScrollEnd', {
+      nativeEvent: { contentOffset: { y: 2 * 44 } },
+    });
+    await fireEvent(view.getByTestId('duration-wheel.minutes'), 'momentumScrollEnd', {
+      nativeEvent: { contentOffset: { y: 15 * 44 } },
+    });
+    await user.press(view.getByLabelText('通知時間を確定'));
+
+    expect(onAdd).toHaveBeenCalledWith(135);
   });
 });

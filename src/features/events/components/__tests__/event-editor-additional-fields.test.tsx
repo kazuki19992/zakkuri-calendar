@@ -112,6 +112,21 @@ describe('予定編集の追加項目', () => {
     expect(view.queryByTestId('event-editor.reminder-preset-10-check')).toBeNull();
   });
 
+  it('60分以上の通知時間を時間と分で表示する', async () => {
+    const view = await render(<EventReminderEditor reminders={[
+      { id: 'r60', minutesBefore: 60 },
+      { id: 'r90', minutesBefore: 90 },
+      { id: 'r135', minutesBefore: 135 },
+      { id: 'r1440', minutesBefore: 1_440 },
+    ]} disabled={false} error={null} onAdd={jest.fn()} onRemove={jest.fn()}
+      onMove={jest.fn()} />);
+
+    expect(view.getByLabelText('1時間前を削除')).toBeOnTheScreen();
+    expect(view.getByLabelText('1時間30分前を削除')).toBeOnTheScreen();
+    expect(view.getByLabelText('2時間15分前を削除')).toBeOnTheScreen();
+    expect(view.getByLabelText('1日前を削除')).toBeOnTheScreen();
+  });
+
   it('任意の通知時間を時・分ドラムから追加する', async () => {
     const user = userEvent.setup();
     const onAdd = jest.fn();

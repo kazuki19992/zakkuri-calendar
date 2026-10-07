@@ -43,6 +43,6 @@ const styles = StyleSheet.create({
   weekday: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '500' },
   pickerWeekday: { fontSize: 11 },
   week: { flexDirection: 'row' },
-  monthGrid: { flex: 1 },
+  monthGrid: { alignSelf: 'stretch', flex: 1, width: '100%' },
   monthWeek: { flex: 1, position: 'relative' },
 });

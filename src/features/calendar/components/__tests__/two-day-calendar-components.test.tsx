@@ -107,7 +107,9 @@ function renderTwoDayView(overrides: Partial<{
 
 describe('2日カレンダー表示コンポーネント', () => {
   it('予備列を含む全列を横並びで描画し、共通24時間軸・予定・空状態・祝日未対応を示す', async () => {
-    const view = await renderTwoDayView();
+    const view = await renderTwoDayView({
+      now: () => new Date(2026, 8, 8, 10, 0),
+    });
     expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.summary').props.style)).toMatchObject({
       flexDirection: 'row',
     });

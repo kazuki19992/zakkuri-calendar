@@ -9,7 +9,13 @@ const PRESETS = [0, 5, 10, 30, 60, 1_440] as const;
 function reminderLabel(minutes: number): string {
   if (minutes === 0) return '予定時刻';
   if (minutes === 1_440) return '1日前';
-  if (minutes % 60 === 0) return `${minutes / 60}時間前`;
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes === 0
+      ? `${hours}時間前`
+      : `${hours}時間${remainingMinutes}分前`;
+  }
   return `${minutes}分前`;
 }
 

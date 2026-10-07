@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     minHeight: 52,
-    paddingHorizontal: 4,
+    paddingHorizontal: 0,
   },
   label: { fontSize: 15 },
   control: {

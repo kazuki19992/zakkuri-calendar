@@ -1,6 +1,7 @@
 import { render, userEvent } from '@testing-library/react-native';
 import { Platform, StyleSheet } from 'react-native';
 import type { ReactNode } from 'react';
+import type { ViewProps } from 'react-native';
 import { Colors } from '@/constants/theme';
 import type { MonthDayViewModel, MonthWeekViewModel } from '../../month-view-model';
 import { CalendarLoadState } from '../calendar-load-state';
@@ -9,13 +10,18 @@ import { MonthGrid } from '../month-grid';
 import { SelectedDayAgenda } from '../selected-day-agenda';
 
 jest.mock('@/global.css', () => ({}));
-jest.mock('expo-router', () => ({
-  // Link Preview is iOS only. The unit test verifies the cell action independently.
-  Link: Object.assign(({ children }: { children: ReactNode }) => children, {
-    Trigger: ({ children }: { children: ReactNode }) => children,
-    Preview: () => null,
-  }),
-}));
+jest.mock('expo-router', () => {
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    // Link Preview is iOS only. The mock preserves Link layout props for the width contract.
+    Link: Object.assign(({ children, ...props }: { children: ReactNode } & ViewProps) => (
+      <View {...props}>{children}</View>
+    ), {
+      Trigger: ({ children }: { children: ReactNode }) => children,
+      Preview: () => null,
+    }),
+  };
+});
 
 function createDays(): readonly MonthDayViewModel[] {
   const start = new Date(Date.UTC(2026, 7, 31));
@@ -110,6 +116,25 @@ describe('独自月カレンダー表示', () => {
     expect(view.getAllByRole('button')).toHaveLength(42);
     await user.press(view.getByLabelText('2026年9月21日、敬老の日、選択中、予定あり'));
     expect(onSelectDate).toHaveBeenCalledWith('2026-09-21');
+  });
+
+  it('iOSプレビュー用Linkを含め7列を画面幅へ均等配分する', async () => {
+    const platform = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
+    try {
+      const view = await render(<MonthGrid days={createDays()} onSelectDate={jest.fn()}
+        onOpenDay={jest.fn()} />);
+
+      expect(StyleSheet.flatten(view.getByTestId('month-calendar').props.style)).toMatchObject({
+        alignSelf: 'stretch',
+        width: '100%',
+      });
+      expect(StyleSheet.flatten(view.getByTestId(
+        'month-calendar.day-link.2026-09-21',
+      ).props.style).flex).toBe(1);
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
+    }
   });
 
   it('選択日を読み上げ状態と淡い背景で示し、操作領域を44pt以上にする', async () => {

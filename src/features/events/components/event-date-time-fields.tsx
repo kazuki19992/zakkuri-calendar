@@ -131,7 +131,7 @@ export function EventDateTimeFields({
 
 const styles = StyleSheet.create({
   container: { gap: 0 },
-  row: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', minHeight: 52, paddingHorizontal: 4 },
+  row: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', minHeight: 52, paddingHorizontal: 0 },
   rowLabel: { fontSize: 15 },
   rowValue: { fontSize: 16 },
   dateControl: { alignItems: 'flex-end', justifyContent: 'center', minHeight: 44,

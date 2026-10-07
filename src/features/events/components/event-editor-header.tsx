@@ -31,7 +31,7 @@ export function EventEditorHeader({ mode, busy, ready, onCancel, onSave }: Props
 }
 
 const styles = StyleSheet.create({
-  header: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 52, paddingHorizontal: 8 },
+  header: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 52, paddingHorizontal: 16 },
   side: { flex: 1 },
   action: { justifyContent: 'center', minHeight: 44, paddingHorizontal: 4 },
   rightAction: { alignItems: 'flex-end' },

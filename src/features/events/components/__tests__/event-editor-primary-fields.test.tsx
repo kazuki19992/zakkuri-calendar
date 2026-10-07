@@ -1,5 +1,5 @@
 import { act, fireEvent, render, userEvent } from '@testing-library/react-native';
-import { Animated, Text } from 'react-native';
+import { Animated, StyleSheet, Text } from 'react-native';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { EventDateTimeFields } from '../event-date-time-fields';
 import { EventEditorHeader } from '../event-editor-header';
@@ -60,6 +60,8 @@ describe('予定編集の基本項目', () => {
     const view = await render(<EventEditorHeader mode="create" busy={false} ready onCancel={jest.fn()} onSave={jest.fn()} />);
     expect(view.getByText('予定を追加')).toBeOnTheScreen();
     expect(view.getByLabelText('キャンセル').parent?.props.style).toEqual(view.getByLabelText('保存').parent?.props.style);
+    expect(StyleSheet.flatten(view.getByText('予定を追加').parent?.props.style).paddingHorizontal)
+      .toBe(16);
   });
 
   it('2つのタブに選択状態を付ける', async () => {

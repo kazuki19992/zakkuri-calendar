@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react-native';
+import { render, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import type { EventEditorState } from '../../hooks/use-event-editor';
 import { EventEditorScreen } from '../event-editor-screen';
 
@@ -39,6 +40,31 @@ describe('予定編集フォーム', () => {
     expect(view.getByText('設定は保存されますが、端末への通知はまだ行われません')).toBeOnTheScreen();
     expect(view.getByLabelText('メモを追加')).toBeOnTheScreen();
     expect(view.queryByLabelText('予定を削除')).toBeNull();
+  });
+
+  it('タブより下の全項目をひとまとめに横スライドする', async () => {
+    const view = await render(<EventEditorScreen state={state} onSave={jest.fn()}
+      onDelete={jest.fn()} onCancel={jest.fn()} />);
+    const tabContent = view.getByTestId('event-editor.tab-content');
+
+    expect(within(tabContent).getByText('日時')).toBeOnTheScreen();
+    expect(within(tabContent).getByText('繰り返し')).toBeOnTheScreen();
+    expect(within(tabContent).getByText('カレンダーと色')).toBeOnTheScreen();
+    expect(within(tabContent).getByText('場所')).toBeOnTheScreen();
+    expect(within(tabContent).getByText('通知')).toBeOnTheScreen();
+    expect(within(tabContent).getByText('メモ')).toBeOnTheScreen();
+  });
+
+  it('フォーム外周を基準にタイトルと行ラベルの左端を揃える', async () => {
+    const view = await render(<EventEditorScreen state={state} onSave={jest.fn()}
+      onDelete={jest.fn()} onCancel={jest.fn()} />);
+
+    expect(StyleSheet.flatten(view.getByLabelText('タイトル').props.style).paddingHorizontal)
+      .toBe(0);
+    expect(StyleSheet.flatten(view.getByText('開始日').parent?.props.style).paddingHorizontal)
+      .toBe(0);
+    expect(StyleSheet.flatten(view.getByText('パターン').parent?.props.style).paddingHorizontal)
+      .toBe(0);
   });
 
   it('編集時はシリーズ全体の削除操作を表示する', async () => {

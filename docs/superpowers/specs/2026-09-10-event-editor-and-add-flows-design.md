@@ -79,7 +79,7 @@ UIコンポーネントはRepository、SQLite、Expo Router、端末APIへ直接
 
 - `EventEditorScreen`: ヘッダー、フォーム状態、保存・削除・キャンセルの表示組み立て
 - `EventEditorTabs`: ざっくり・きっちりの単一選択と、Reduce Motion対応の選択indicator移動
-- `EventEditorTabContent`: タブ切替方向に応じた日時入力内容の横スライド。Reduce Motion時は即時切替
+- `EventEditorTabContent`: タブ切替方向に応じ、タブより下の全フォーム項目をまとめて横スライド。Reduce Motion時は即時切替
 - `EventDateTimeFields`: 日付、開始時刻、終了時刻を表示する。Expo SDK 57の`@expo/ui/community/datetime-picker`をこの部品だけで利用する
 - `TemporalDefinitionPicker`: 時間表現を「この日」「週単位」「月単位」のgroupへ変換する
 - `EventSingleSelectField`: 現在値を表示し、共通の`SingleSelectSheet`を開く
@@ -93,7 +93,7 @@ UIコンポーネントはRepository、SQLite、Expo Router、端末APIへ直接
 
 単一選択のボトムシートは複数の予定入力で再利用するため`src/shared/components`へ置く。通知時間ドラムは現在の利用先が予定通知だけのため、`features/events/components`へ置く。
 
-- `SingleSelectSheet`: 任意のgroup見出し、選択肢、補助表示、現在値のcheck、取消を扱う
+- `SingleSelectSheet`: 任意のgroup見出し、選択肢、補助表示、現在値のcheck、取消を扱う。背景はfade、シート本体は短い上下移動で表示・非表示する
 - `DurationWheelPicker`: events feature内で時・分のドラム、範囲内へのclamp、確定・取消を扱う
 
 feature側はdomain値を共通部品のoptionへ変換し、選択結果を既存の編集draft更新callbackへ渡す。共通部品はSQLite、予定型、時間表現定義へ依存しない。通知値の保存形式は整数分のままとし、端末への通知発火は引き続き対象外とする。

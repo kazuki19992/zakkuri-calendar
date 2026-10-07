@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -65,17 +65,35 @@ export function SingleSelectSheet<T extends string | number>({
   );
   const [closing, setClosing] = useState(false);
   const closingRef = useRef(false);
+  const closeNotifiedRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const notifyClose = useCallback(() => {
+    if (closeNotifiedRef.current) return;
+    closeNotifiedRef.current = true;
+    setClosing(false);
+    onCloseRef.current();
+  }, []);
 
   useEffect(() => {
     if (!visible) {
       const wasClosing = closingRef.current;
       closingRef.current = false;
+      closeNotifiedRef.current = false;
       if (wasClosing) setClosing(false);
       return;
     }
-    const wasClosing = closingRef.current;
-    closingRef.current = false;
-    if (wasClosing) setClosing(false);
+    if (closingRef.current) {
+      backdropOpacity.stopAnimation();
+      sheetTranslateY.stopAnimation();
+      if (reduceMotion) notifyClose();
+      return;
+    }
+    closeNotifiedRef.current = false;
     backdropOpacity.stopAnimation();
     sheetTranslateY.stopAnimation();
     if (reduceMotion) {
@@ -97,17 +115,18 @@ export function SingleSelectSheet<T extends string | number>({
         useNativeDriver: true,
       }),
     ]).start();
-  }, [backdropOpacity, reduceMotion, sheetTranslateY, visible]);
+  }, [backdropOpacity, notifyClose, reduceMotion, sheetTranslateY, visible]);
 
   const startClose = (beforeClose?: () => void) => {
     if (closingRef.current) return;
     closingRef.current = true;
+    closeNotifiedRef.current = false;
     setClosing(true);
     beforeClose?.();
     backdropOpacity.stopAnimation();
     sheetTranslateY.stopAnimation();
     if (reduceMotion) {
-      onClose();
+      notifyClose();
       return;
     }
     Animated.parallel([
@@ -122,7 +141,7 @@ export function SingleSelectSheet<T extends string | number>({
         useNativeDriver: true,
       }),
     ]).start(({ finished }) => {
-      if (finished) onClose();
+      if (finished) notifyClose();
     });
   };
 

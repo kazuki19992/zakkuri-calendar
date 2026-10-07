@@ -121,17 +121,20 @@ describe('独自月カレンダー表示', () => {
   it('iOSプレビュー用Linkを含め7列を画面幅へ均等配分する', async () => {
     const platform = Platform.OS;
     Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
-    const view = await render(<MonthGrid days={createDays()} onSelectDate={jest.fn()}
-      onOpenDay={jest.fn()} />);
+    try {
+      const view = await render(<MonthGrid days={createDays()} onSelectDate={jest.fn()}
+        onOpenDay={jest.fn()} />);
 
-    expect(StyleSheet.flatten(view.getByTestId('month-calendar').props.style)).toMatchObject({
-      alignSelf: 'stretch',
-      width: '100%',
-    });
-    expect(StyleSheet.flatten(view.getByTestId(
-      'month-calendar.day-link.2026-09-21',
-    ).props.style).flex).toBe(1);
-    Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
+      expect(StyleSheet.flatten(view.getByTestId('month-calendar').props.style)).toMatchObject({
+        alignSelf: 'stretch',
+        width: '100%',
+      });
+      expect(StyleSheet.flatten(view.getByTestId(
+        'month-calendar.day-link.2026-09-21',
+      ).props.style).flex).toBe(1);
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
+    }
   });
 
   it('選択日を読み上げ状態と淡い背景で示し、操作領域を44pt以上にする', async () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, userEvent } from '@testing-library/react-native';
+import { act, fireEvent, render, userEvent } from '@testing-library/react-native';
 import { Animated, StyleSheet } from 'react-native';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { SingleSelectSheet } from '../single-select-sheet';
@@ -25,6 +25,7 @@ const closeActions: readonly [string, (view: RenderResult) => void][] = [
 
 describe('共通の単一選択シート', () => {
   afterEach(() => {
+    jest.restoreAllMocks();
     jest.mocked(useReduceMotion).mockReturnValue(false);
   });
 
@@ -179,7 +180,7 @@ describe('共通の単一選択シート', () => {
 
   it('閉じる遷移中の連続選択は最初の一回だけ受け付ける', async () => {
     const animationCallbacks: (Animated.EndCallback | undefined)[] = [];
-    const parallel = jest.spyOn(Animated, 'parallel').mockImplementation(() => ({
+    jest.spyOn(Animated, 'parallel').mockImplementation(() => ({
       start: (callback?: Animated.EndCallback) => animationCallbacks.push(callback),
       stop: jest.fn(),
       reset: jest.fn(),
@@ -197,8 +198,40 @@ describe('共通の単一選択シート', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith('this-week');
     expect(onClose).not.toHaveBeenCalled();
-    animationCallbacks.at(-1)?.({ finished: true });
+    await act(() => animationCallbacks.at(-1)?.({ finished: true }));
     expect(onClose).toHaveBeenCalledTimes(1);
-    parallel.mockRestore();
+  });
+
+  it('閉じる遷移中にReduce Motionが有効になっても閉じる要求を完了する', async () => {
+    let reduceMotion = false;
+    jest.mocked(useReduceMotion).mockImplementation(() => reduceMotion);
+    const animationCallbacks: (Animated.EndCallback | undefined)[] = [];
+    jest.spyOn(Animated, 'parallel').mockImplementation(() => ({
+      start: (callback?: Animated.EndCallback) => animationCallbacks.push(callback),
+      stop: jest.fn(),
+      reset: jest.fn(),
+    }) as unknown as Animated.CompositeAnimation);
+    const onClose = jest.fn();
+    const props = {
+      visible: true,
+      title: '時間帯',
+      value: 'morning' as const,
+      options,
+      onSelect: jest.fn(),
+      onClose,
+    };
+    const view = await render(<SingleSelectSheet {...props} />);
+
+    await fireEvent.press(view.getByTestId(
+      'single-select-sheet.backdrop', { includeHiddenElements: true },
+    ));
+    expect(onClose).not.toHaveBeenCalled();
+
+    reduceMotion = true;
+    await view.rerender(<SingleSelectSheet {...props} />);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await act(() => animationCallbacks.at(-1)?.({ finished: true }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

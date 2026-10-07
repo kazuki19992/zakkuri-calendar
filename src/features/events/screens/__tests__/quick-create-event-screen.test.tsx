@@ -1,24 +1,9 @@
-import { act, fireEvent, render, screen, userEvent } from '@testing-library/react-native';
+import { render, screen, userEvent } from '@testing-library/react-native';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import type { QuickCreateEventState } from '../../hooks/use-quick-create-event';
 import { QuickCreateEventScreen } from '../quick-create-event-screen';
 
 jest.mock('@/global.css', () => ({}));
-jest.mock('@expo/ui', () => {
-  const ReactModule = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-  function Host({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
-    return ReactModule.createElement(View, props, children);
-  }
-  const Picker = Object.assign(
-    function Picker({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
-      return ReactModule.createElement(View, props, children);
-    },
-    { Item: function PickerItem() { return null; } },
-  );
-  return { Host, Picker };
-});
-
 const morning: TemporalDefinition = {
   id: 'personal-default:morning',
   calendarId: 'personal-default',
@@ -83,8 +68,9 @@ describe('ざっくり予定作成画面', () => {
     await user.type(screen.getByLabelText('タイトル'), '散歩');
     await user.clear(screen.getByLabelText('日付'));
     await user.type(screen.getByLabelText('日付'), '2026-09-10');
-    const picker = screen.getByTestId('event-editor.temporal-definition-picker');
-    await act(async () => { fireEvent(picker, 'valueChange', afternoon.id); });
+    const picker = screen.getByLabelText('時間帯、朝、選択する');
+    await user.press(picker);
+    await user.press(screen.getByLabelText('午後、この日'));
     await user.press(screen.getByRole('button', { name: '保存' }));
     await user.press(screen.getByRole('button', { name: 'キャンセル' }));
 
@@ -93,7 +79,7 @@ describe('ざっくり予定作成画面', () => {
     expect(callbacks.selectDefinition).toHaveBeenCalledWith(afternoon.id);
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(picker.props).toMatchObject({ enabled: true, selectedValue: morning.id });
+    expect(picker.props.accessibilityState).toMatchObject({ disabled: false });
     expect(screen.getAllByText('時間帯')).toHaveLength(1);
   });
 
@@ -131,8 +117,7 @@ describe('ざっくり予定作成画面', () => {
     });
     expect(screen.getByLabelText('タイトル').props.editable).toBe(false);
     expect(screen.getByLabelText('日付').props.editable).toBe(false);
-    expect(screen.getByTestId('event-editor.temporal-definition-picker').props)
-      .toMatchObject({ enabled: false, selectedValue: morning.id });
+    expect(screen.getByLabelText('時間帯、朝、選択する')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'キャンセル' }).props.accessibilityState).toEqual({
       disabled: true,
     });

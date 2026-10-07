@@ -1,11 +1,15 @@
 import { act, fireEvent, render, userEvent } from '@testing-library/react-native';
+import { Animated, Text } from 'react-native';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { EventDateTimeFields } from '../event-date-time-fields';
 import { EventEditorHeader } from '../event-editor-header';
+import { EventEditorTabContent } from '../event-editor-tab-content';
 import { EventEditorTabs } from '../event-editor-tabs';
 import { TemporalDefinitionPicker } from '../temporal-definition-picker';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('@/hooks/use-reduce-motion', () => ({ useReduceMotion: jest.fn(() => false) }));
 jest.mock('@expo/ui/community/datetime-picker', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { __esModule: true, default: View };
@@ -60,6 +64,53 @@ describe('予定編集の基本項目', () => {
     expect(view.getByLabelText('きっちり').props.accessibilityState).toMatchObject({ selected: false });
     fireEvent.press(view.getByLabelText('きっちり'));
     expect(onChange).toHaveBeenCalledWith('exact');
+  });
+
+  it('タブindicatorを通常時は180ms、Reduce Motion時は即時に移動する', async () => {
+    const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+      start: jest.fn(), stop: jest.fn(), reset: jest.fn(),
+    } as unknown as Animated.CompositeAnimation);
+    jest.mocked(useReduceMotion).mockReturnValue(false);
+    const view = await render(<EventEditorTabs value="fuzzy" disabled={false} onChange={jest.fn()} />);
+    timing.mockClear();
+
+    await view.rerender(<EventEditorTabs value="exact" disabled={false} onChange={jest.fn()} />);
+    expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      toValue: 1, duration: 180, useNativeDriver: true,
+    }));
+
+    jest.mocked(useReduceMotion).mockReturnValue(true);
+    timing.mockClear();
+    await view.rerender(<EventEditorTabs value="fuzzy" disabled={false} onChange={jest.fn()} />);
+    expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ duration: 0 }));
+    timing.mockRestore();
+    jest.mocked(useReduceMotion).mockReturnValue(false);
+  });
+
+  it('タブ内容を切替方向から入れ、古い完了callbackへ表示stateを持たせない', async () => {
+    const setValue = jest.spyOn(Animated.Value.prototype, 'setValue');
+    const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+      start: jest.fn(), stop: jest.fn(), reset: jest.fn(),
+    } as unknown as Animated.CompositeAnimation);
+    const view = await render(<EventEditorTabContent tab="fuzzy"><Text>内容</Text></EventEditorTabContent>);
+
+    setValue.mockClear();
+    await view.rerender(<EventEditorTabContent tab="exact"><Text>内容</Text></EventEditorTabContent>);
+    expect(setValue).toHaveBeenCalledWith(-12);
+    expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      toValue: 0, duration: 180, useNativeDriver: true,
+    }));
+
+    timing.mockClear();
+    setValue.mockClear();
+    await view.rerender(<EventEditorTabContent tab="fuzzy"><Text>内容</Text></EventEditorTabContent>);
+    expect(setValue).toHaveBeenCalledWith(12);
+    expect(timing.mock.results.every((result) => {
+      const animation = result.value as Animated.CompositeAnimation;
+      return jest.mocked(animation.start).mock.calls.every((call) => call.length === 0);
+    })).toBe(true);
+    timing.mockRestore();
+    setValue.mockRestore();
   });
 
   it('日本語の日付表示にcompact pickerを重ねて直接選択できる', async () => {

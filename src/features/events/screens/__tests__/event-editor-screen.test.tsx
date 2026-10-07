@@ -33,6 +33,7 @@ describe('予定編集フォーム', () => {
 
     expect(view.getByText('予定を追加')).toBeOnTheScreen();
     expect(view.getByText('9月25日（金）')).toBeOnTheScreen();
+    expect(view.getByTestId('event-editor.tab-content')).toBeOnTheScreen();
     expect(view.getByText('繰り返し')).toBeOnTheScreen();
     expect(view.getByText('マイカレンダー')).toBeOnTheScreen();
     expect(view.getByText('設定は保存されますが、端末への通知はまだ行われません')).toBeOnTheScreen();

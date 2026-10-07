@@ -84,17 +84,17 @@ UIコンポーネントはRepository、SQLite、Expo Router、端末APIへ直接
 - `TemporalDefinitionPicker`: 時間表現を「この日」「週単位」「月単位」のgroupへ変換する
 - `EventSingleSelectField`: 現在値を表示し、共通の`SingleSelectSheet`を開く
 - `EventColorPicker`: 現在値と各候補へ色名と色見本を表示する
-- `EventReminderEditor`: presetに加え、共通の`DurationWheelPicker`から0〜23時間59分を整数分へ変換する。1日前はpresetを維持する
+- `EventReminderEditor`: presetに加え、events feature内の`DurationWheelPicker`から0〜23時間59分を整数分へ変換する。1日前はpresetを維持する
 - `DeleteEventButton`: 編集時だけ表示し、削除確認のcallbackを呼ぶ
 
 常設追加ボタンはカレンダー画面のみで使うため、`features/calendar/components`に置く。
 
 ### 4.4 共通選択部品
 
-単一選択のボトムシートと通知時間ドラムは、予定編集以外でも再利用できるように`src/shared/components`へ置く。
+単一選択のボトムシートは複数の予定入力で再利用するため`src/shared/components`へ置く。通知時間ドラムは現在の利用先が予定通知だけのため、`features/events/components`へ置く。
 
 - `SingleSelectSheet`: 任意のgroup見出し、選択肢、補助表示、現在値のcheck、取消を扱う
-- `DurationWheelPicker`: 時・分のドラム、範囲内へのclamp、確定・取消を扱う
+- `DurationWheelPicker`: events feature内で時・分のドラム、範囲内へのclamp、確定・取消を扱う
 
 feature側はdomain値を共通部品のoptionへ変換し、選択結果を既存の編集draft更新callbackへ渡す。共通部品はSQLite、予定型、時間表現定義へ依存しない。通知値の保存形式は整数分のままとし、端末への通知発火は引き続き対象外とする。
 

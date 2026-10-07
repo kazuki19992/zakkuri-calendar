@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
-import { DurationWheelPicker } from '@/shared/components/duration-wheel-picker';
 import type { ReminderDraft } from '../event-editor-model';
+import { DurationWheelPicker } from './duration-wheel-picker';
 
 const PRESETS = [0, 5, 10, 30, 60, 1_440] as const;
 

@@ -40,8 +40,10 @@ export function DurationWheelPicker({
   ...props
 }: DurationWheelPickerProps) {
   const safeMaxHours = Math.max(0, Math.floor(maxHours));
-  return <DurationWheelPickerContent key={`${props.visible}-${props.initialMinutes}-${safeMaxHours}`}
-    {...props} maxHours={safeMaxHours} />;
+  return (
+    <DurationWheelPickerContent key={`${props.visible}-${props.initialMinutes}-${safeMaxHours}`}
+      {...props} maxHours={safeMaxHours} />
+  );
 }
 
 function DurationWheelPickerContent({
@@ -63,7 +65,7 @@ function DurationWheelPickerContent({
   );
   const minuteOptions = useMemo(() => Array.from({ length: 60 }, (_, value) => value), []);
 
-  const onMomentumScrollEnd = (
+  const updateSelectionFromScroll = (
     event: NativeSyntheticEvent<NativeScrollEvent>,
     maximum: number,
     setValue: (value: number) => void,
@@ -84,7 +86,12 @@ function DurationWheelPickerContent({
         snapToInterval={ITEM_HEIGHT} decelerationRate="fast" showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.wheelContent}
         contentOffset={{ x: 0, y: selected * ITEM_HEIGHT }}
-        onMomentumScrollEnd={(event) => onMomentumScrollEnd(
+        onScrollEndDrag={(event) => updateSelectionFromScroll(
+          event,
+          data.length - 1,
+          setSelected,
+        )}
+        onMomentumScrollEnd={(event) => updateSelectionFromScroll(
           event,
           data.length - 1,
           setSelected,

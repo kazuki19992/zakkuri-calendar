@@ -159,8 +159,8 @@ git commit -m "feat(events): 単一選択を共通シートへ移行"
 ### Task 3: 通知時間のドラムロールを追加する
 
 **Files:**
-- Create: `src/shared/components/duration-wheel-picker.tsx`
-- Create: `src/shared/components/__tests__/duration-wheel-picker.test.tsx`
+- Create: `src/features/events/components/duration-wheel-picker.tsx`
+- Create: `src/features/events/components/__tests__/duration-wheel-picker.test.tsx`
 - Modify: `src/features/events/components/event-reminder-editor.tsx`
 - Modify: `src/features/events/components/__tests__/event-editor-additional-fields.test.tsx`
 
@@ -188,7 +188,7 @@ expect(onConfirm).toHaveBeenCalledWith(1_439);
 
 - [ ] **Step 2: 失敗を確認する**
 
-Run: `npm test -- src/shared/components/__tests__/duration-wheel-picker.test.tsx --runInBand`
+Run: `npm test -- src/features/events/components/__tests__/duration-wheel-picker.test.tsx --runInBand`
 
 Expected: module未作成のためFAIL。
 
@@ -217,10 +217,10 @@ expect(onAdd).toHaveBeenCalledWith(135);
 
 - [ ] **Step 5: focused testを通してコミットする**
 
-Run: `npm test -- src/shared/components/__tests__/duration-wheel-picker.test.tsx src/features/events/components/__tests__/event-editor-additional-fields.test.tsx --runInBand`
+Run: `npm test -- src/features/events/components/__tests__/duration-wheel-picker.test.tsx src/features/events/components/__tests__/event-editor-additional-fields.test.tsx --runInBand`
 
 ```bash
-git add src/shared/components/duration-wheel-picker.tsx src/shared/components/__tests__/duration-wheel-picker.test.tsx src/features/events/components/event-reminder-editor.tsx src/features/events/components/__tests__/event-editor-additional-fields.test.tsx
+git add src/features/events/components/duration-wheel-picker.tsx src/features/events/components/__tests__/duration-wheel-picker.test.tsx src/features/events/components/event-reminder-editor.tsx src/features/events/components/__tests__/event-editor-additional-fields.test.tsx
 git commit -m "feat(events): 通知時間のドラムロールを追加"
 ```
 

@@ -6,7 +6,7 @@ import { DurationWheelPicker } from '../duration-wheel-picker';
 jest.mock('@/global.css', () => ({}));
 jest.mock('@/hooks/use-reduce-motion', () => ({ useReduceMotion: jest.fn(() => false) }));
 
-describe('通知時間ドラムロール', () => {
+describe('予定通知時間ドラムロール', () => {
   it('時と分を選択して合計分を確定する', async () => {
     const onConfirm = jest.fn();
     const onClose = jest.fn();
@@ -24,6 +24,22 @@ describe('通知時間ドラムロール', () => {
 
     expect(onConfirm).toHaveBeenCalledWith(1_439);
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('慣性スクロールなしでドラッグを終えた値を確定する', async () => {
+    const onConfirm = jest.fn();
+    const view = await render(<DurationWheelPicker visible initialMinutes={0} maxHours={23}
+      onConfirm={onConfirm} onClose={jest.fn()} />);
+
+    await fireEvent(view.getByTestId('duration-wheel.hours'), 'scrollEndDrag', {
+      nativeEvent: { contentOffset: { y: 2 * 44 } },
+    });
+    await fireEvent(view.getByTestId('duration-wheel.minutes'), 'scrollEndDrag', {
+      nativeEvent: { contentOffset: { y: 15 * 44 } },
+    });
+    await fireEvent.press(view.getByLabelText('通知時間を確定'));
+
+    expect(onConfirm).toHaveBeenCalledWith(135);
   });
 
   it('0分は予定時刻と読み上げ、範囲外の初期値をclampする', async () => {

@@ -14,19 +14,19 @@
 
 ## コンポーネント境界
 
-共通化した部品は`src/shared/components`に置く。
+複数featureで共用する部品は`src/shared/components`に置き、予定通知専用の部品は`features/events/components`に閉じる。
 
 ```text
 shared/components
-├─ single-select-sheet.tsx       # シート表示、選択・取消、group表示
-└─ duration-wheel-picker.tsx     # 時・分のドラムロールと分変換
+└─ single-select-sheet.tsx       # シート表示、選択・取消、group表示
 
 features/events/components
 ├─ event-single-select-field.tsx # 現在値を表示しSingleSelectSheetを接続
 ├─ temporal-definition-picker.tsx # 定義を「この日 / 週単位 / 月単位」へ変換
 ├─ event-color-picker.tsx        # 色名・swatch付きoptionを変換
 ├─ event-editor-tabs.tsx         # Reduce Motion対応の横スライド
-└─ event-reminder-editor.tsx     # presetとDurationWheelPickerを接続
+├─ event-reminder-editor.tsx     # presetとDurationWheelPickerを接続
+└─ duration-wheel-picker.tsx     # 時・分のドラムロールと分変換
 ```
 
 `SingleSelectSheet`のoptionは`value`、`label`、任意の`group`、任意の`accessory`、任意の`accessibilityLabel`を持つ。表示部品はSQLite、イベント型、時間表現定義へ依存しない。`TemporalDefinitionPicker`と`EventColorPicker`だけがそれぞれのdomain値をoptionへ変換する。

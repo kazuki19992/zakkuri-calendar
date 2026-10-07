@@ -130,4 +130,16 @@ describe('予定編集の追加項目', () => {
 
     expect(onAdd).toHaveBeenCalledWith(135);
   });
+
+  it('既存通知と同じ0分を確定しても既存追加callbackへ同値を渡す', async () => {
+    const user = userEvent.setup();
+    const onAdd = jest.fn();
+    const view = await render(<EventReminderEditor reminders={[{ id: 'r0', minutesBefore: 0 }]}
+      disabled={false} error={null} onAdd={onAdd} onRemove={jest.fn()} onMove={jest.fn()} />);
+
+    await user.press(view.getByLabelText('任意の通知時間を追加'));
+    await user.press(view.getByLabelText('通知時間を確定'));
+
+    expect(onAdd).toHaveBeenCalledWith(0);
+  });
 });

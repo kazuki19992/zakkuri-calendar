@@ -41,7 +41,9 @@ describe('共通の単一選択シート', () => {
         onSelect={onSelect} onClose={onClose} />,
     );
 
-    fireEvent.press(view.getByTestId('single-select-sheet.backdrop', { includeHiddenElements: true }));
+    const backdrop = view.getByTestId('single-select-sheet.backdrop', { includeHiddenElements: true });
+    expect(backdrop.props).toMatchObject({ accessible: false, importantForAccessibility: 'no' });
+    fireEvent.press(backdrop);
     await user.press(view.getByLabelText('キャンセル'));
     view.getByTestId('single-select-sheet.modal').props.onRequestClose();
 

@@ -60,7 +60,8 @@ export function SingleSelectSheet<T extends string | number>({
       animationType={reduceMotion ? 'none' : 'slide'}
       statusBarTranslucent onRequestClose={onClose}>
       <View style={[styles.overlay, { backgroundColor: theme.calendarBackdrop }]}>
-        <Pressable testID="single-select-sheet.backdrop" onPress={onClose}
+        <Pressable testID="single-select-sheet.backdrop" accessible={false}
+          importantForAccessibility="no" focusable={false} onPress={onClose}
           style={StyleSheet.absoluteFill} />
         <View accessibilityViewIsModal style={[styles.sheet, {
           backgroundColor: theme.background,

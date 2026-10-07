@@ -42,7 +42,9 @@ describe('通知時間ドラムロール', () => {
     const view = await render(<DurationWheelPicker visible initialMinutes={30} maxHours={23}
       onConfirm={onConfirm} onClose={onClose} />);
 
-    await fireEvent.press(view.getByTestId('duration-wheel.backdrop', { includeHiddenElements: true }));
+    const backdrop = view.getByTestId('duration-wheel.backdrop', { includeHiddenElements: true });
+    expect(backdrop.props).toMatchObject({ accessible: false, importantForAccessibility: 'no' });
+    await fireEvent.press(backdrop);
     await fireEvent.press(view.getByLabelText('キャンセル'));
     view.getByTestId('duration-wheel.modal').props.onRequestClose();
 

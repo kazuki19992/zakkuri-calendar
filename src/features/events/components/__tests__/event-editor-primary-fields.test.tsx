@@ -16,6 +16,11 @@ jest.mock('@expo/ui/community/datetime-picker', () => {
 });
 
 describe('予定編集の基本項目', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.mocked(useReduceMotion).mockReturnValue(false);
+  });
+
   it('ざっくり定義を単一選択dropdownで変更する', async () => {
     const user = userEvent.setup();
     const base = { calendarId: 'personal-default', fadeInRatio: 0, fadeOutRatio: 0,
@@ -111,6 +116,28 @@ describe('予定編集の基本項目', () => {
     })).toBe(true);
     timing.mockRestore();
     setValue.mockRestore();
+  });
+
+  it('内容のanimation中にReduce Motionが有効になれば同じタブでも即時完了する', async () => {
+    const stopAnimation = jest.spyOn(Animated.Value.prototype, 'stopAnimation');
+    const setValue = jest.spyOn(Animated.Value.prototype, 'setValue');
+    const timing = jest.spyOn(Animated, 'timing').mockReturnValue({
+      start: jest.fn(), stop: jest.fn(), reset: jest.fn(),
+    } as unknown as Animated.CompositeAnimation);
+    jest.mocked(useReduceMotion).mockReturnValue(false);
+    const view = await render(<EventEditorTabContent tab="fuzzy"><Text>内容</Text></EventEditorTabContent>);
+    await view.rerender(<EventEditorTabContent tab="exact"><Text>内容</Text></EventEditorTabContent>);
+
+    stopAnimation.mockClear();
+    setValue.mockClear();
+    timing.mockClear();
+    jest.mocked(useReduceMotion).mockReturnValue(true);
+    await view.rerender(<EventEditorTabContent tab="exact"><Text>内容</Text></EventEditorTabContent>);
+
+    expect(stopAnimation).toHaveBeenCalledTimes(2);
+    expect(setValue).toHaveBeenCalledWith(0);
+    expect(setValue).toHaveBeenCalledWith(1);
+    expect(timing).not.toHaveBeenCalled();
   });
 
   it('日本語の日付表示にcompact pickerを重ねて直接選択できる', async () => {

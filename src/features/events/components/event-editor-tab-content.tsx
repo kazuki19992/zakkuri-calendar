@@ -13,21 +13,28 @@ export function EventEditorTabContent({ tab, children }: Readonly<{
   const [opacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
+    if (reduceMotion) {
+      previousTab.current = tab;
+      translateX.stopAnimation();
+      opacity.stopAnimation();
+      translateX.setValue(0);
+      opacity.setValue(1);
+      return;
+    }
     if (previousTab.current === tab) return;
     previousTab.current = tab;
     translateX.stopAnimation();
     opacity.stopAnimation();
-    translateX.setValue(reduceMotion ? 0 : tab === 'exact' ? -12 : 12);
-    opacity.setValue(reduceMotion ? 1 : 0.82);
-    const duration = reduceMotion ? 0 : 180;
+    translateX.setValue(tab === 'exact' ? -12 : 12);
+    opacity.setValue(0.82);
     Animated.timing(translateX, {
       toValue: 0,
-      duration,
+      duration: 180,
       useNativeDriver: true,
     }).start();
     Animated.timing(opacity, {
       toValue: 1,
-      duration,
+      duration: 180,
       useNativeDriver: true,
     }).start();
   }, [opacity, reduceMotion, tab, translateX]);

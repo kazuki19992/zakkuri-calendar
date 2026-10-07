@@ -22,14 +22,16 @@ export function TemporalDefinitionPicker({
     return <Text style={[styles.empty, { color: theme.textSecondary }]}>利用できる時間帯がありません</Text>;
   }
 
-  const groupLabels = { day: '日内', week: '週', month: '月' } as const;
-  const selectedIdWithFallback = selectedId ?? definitions[0].id;
+  const groupLabels = { day: 'この日', week: '週単位', month: '月単位' } as const;
+  const selectedIdWithFallback = definitions.find((definition) => definition.id === selectedId)?.id
+    ?? definitions[0].id;
 
   return (
     <EventSingleSelectField label="時間帯" value={selectedIdWithFallback}
       options={definitions.map((definition) => ({
-        label: `${groupLabels[definition.granularity]}・${definition.label}`,
+        label: definition.label,
         value: definition.id,
+        group: groupLabels[definition.granularity],
       }))}
       disabled={disabled} testID="event-editor.temporal-definition-picker" onChange={onSelect} />
   );

@@ -25,7 +25,7 @@ MVPで作成済みの日内ざっくり予定を、Googleカレンダーに近�
 - 週・月粒度のざっくり予定の作成UI
 - 期間をまたぐ繰り返し予定
 - 独自の日時ピッカー実装
-- 通知、外部カレンダー連携、共有、クラウド同期
+- 通知の端末スケジュール、外部カレンダー連携、共有、クラウド同期
 
 ネイティブピッカーは、将来独自の日時選択UIへ置き換える前提で表示コンポーネント内に閉じ込める。
 
@@ -78,12 +78,25 @@ UIコンポーネントはRepository、SQLite、Expo Router、端末APIへ直接
 ### 4.3 表示部品
 
 - `EventEditorScreen`: ヘッダー、フォーム状態、保存・削除・キャンセルの表示組み立て
-- `EventTypePicker`: 正確・終日・ざっくりの選択
+- `EventEditorTabs`: ざっくり・きっちりの単一選択と、Reduce Motion対応の選択indicator移動
+- `EventEditorTabContent`: タブ切替方向に応じた日時入力内容の横スライド。Reduce Motion時は即時切替
 - `EventDateTimeFields`: 日付、開始時刻、終了時刻を表示する。Expo SDK 57の`@expo/ui/community/datetime-picker`をこの部品だけで利用する
-- `TemporalDefinitionPicker`: 既存部品を再利用する
+- `TemporalDefinitionPicker`: 時間表現を「この日」「週単位」「月単位」のgroupへ変換する
+- `EventSingleSelectField`: 現在値を表示し、共通の`SingleSelectSheet`を開く
+- `EventColorPicker`: 現在値と各候補へ色名と色見本を表示する
+- `EventReminderEditor`: presetに加え、events feature内の`DurationWheelPicker`から0〜23時間59分を整数分へ変換する。1日前はpresetを維持する
 - `DeleteEventButton`: 編集時だけ表示し、削除確認のcallbackを呼ぶ
 
 常設追加ボタンはカレンダー画面のみで使うため、`features/calendar/components`に置く。
+
+### 4.4 共通選択部品
+
+単一選択のボトムシートは複数の予定入力で再利用するため`src/shared/components`へ置く。通知時間ドラムは現在の利用先が予定通知だけのため、`features/events/components`へ置く。
+
+- `SingleSelectSheet`: 任意のgroup見出し、選択肢、補助表示、現在値のcheck、取消を扱う
+- `DurationWheelPicker`: events feature内で時・分のドラム、範囲内へのclamp、確定・取消を扱う
+
+feature側はdomain値を共通部品のoptionへ変換し、選択結果を既存の編集draft更新callbackへ渡す。共通部品はSQLite、予定型、時間表現定義へ依存しない。通知値の保存形式は整数分のままとし、端末への通知発火は引き続き対象外とする。
 
 ## 5. ドメインと永続化
 
@@ -127,6 +140,9 @@ SQLiteの既存`events`テーブルの`start_time`と`duration_minutes`を利用
 - 保存・削除失敗時はフォームを維持し、理由を安全なユーザー向け文言で表示する。
 - 保存・削除中は重複操作、キャンセル、戻るジェスチャーを無効にする。
 - 操作要素は44pt以上のタップ領域と、内容を説明するアクセシビリティラベルを持つ。
+- 単一選択は色だけで状態を示さず、名称、check、`accessibilityState.selected`を併用する。
+- group見出しは選択肢としてフォーカスさせず、各選択肢の読み上げへgroup名を含める。
+- タブとシートのアニメーションはOSのReduce Motion設定を尊重する。
 - 削除確認の操作には「削除」と対象タイトルを含める。
 
 ## 8. 受け入れ条件
@@ -139,10 +155,14 @@ SQLiteの既存`events`テーブルの`start_time`と`duration_minutes`を利用
 - 編集画面から確認付きで削除でき、成功後にカレンダーから消える。
 - 保存・削除の失敗ではフォーム入力を失わない。
 - 既存のざっくり予定作成は維持される。
+- 時間帯、予定色、繰り返しの単一選択を同一形式のアプリ内シートで操作できる。
+- 予定色は現在値と候補の双方で色名と色見本を確認でき、選択状態をcheckでも判別できる。
+- 任意通知時間を0〜23時間、0〜59分のドラムから選び、整数分として編集draftへ追加できる。
+- ざっくり・きっちり切替は横方向へ遷移し、Reduce Motion時は即時切替になる。
 - 型チェック、lint、全テスト、iOS/Android exportが成功する。
 
 ## 9. 検証範囲
 
 テスト名、`describe`、`test`、`it`、新規コメントは日本語で記述する。実装は各振る舞いについて失敗するテストを先に書き、失敗理由を確認してから最小実装を追加する。
 
-自動テストでは、任意終了時刻、種別切替、保存・更新・削除、失敗時の入力保持、イベントタップ、常設追加、ダブルタップ時刻解決を検証する。ネイティブピッカーのOS固有の見た目と実機ジェスチャーは、iOS/Android実機で確認できるまで未検証として扱う。
+自動テストでは、任意終了時刻、種別切替、保存・更新・削除、失敗時の入力保持、イベントタップ、常設追加、ダブルタップ時刻解決に加え、単一選択group、色見本、通知時間の分変換、タブ遷移値を検証する。ネイティブピッカー、ボトムシート、ドラムロールのOS固有の見た目と実機ジェスチャーは、iOS/Android実機で確認できるまで未検証として扱う。

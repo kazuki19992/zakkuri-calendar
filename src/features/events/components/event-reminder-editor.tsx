@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import type { ReminderDraft } from '../event-editor-model';
+import { DurationWheelPicker } from './duration-wheel-picker';
 
 const PRESETS = [0, 5, 10, 30, 60, 1_440] as const;
 
@@ -21,7 +22,7 @@ export function EventReminderEditor({ reminders, disabled, error, onAdd, onRemov
   onMove(id: string, offset: -1 | 1): void;
 }>) {
   const theme = useTheme();
-  const [custom, setCustom] = useState('');
+  const [customPickerOpen, setCustomPickerOpen] = useState(false);
   return (
     <View style={styles.container}>
       <View style={styles.presets}>
@@ -47,12 +48,15 @@ export function EventReminderEditor({ reminders, disabled, error, onAdd, onRemov
           );
         })}
       </View>
-      <View style={styles.customRow}>
-        <TextInput accessibilityLabel="任意の通知時間（分）" keyboardType="number-pad" editable={!disabled} value={custom} onChangeText={setCustom} placeholder="任意の分数" placeholderTextColor={theme.textSecondary} style={[styles.customInput, { borderColor: theme.calendarBorder, color: theme.text }]} />
-        <Pressable accessibilityRole="button" accessibilityLabel="任意の通知時間を追加" disabled={disabled || !/^\d+$/.test(custom)} onPress={() => { onAdd(Number(custom)); setCustom(''); }} style={styles.addButton}>
-          <Text style={{ color: theme.calendarAccent }}>追加</Text>
-        </Pressable>
-      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="任意の通知時間を追加"
+        accessibilityState={{ disabled }} disabled={disabled}
+        onPress={() => setCustomPickerOpen(true)}
+        style={[styles.customButton, { borderColor: theme.calendarBorder }]}>
+        <Text style={{ color: theme.text }}>任意の通知時間</Text>
+        <Text style={{ color: theme.calendarAccent }}>選択</Text>
+      </Pressable>
+      <DurationWheelPicker visible={customPickerOpen} initialMinutes={0} maxHours={23}
+        onConfirm={onAdd} onClose={() => setCustomPickerOpen(false)} />
       {reminders.map((reminder, index) => {
         const label = reminderLabel(reminder.minutesBefore);
         return (
@@ -78,9 +82,15 @@ const styles = StyleSheet.create({
   checkBadge: { alignItems: 'center', borderRadius: 8, height: 16, justifyContent: 'center',
     position: 'absolute', right: -4, top: -4, width: 16 },
   checkText: { fontSize: 10, fontWeight: '700', lineHeight: 12 },
-  customRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  customInput: { borderRadius: 8, borderWidth: 1, flex: 1, minHeight: 44, paddingHorizontal: 12 },
-  addButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 54 },
+  customButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
   reminderRow: { alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 48 },
   reminderText: { flex: 1, fontSize: 15 },
   smallButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },

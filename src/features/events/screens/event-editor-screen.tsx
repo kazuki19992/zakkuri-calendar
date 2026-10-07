@@ -5,6 +5,7 @@ import { DeleteEventButton } from '../components/delete-event-button';
 import { EventColorPicker } from '../components/event-color-picker';
 import { EventDateTimeFields } from '../components/event-date-time-fields';
 import { EventEditorHeader } from '../components/event-editor-header';
+import { EventEditorTabContent } from '../components/event-editor-tab-content';
 import { EventEditorTabs } from '../components/event-editor-tabs';
 import { EventMetadataFields, EventNoteField } from '../components/event-metadata-fields';
 import { FormattedNoteEditorModal } from '../components/formatted-note-editor/formatted-note-editor-modal';
@@ -43,14 +44,14 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
           <TextInput accessibilityLabel="タイトル" placeholder="タイトルを追加" placeholderTextColor={theme.textSecondary} value={state.title} onChangeText={state.setTitle} editable={!busy} style={[styles.titleInput, { color: theme.text, borderBottomColor: theme.calendarBorder }]} />
           {state.titleError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.titleError}</Text> : null}
           <EventEditorTabs value={state.editorTab} disabled={busy} onChange={state.setEditorTab} />
-          {section('日時', <>
+          {section('日時', <EventEditorTabContent tab={state.editorTab}>
             <EventDateTimeFields editorTab={state.editorTab} isAllDay={state.isAllDay} isDateEditable={state.isDateEditable} startDate={state.startDate} startTime={state.startTime} endDate={state.endDate} endTime={state.endTime} disabled={busy} onAllDayChange={state.setAllDay} onStartDateChange={state.setStartDate} onStartTimeChange={state.setStartTime} onEndDateChange={state.setEndDate} onEndTimeChange={state.setEndTime} />
             {state.editorTab === 'fuzzy' ? <TemporalDefinitionPicker definitions={state.definitions} selectedId={state.selectedDefinitionId} disabled={busy} onSelect={state.selectDefinition} /> : null}
             {state.relativeDatePreview ? <Text style={{ color: theme.text }}>{state.relativeDatePreview}</Text> : null}
             {!state.isDateEditable ? <Text style={{ color: theme.textSecondary }}>相対日付では基準日から期間を決めます</Text> : null}
             {state.dateError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.dateError}</Text> : null}
             {state.endTimeError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.endTimeError}</Text> : null}
-          </>)}
+          </EventEditorTabContent>)}
           {section('繰り返し', <>
             <RecurrenceEditor draft={state.recurrenceDraft} disabled={busy || !state.isRecurrenceEditable} error={state.recurrenceError} onPresetChange={state.setRecurrencePreset} onFrequencyChange={state.setRecurrenceFrequency} onIntervalChange={state.setRecurrenceIntervalText} onWeekdayToggle={state.toggleRecurrenceWeekday} onEndTypeChange={state.setRecurrenceEndType} onUntilDateChange={state.setRecurrenceUntilDate} onCountChange={state.setRecurrenceCountText} />
             {!state.isRecurrenceEditable ? <Text style={{ color: theme.textSecondary }}>複数日のざっくり予定では現在利用できません</Text> : null}

@@ -1,27 +1,17 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, userEvent } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { EventColorPicker } from '../event-color-picker';
 import { EventMetadataFields, EventNoteField } from '../event-metadata-fields';
 import { EventReminderEditor } from '../event-reminder-editor';
 import { RecurrenceEditor } from '../recurrence-editor';
 
 jest.mock('@/global.css', () => ({}));
-jest.mock('@expo/ui', () => {
-  const ReactModule = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-  function Host({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
-    return ReactModule.createElement(View, props, children);
-  }
-  const Picker = Object.assign(
-    function Picker({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) {
-      return ReactModule.createElement(View, props, children);
-    },
-    { Item: function PickerItem() { return null; } },
-  );
-  return { Host, Picker };
-});
+jest.mock('@/hooks/use-color-scheme', () => ({ useColorScheme: jest.fn(() => 'light') }));
 
 describe('予定編集の追加項目', () => {
   it('繰り返しの単一選択をdropdownで変更する', async () => {
+    const user = userEvent.setup();
     const onPresetChange = jest.fn();
     const props = {
       draft: { preset: 'none' as const, frequency: 'weekly' as const, intervalText: '1', weekdays: [1], endType: 'never' as const, untilDate: '2026-09-25', countText: '1' },
@@ -36,16 +26,17 @@ describe('予定編集の追加項目', () => {
       onCountChange: jest.fn(),
     };
     const view = await render(<RecurrenceEditor {...props} />);
-    const presetPicker = view.getByTestId('event-editor.recurrence-preset-picker');
-    expect(presetPicker.props.selectedValue).toBe('none');
-    await act(async () => { fireEvent(presetPicker, 'valueChange', 'custom'); });
+    await user.press(view.getByLabelText('パターン、繰り返しなし、選択する'));
+    await user.press(view.getByLabelText('カスタム'));
     expect(onPresetChange).toHaveBeenCalledWith('custom');
     await view.rerender(<RecurrenceEditor {...props} draft={{ ...props.draft, preset: 'custom' }} />);
     expect(view.getByLabelText('繰り返し間隔')).toBeOnTheScreen();
-    expect(view.getByTestId('event-editor.recurrence-frequency-picker').props.selectedValue)
-      .toBe('weekly');
-    expect(view.getByTestId('event-editor.recurrence-end-picker').props.selectedValue)
-      .toBe('never');
+    await user.press(view.getByLabelText('単位、週、選択する'));
+    await user.press(view.getByLabelText('月'));
+    expect(props.onFrequencyChange).toHaveBeenCalledWith('monthly');
+    await user.press(view.getByLabelText('終了条件、終了なし、選択する'));
+    await user.press(view.getByLabelText('回数'));
+    expect(props.onEndTypeChange).toHaveBeenCalledWith('count');
   });
 
   it('複数選択の曜日は位置を変えないbadgeと選択状態を併用する', async () => {
@@ -69,13 +60,37 @@ describe('予定編集の追加項目', () => {
   });
 
   it('色名と色見本を表示しdropdownで単一選択する', async () => {
+    const user = userEvent.setup();
     const onChange = jest.fn();
     const view = await render(<EventColorPicker calendarColorId="blue" value={null} disabled={false} onChange={onChange} />);
-    const picker = view.getByTestId('event-editor.color-picker');
-    expect(picker.props.selectedValue).toBe('calendar');
     expect(view.getByTestId('event-editor.selected-color-swatch')).toBeOnTheScreen();
-    await act(async () => { fireEvent(picker, 'valueChange', 'red'); });
+    await user.press(view.getByLabelText('予定の色、カレンダーの色、選択する'));
+    expect(view.getByLabelText('赤')).toBeOnTheScreen();
+    expect(StyleSheet.flatten(view.getByTestId('event-editor.color-option-red-swatch').props.style))
+      .toMatchObject({ backgroundColor: '#B3261E' });
+    await user.press(view.getByLabelText('赤'));
     expect(onChange).toHaveBeenCalledWith('red');
+  });
+
+  it('dark themeでも各色候補に対応する色見本を表示する', async () => {
+    jest.mocked(useColorScheme).mockReturnValue('dark');
+    const user = userEvent.setup();
+    const view = await render(<EventColorPicker calendarColorId="blue" value="red"
+      disabled={false} onChange={jest.fn()} />);
+    await user.press(view.getByLabelText('予定の色、赤、選択する'));
+    expect(StyleSheet.flatten(view.getByTestId('event-editor.color-option-red-swatch').props.style))
+      .toMatchObject({ backgroundColor: '#F28B82' });
+    jest.mocked(useColorScheme).mockReturnValue('light');
+  });
+
+  it('disabledの単一選択項目はシートを開かない', async () => {
+    const user = userEvent.setup();
+    const view = await render(<EventColorPicker calendarColorId="blue" value={null}
+      disabled onChange={jest.fn()} />);
+    const field = view.getByLabelText('予定の色、カレンダーの色、選択する');
+    expect(field).toBeDisabled();
+    await user.press(field);
+    expect(view.queryByText('赤')).toBeNull();
   });
 
   it('場所とメモeditorへの導線を表示する', async () => {
@@ -95,5 +110,36 @@ describe('予定編集の追加項目', () => {
     expect(view.getByLabelText('30分前を削除')).toBeOnTheScreen();
     expect(view.getByTestId('event-editor.reminder-preset-30-check')).toBeOnTheScreen();
     expect(view.queryByTestId('event-editor.reminder-preset-10-check')).toBeNull();
+  });
+
+  it('任意の通知時間を時・分ドラムから追加する', async () => {
+    const user = userEvent.setup();
+    const onAdd = jest.fn();
+    const view = await render(<EventReminderEditor reminders={[]} disabled={false} error={null}
+      onAdd={onAdd} onRemove={jest.fn()} onMove={jest.fn()} />);
+
+    await user.press(view.getByLabelText('任意の通知時間を追加'));
+    expect(view.getByLabelText('通知時間、予定時刻')).toBeOnTheScreen();
+    await fireEvent(view.getByTestId('duration-wheel.hours'), 'momentumScrollEnd', {
+      nativeEvent: { contentOffset: { y: 2 * 44 } },
+    });
+    await fireEvent(view.getByTestId('duration-wheel.minutes'), 'momentumScrollEnd', {
+      nativeEvent: { contentOffset: { y: 15 * 44 } },
+    });
+    await user.press(view.getByLabelText('通知時間を確定'));
+
+    expect(onAdd).toHaveBeenCalledWith(135);
+  });
+
+  it('既存通知と同じ0分を確定しても既存追加callbackへ同値を渡す', async () => {
+    const user = userEvent.setup();
+    const onAdd = jest.fn();
+    const view = await render(<EventReminderEditor reminders={[{ id: 'r0', minutesBefore: 0 }]}
+      disabled={false} error={null} onAdd={onAdd} onRemove={jest.fn()} onMove={jest.fn()} />);
+
+    await user.press(view.getByLabelText('任意の通知時間を追加'));
+    await user.press(view.getByLabelText('通知時間を確定'));
+
+    expect(onAdd).toHaveBeenCalledWith(0);
   });
 });

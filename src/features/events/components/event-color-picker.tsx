@@ -28,8 +28,14 @@ export function EventColorPicker({ calendarColorId, value, disabled, onChange }:
   const selectedValue: EventColorSelection = value ?? 'calendar';
   const selectedColor = options.find((option) => option.value === selectedValue)?.color
     ?? getEventColor(calendarColorId, scheme);
+  const selectionOptions = options.map((option) => ({
+    value: option.value,
+    label: option.label,
+    accessory: <View testID={`event-editor.color-option-${option.value}-swatch`}
+      style={[styles.swatch, { backgroundColor: option.color }]} />,
+  }));
   return (
-    <EventSingleSelectField label="予定の色" value={selectedValue} options={options}
+    <EventSingleSelectField label="予定の色" value={selectedValue} options={selectionOptions}
       disabled={disabled} testID="event-editor.color-picker"
       leading={<View testID="event-editor.selected-color-swatch"
         style={[styles.swatch, { backgroundColor: selectedColor }]} />}

@@ -73,13 +73,18 @@ export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: Mon
       />
     </Pressable>;
   if (onOpenDay === undefined || Platform.OS !== 'ios') return content;
-  return <Link href={{ pathname: '/calendar/day/[date]', params: { date: day.date } }}>
-    <Link.Trigger>{content}</Link.Trigger>
-    <Link.Preview />
-  </Link>;
+  return (
+    <View testID={`month-calendar.day-link.${day.date}`} style={styles.linkCell}>
+      <Link href={{ pathname: '/calendar/day/[date]', params: { date: day.date } }}>
+        <Link.Trigger>{content}</Link.Trigger>
+        <Link.Preview />
+      </Link>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  linkCell: { flex: 1 },
   cell: {
     flex: 1,
     minHeight: 44,

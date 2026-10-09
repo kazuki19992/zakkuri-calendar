@@ -362,3 +362,27 @@ describe('2日ビューのスワイプ用予備列', () => {
     expect(result[3].timelineItems).toMatchObject([{ id: 'next-event' }]);
   });
 });
+
+describe('2日表示の終日レーン', () => {
+  it('表示端で1日だけ見える複数日予定を祝日と単日予定より優先する', () => {
+    const day = {
+      date: '2026-09-08', dateLabel: '9月8日', weekdayLabel: '火', isToday: false,
+      holidayName: '記念日', holidaySupport: 'available' as const, timelineItems: [],
+      accessibilityLabel: '2026年9月8日、火曜日',
+      allDayItems: [
+        { kind: 'event' as const, id: 'a-single', eventId: 'a-single', colorId: 'blue' as const,
+          isInteractive: true, title: '単日', temporalLabel: '終日', accessibilityLabel: '単日、終日' },
+        { kind: 'holiday' as const, id: 'holiday:2026-09-08', eventId: null, colorId: 'holiday' as const,
+          isInteractive: false, title: '記念日', temporalLabel: '祝日', accessibilityLabel: '記念日、祝日' },
+        { kind: 'fuzzyRange' as const, id: 'z-multi', eventId: 'z-multi', colorId: 'blue' as const,
+          isInteractive: true, title: '複数日', temporalLabel: '今週中', rangePosition: 'middle' as const,
+          accessibilityLabel: '複数日、今週中、期間の途中' },
+      ],
+    };
+
+    const layout = createTwoDayAllDayLayout([day]);
+
+    expect(layout.segments.map((segment) => segment.id)).toEqual(['z-multi', 'holiday:2026-09-08']);
+    expect(layout.hiddenCounts).toEqual([1]);
+  });
+});

@@ -193,6 +193,29 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getByText('今週中・9月8日〜9月11日')).toBeOnTheScreen();
   });
 
+  it('予備列から続く複数日予定のラベルを表示中の列へ寄せる', async () => {
+    const fuzzyRangeItem = {
+      ...allDayItem,
+      kind: 'fuzzyRange' as const,
+      id: 'relative-range',
+      eventId: 'relative-range',
+      title: '今週やること',
+      temporalLabel: '今週中',
+      rangePosition: 'middle' as const,
+      accessibilityLabel: '今週やること、今週中、期間の途中',
+    };
+    const view = await renderTwoDayView({
+      strip: [
+        { ...prevBuffer, allDayItems: [fuzzyRangeItem] },
+        { ...day1, allDayItems: [fuzzyRangeItem] },
+        { ...day2, allDayItems: [fuzzyRangeItem] },
+        nextBuffer,
+      ],
+    });
+
+    expect(StyleSheet.flatten(view.getByText('今週やること').parent?.props.style)).toMatchObject({ left: COLUMN_WIDTH + 6 });
+  });
+
   it('祝日を終日領域の読み取り専用項目として表示し、日付ヘッダーの高さを変えない', async () => {
     const onEditEvent = jest.fn();
     const view = await renderTwoDayView({

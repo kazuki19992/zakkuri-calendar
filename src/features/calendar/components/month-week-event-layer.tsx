@@ -41,7 +41,7 @@ export function MonthWeekEventLayer({ week, onOpenDay, onEditEvent }: Readonly<{
           colors={item.opacityStops.map((stop) => withOpacity(color, stop.opacity)) as [string, string, ...string[]]}
           locations={item.opacityStops.map((stop) => stop.offset) as [number, number, ...number[]]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-        <Text numberOfLines={1} style={[styles.label, { color: theme.background }]}>{item.temporalLabel} {item.title}</Text>
+        <Text numberOfLines={1} style={[styles.label, { color: theme.background, backgroundColor: color }]}>{item.temporalLabel} {item.title}</Text>
       </Pressable>;
     })}
     {week.days.map((day) => day.hiddenEventCount > 0 ? <Pressable key={day.date}

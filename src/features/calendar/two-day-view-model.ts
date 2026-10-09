@@ -204,8 +204,12 @@ export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[]): Two
   candidates.sort((a, b) => {
     const aSpan = a.endIndex - a.startIndex;
     const bSpan = b.endIndex - b.startIndex;
-    return bSpan - aSpan
-      || (a.item.kind === 'holiday' ? 0 : 1) - (b.item.kind === 'holiday' ? 0 : 1)
+    const priority = (candidate: typeof a): number =>
+      candidate.item.rangePosition !== undefined || candidate.endIndex > candidate.startIndex
+        ? 0
+        : candidate.item.kind === 'holiday' ? 1 : 2;
+    return priority(a) - priority(b)
+      || bSpan - aSpan
       || a.startIndex - b.startIndex
       || a.item.id.localeCompare(b.item.id);
   });

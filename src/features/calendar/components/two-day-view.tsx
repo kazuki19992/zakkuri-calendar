@@ -60,7 +60,8 @@ export function TwoDayView({
   const allDayLayout = useMemo(() => createTwoDayAllDayLayout(strip), [strip]);
   const allDayLaneCount = allDayLayout.segments.reduce((count, segment) => Math.max(count, segment.lane + 1), 0);
   const allDayHeight = Math.max(30, allDayLaneCount * 44 + 4)
-    + (allDayLayout.hiddenCounts.some((count) => count > 0) ? 24 : 0);
+    + (allDayLayout.hiddenCounts.some((count) => count > 0) ? 24 : 0)
+    + (strip.some((day) => day.holidaySupport === 'unsupported') ? 12 : 0);
   const timelineHeight = TIMELINE_HEIGHT * zoom.scale;
   const isTimelineScrollable = zoom.scale > fitScale + 0.001;
 
@@ -79,7 +80,8 @@ export function TwoDayView({
             style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
             {strip.map((day, index) => <TwoDayColumn key={day.date} day={day} sharedAllDayLayout
               sharedAllDayHeight={allDayHeight} hiddenAllDayItemCount={allDayLayout.hiddenCounts[index]} onEditEvent={onEditEvent} />)}
-            <TwoDayAllDayLayer layout={allDayLayout} columnWidth={columnWidth} height={allDayHeight} onEditEvent={onEditEvent} />
+            <TwoDayAllDayLayer layout={allDayLayout} columnWidth={columnWidth} height={allDayHeight}
+              visibleStartIndex={bufferDays} visibleDayCount={2} onEditEvent={onEditEvent} />
           </Animated.View>
         </View>
       </View>

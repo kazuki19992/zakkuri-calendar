@@ -137,7 +137,7 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
           </Text>
         ) : null}
         {day.holidaySupport === 'unsupported'
-          ? <Text style={[styles.support, { color: theme.textSecondary }]}>祝日情報未対応</Text>
+          ? <Text style={[styles.support, { color: theme.textSecondary }, sharedAllDayLayout ? [styles.sharedSupport, { bottom: resolvedHiddenCount > 0 ? 24 : 0 }] : null]}>祝日情報未対応</Text>
           : null}
         {day.allDayItems.length === 0 && day.timelineItems.length === 0
           ? <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text>
@@ -154,6 +154,7 @@ const styles = StyleSheet.create({
   dateCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   date: { fontSize: 22, fontWeight: '500', lineHeight: 26 },
   support: { fontSize: 10, lineHeight: 12 },
+  sharedSupport: { position: 'absolute', left: 2, right: 2 },
   empty: { fontSize: 11, paddingHorizontal: 6, paddingVertical: 4 },
   allDayRegion: { flex: 1, minHeight: 30, padding: 2, borderBottomWidth: StyleSheet.hairlineWidth },
   item: { minHeight: 44, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 3 },

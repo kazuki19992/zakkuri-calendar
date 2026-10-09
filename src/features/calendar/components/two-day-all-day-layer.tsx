@@ -10,10 +10,12 @@ function withOpacity(color: string, opacity: number): string {
   return color;
 }
 
-export function TwoDayAllDayLayer({ layout, columnWidth, height, onEditEvent }: Readonly<{
+export function TwoDayAllDayLayer({ layout, columnWidth, height, visibleStartIndex, visibleDayCount, onEditEvent }: Readonly<{
   layout: TwoDayAllDayLayout;
   columnWidth: number;
   height: number;
+  visibleStartIndex: number;
+  visibleDayCount: number;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
 }>) {
   const theme = useTheme();
@@ -24,13 +26,26 @@ export function TwoDayAllDayLayer({ layout, columnWidth, height, onEditEvent }: 
       const color = item.colorId === 'holiday'
         ? theme.calendarHolidayBackground
         : getEventColor(item.colorId, scheme);
+      const overlapsVisibleRange = segment.startIndex < visibleStartIndex + visibleDayCount
+        && segment.startIndex + segment.spanDays > visibleStartIndex;
+      const labelLeft = overlapsVisibleRange
+        ? Math.max(0, visibleStartIndex - segment.startIndex) * columnWidth + 6
+        : 6;
       const content = <>
         <LinearGradient pointerEvents="none"
           colors={segment.opacityStops.map((stop) => withOpacity(color, stop.opacity)) as [string, string, ...string[]]}
           locations={segment.opacityStops.map((stop) => stop.offset) as [number, number, ...number[]]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-        <Text numberOfLines={1} style={[styles.title, { color: item.colorId === 'holiday' ? theme.calendarHoliday : theme.background }] }>{item.title}</Text>
-        <Text numberOfLines={1} style={[styles.time, { color: item.colorId === 'holiday' ? theme.calendarHoliday : theme.background }] }>{item.temporalLabel}</Text>
+        <View pointerEvents="none" style={[styles.label, { left: labelLeft }]}>
+          <Text numberOfLines={1} style={[styles.title, {
+            color: item.colorId === 'holiday' ? theme.calendarHoliday : theme.background,
+            backgroundColor: item.colorId === 'holiday' ? theme.calendarHolidayBackground : color,
+          }] }>{item.title}</Text>
+          <Text numberOfLines={1} style={[styles.time, {
+            color: item.colorId === 'holiday' ? theme.calendarHoliday : theme.background,
+            backgroundColor: item.colorId === 'holiday' ? theme.calendarHolidayBackground : color,
+          }] }>{item.temporalLabel}</Text>
+        </View>
       </>;
       const style = [styles.segment, {
         left: segment.startIndex * columnWidth + 2,
@@ -62,6 +77,7 @@ const styles = StyleSheet.create({
   segment: { position: 'absolute', height: 42, borderRadius: 3, paddingHorizontal: 6, justifyContent: 'center', overflow: 'hidden' },
   title: { fontSize: 11, fontWeight: '500' },
   time: { fontSize: 10, marginTop: 1 },
+  label: { position: 'absolute', top: 4, right: 6 },
   fuzzy: { borderWidth: 1, borderStyle: 'dashed' },
   continuesFromPrevious: { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
   continuesToNext: { borderTopRightRadius: 0, borderBottomRightRadius: 0 },

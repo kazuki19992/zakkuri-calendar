@@ -56,7 +56,11 @@ export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
         ? onPress?.(item.eventId)
         : onPress?.(item.eventId, item.originalOccurrenceDate)}
     >
-      <View testID={`timeline-event.${item.id}.card`} style={styles.card}>
+      <View testID={`timeline-event.${item.id}.card`} style={[
+        styles.card,
+        item.continuesFromPreviousDay ? styles.continuesFromPreviousDay : null,
+        item.continuesToNextDay ? styles.continuesToNextDay : null,
+      ]}>
         <LinearGradient
           testID={`timeline-event.${item.id}.gradient`}
           accessibilityElementsHidden
@@ -86,6 +90,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
     paddingVertical: 2,
   },
+  continuesFromPreviousDay: { borderTopLeftRadius: 0, borderTopRightRadius: 0 },
+  continuesToNextDay: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   instantLine: { position: 'absolute', left: 0, right: 0, top: 0, height: 2 },
   text: { flex: 1 },
   title: { fontSize: 12, fontWeight: '500', lineHeight: 14 },

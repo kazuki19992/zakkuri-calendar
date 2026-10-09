@@ -635,6 +635,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       occurrences: visibleOccurrences,
       definitionLabels: new Map([...state.snapshot.definitions.values()]
         .map((definition) => [definition.id, definition.label] as const)),
+      definitions: state.snapshot.definitions,
       calendarColorId: state.snapshot.calendarColorId,
     }),
     [input.weekStartsOn, state.snapshot.calendarColorId, state.snapshot.definitions, state.visibleMonth, visibleOccurrences],

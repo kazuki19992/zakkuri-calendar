@@ -49,14 +49,14 @@ describe('migrateDatabase', () => {
     await migrateDatabase(database.database, environment);
 
     const writes = database.run.mock.calls as [string, Record<string, unknown>][];
-    expect(writes).toHaveLength(31);
-    expect(writes.every(([sql]) => sql.includes('ON CONFLICT DO NOTHING'))).toBe(true);
+    expect(writes).toHaveLength(33);
+    expect(writes.filter(([sql]) => sql.startsWith('INSERT')).every(([sql]) => sql.includes('ON CONFLICT DO NOTHING'))).toBe(true);
     expect(writes[0][1]).toMatchObject({
       $id: 'personal-default',
       $timeZoneId: 'Asia/Tokyo',
       $createdAt: environment.now(),
     });
-    const definitionWrites = writes.filter(([sql]) => sql.includes('temporal_definitions'));
+    const definitionWrites = writes.filter(([sql]) => sql.includes('INSERT INTO temporal_definitions'));
     expect(definitionWrites).toHaveLength(23);
     expect(definitionWrites[0][1]).toMatchObject({
       $id: 'personal-default:morning',
@@ -133,7 +133,7 @@ describe('migrateDatabase', () => {
     await migrateDatabase(database.database, environment);
 
     const schemaSql = database.exec.mock.calls.map(([sql]) => sql).join('\n');
-    expect(LATEST_SCHEMA_VERSION).toBe(5);
+    expect(LATEST_SCHEMA_VERSION).toBe(6);
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS recurrence_exceptions');
     expect(schemaSql).toContain('PRIMARY KEY (series_event_id, original_occurrence_date)');
     expect(schemaSql).toContain('recurrence_exceptions_replacement_event_id');
@@ -149,11 +149,33 @@ describe('migrateDatabase', () => {
     await migrateDatabase(database.database, environment);
 
     const schemaSql = database.exec.mock.calls.map(([sql]) => sql).join('\n');
-    expect(LATEST_SCHEMA_VERSION).toBe(5);
+    expect(LATEST_SCHEMA_VERSION).toBe(6);
     expect(schemaSql).toContain('ALTER TABLE events ADD COLUMN notes_document_json TEXT');
     expect(schemaSql).not.toContain('DELETE FROM events');
     expect(database.run).toHaveBeenCalledWith(expect.stringContaining('schema_migrations'), {
       $version: 5,
+      $appliedAt: environment.now(),
+    });
+  });
+
+  it('version 5から今週中の標準定義を締切へ向けて濃くする', async () => {
+    const database = createDatabaseDouble();
+    database.first.mockResolvedValue({ version: 5 });
+
+    await migrateDatabase(database.database, environment);
+
+    expect(LATEST_SCHEMA_VERSION).toBe(6);
+    expect(database.run).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE temporal_definitions'),
+      expect.objectContaining({
+        $key: 'this_week',
+        $fadeInRatio: 1,
+        $fadeOutRatio: 0,
+        $updatedAt: environment.now(),
+      }),
+    );
+    expect(database.run).toHaveBeenCalledWith(expect.stringContaining('schema_migrations'), {
+      $version: 6,
       $appliedAt: environment.now(),
     });
   });

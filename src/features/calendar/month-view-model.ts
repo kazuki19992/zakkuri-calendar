@@ -1,6 +1,8 @@
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { EventColorId } from '@/constants/event-colors';
 import type { MonthGridDate } from '@/domain/calendar/month';
+import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
+import { createDateRangeOpacityStops, type DateRangeOpacityStop } from './date-range-gradient';
 import {
   getHolidayInfo,
   isResolvedRelativeEvent,
@@ -47,6 +49,8 @@ export type MonthEventSegmentViewModel = Readonly<{
   title: string;
   temporalLabel: string;
   accessibilityLabel: string;
+  isFuzzyRange: boolean;
+  opacityStops: readonly DateRangeOpacityStop[];
 }>;
 
 export type MonthWeekViewModel = Readonly<{
@@ -70,6 +74,7 @@ export function createMonthWeekViewModels(input: Readonly<{
   grid: readonly MonthGridDate[];
   occurrences: readonly EventOccurrence[];
   definitionLabels: ReadonlyMap<string, string>;
+  definitions?: ReadonlyMap<string, TemporalDefinition>;
   calendarColorId: EventColorId;
 }>): readonly MonthWeekViewModel[] {
   return Array.from({ length: Math.ceil(input.grid.length / 7) }, (_, weekIndex) => {
@@ -110,6 +115,11 @@ export function createMonthWeekViewModels(input: Readonly<{
         : continuesToNextWeek ? 'start' : startWeekday === endWeekday ? 'single' : 'start';
       const eventId = occurrence.occurrenceIdentity?.seriesEventId ?? occurrence.eventId;
       const temporalLabel = getOccurrenceTemporalLabel(occurrence, input.definitionLabels);
+      const definition = occurrence.event.temporalType === 'fuzzy'
+        ? input.definitions?.get(occurrence.event.temporalDefinitionId)
+        : undefined;
+      const isFuzzyRange = definition !== undefined
+        && occurrence.occurrenceStartDate < occurrence.occurrenceThroughDate;
       segments.push({
         id: occurrence.key,
         eventId,
@@ -127,6 +137,17 @@ export function createMonthWeekViewModels(input: Readonly<{
         title: occurrence.event.title,
         temporalLabel,
         accessibilityLabel: [occurrence.event.title, temporalLabel, occurrence.occurrenceStartDate < occurrence.occurrenceThroughDate ? '複数日にまたがる予定' : null, occurrence.isRecurring ? '繰り返し予定' : null].filter((value): value is string => value !== null).join('、'),
+        isFuzzyRange,
+        opacityStops: isFuzzyRange
+          ? createDateRangeOpacityStops({
+            rangeStartDate: occurrence.occurrenceStartDate,
+            rangeThroughDate: occurrence.occurrenceThroughDate,
+            clipStartDate: segmentFrom,
+            clipThroughDate: segmentThrough,
+            fadeInRatio: definition.fadeInRatio,
+            fadeOutRatio: definition.fadeOutRatio,
+          })
+          : [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
       });
     }
     return {

@@ -14,11 +14,14 @@ const ALL_DAY_VISIBLE_ITEM_LIMIT = 2;
 /** 罫線の太さ。位置を下端内へ収める計算とstyleの両方で参照する。 */
 const HOUR_LINE_THICKNESS = StyleSheet.hairlineWidth;
 
-export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = null, onEditEvent, onCreateExactAt }: Readonly<{
+export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = null, sharedAllDayLayout = false, sharedAllDayHeight, hiddenAllDayItemCount = 0, onEditEvent, onCreateExactAt }: Readonly<{
   day: TwoDayViewModel;
   variant?: 'summary' | 'timeline';
   scale?: number;
   nowTop?: number | null;
+  sharedAllDayLayout?: boolean;
+  sharedAllDayHeight?: number;
+  hiddenAllDayItemCount?: number;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
 }>) {
@@ -79,8 +82,8 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
       </View>
     );
   }
-  const visibleAllDayItems = day.allDayItems.slice(0, ALL_DAY_VISIBLE_ITEM_LIMIT);
-  const hiddenAllDayItemCount = day.allDayItems.length - visibleAllDayItems.length;
+  const visibleAllDayItems = sharedAllDayLayout ? [] : day.allDayItems.slice(0, ALL_DAY_VISIBLE_ITEM_LIMIT);
+  const resolvedHiddenCount = sharedAllDayLayout ? hiddenAllDayItemCount : day.allDayItems.length - visibleAllDayItems.length;
   return (
     <View testID="two-day-calendar.column" style={[styles.column, { borderColor: theme.calendarBorder }] }>
       <View testID="two-day-calendar.date-header" accessible accessibilityLabel={day.accessibilityLabel}
@@ -94,7 +97,7 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
         </View>
       </View>
       <View testID="two-day-calendar.all-day-region"
-        style={[styles.allDayRegion, { borderBottomColor: theme.calendarBorder }] }>
+        style={[styles.allDayRegion, { borderBottomColor: theme.calendarBorder }, sharedAllDayHeight === undefined ? null : { height: sharedAllDayHeight }] }>
         {visibleAllDayItems.map((item) => item.kind === 'holiday' ? (
           <View key={item.id} accessible accessibilityRole="text" accessibilityLabel={item.accessibilityLabel}
             style={[styles.item, styles.holidayItem, {
@@ -126,15 +129,15 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
             <Text numberOfLines={1} style={[styles.itemTime, { color: theme.background }]}>{item.temporalLabel}</Text>
           </Pressable>
         ))}
-        {hiddenAllDayItemCount > 0 ? (
+        {resolvedHiddenCount > 0 ? (
           <Text accessible accessibilityRole="text"
-            accessibilityLabel={`終日項目${day.allDayItems.length}件、他${hiddenAllDayItemCount}件`}
-            style={[styles.overflow, { color: theme.textSecondary }]}>
-            他{hiddenAllDayItemCount}件
+            accessibilityLabel={`終日項目${day.allDayItems.length}件、他${resolvedHiddenCount}件`}
+            style={[styles.overflow, { color: theme.textSecondary }, sharedAllDayLayout ? styles.sharedOverflow : null]}>
+            他{resolvedHiddenCount}件
           </Text>
         ) : null}
         {day.holidaySupport === 'unsupported'
-          ? <Text style={[styles.support, { color: theme.textSecondary }]}>祝日情報未対応</Text>
+          ? <Text style={[styles.support, { color: theme.textSecondary }, sharedAllDayLayout ? [styles.sharedSupport, { bottom: resolvedHiddenCount > 0 ? 24 : 0 }] : null]}>祝日情報未対応</Text>
           : null}
         {day.allDayItems.length === 0 && day.timelineItems.length === 0
           ? <Text style={[styles.empty, { color: theme.textSecondary }]}>予定はありません</Text>
@@ -151,6 +154,7 @@ const styles = StyleSheet.create({
   dateCircle: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   date: { fontSize: 22, fontWeight: '500', lineHeight: 26 },
   support: { fontSize: 10, lineHeight: 12 },
+  sharedSupport: { position: 'absolute', left: 2, right: 2 },
   empty: { fontSize: 11, paddingHorizontal: 6, paddingVertical: 4 },
   allDayRegion: { flex: 1, minHeight: 30, padding: 2, borderBottomWidth: StyleSheet.hairlineWidth },
   item: { minHeight: 44, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 3 },
@@ -160,6 +164,7 @@ const styles = StyleSheet.create({
   rangeMiddle: { borderRadius: 0 },
   rangeEnd: { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
   overflow: { minHeight: 24, paddingHorizontal: 6, textAlignVertical: 'center' },
+  sharedOverflow: { position: 'absolute', left: 2, right: 2, bottom: 0 },
   itemTitle: { fontSize: 12, fontWeight: '500' },
   itemTime: { fontSize: 10, marginTop: 1 },
   timelineColumn: {

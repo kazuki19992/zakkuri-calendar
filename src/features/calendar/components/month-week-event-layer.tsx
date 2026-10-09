@@ -17,12 +17,9 @@ function formatJapaneseDate(date: string): string {
   return `${year}年${month}月${day}日`;
 }
 
-function getGradientColors(item: MonthEventSegmentViewModel, color: string): readonly [string, string, string] | readonly [string, string] {
-  const faded = `${color}99`;
-  if (item.continuesFromPreviousWeek && item.continuesToNextWeek) return [faded, color, faded];
-  if (item.continuesFromPreviousWeek) return [faded, color];
-  if (item.continuesToNextWeek) return [color, faded];
-  return [color, color];
+function withOpacity(color: string, opacity: number): string {
+  if (/^#[0-9a-f]{6}$/i.test(color)) return `${color}${Math.round(opacity * 255).toString(16).padStart(2, '0')}`;
+  return color;
 }
 
 export function MonthWeekEventLayer({ week, onOpenDay, onEditEvent }: Readonly<{
@@ -41,9 +38,10 @@ export function MonthWeekEventLayer({ week, onOpenDay, onEditEvent }: Readonly<{
         hitSlop={11}
         style={[styles.block, blockStyle(item), item.startsInWeek ? styles.start : null, item.endsInWeek ? styles.end : null]}>
         <LinearGradient accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-          colors={getGradientColors(item, color)}
+          colors={item.opacityStops.map((stop) => withOpacity(color, stop.opacity)) as [string, string, ...string[]]}
+          locations={item.opacityStops.map((stop) => stop.offset) as [number, number, ...number[]]}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-        <Text numberOfLines={1} style={[styles.label, { color: theme.background }]}>{item.temporalLabel} {item.title}</Text>
+        <Text numberOfLines={1} style={[styles.label, { color: theme.background, backgroundColor: color }]}>{item.temporalLabel} {item.title}</Text>
       </Pressable>;
     })}
     {week.days.map((day) => day.hiddenEventCount > 0 ? <Pressable key={day.date}

@@ -13,6 +13,7 @@ import {
   type HolidaySupport,
 } from './calendar-view-model';
 import { createDayTimelineItems, type TimelineItemViewModel } from './timeline-layout';
+import { createDateRangeOpacityStops, type DateRangeOpacityStop } from './date-range-gradient';
 
 const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
@@ -28,6 +29,23 @@ export type TwoDayViewModel = Readonly<{
   accessibilityLabel: string;
 }>;
 
+export type TwoDayAllDaySegmentViewModel = Readonly<{
+  id: string;
+  item: TwoDayAllDayItemViewModel;
+  startIndex: number;
+  spanDays: number;
+  lane: number;
+  isFuzzyRange: boolean;
+  opacityStops: readonly DateRangeOpacityStop[];
+  startsAtRangeStart: boolean;
+  endsAtRangeEnd: boolean;
+}>;
+
+export type TwoDayAllDayLayout = Readonly<{
+  segments: readonly TwoDayAllDaySegmentViewModel[];
+  hiddenCounts: readonly number[];
+}>;
+
 export type TwoDayAllDayItemViewModel = Readonly<{
   kind: 'event' | 'fuzzyRange' | 'holiday';
   id: string;
@@ -39,6 +57,10 @@ export type TwoDayAllDayItemViewModel = Readonly<{
   temporalLabel: string;
   rangePosition?: 'single' | 'start' | 'middle' | 'end';
   accessibilityLabel: string;
+  rangeStartDate?: string;
+  rangeThroughDate?: string;
+  fadeInRatio?: number;
+  fadeOutRatio?: number;
 }>;
 
 function getRangePosition(
@@ -92,7 +114,13 @@ function createDayViewModel(
   ).map((item): TwoDayAllDayItemViewModel => {
     const occurrence = occurrencesForDate.find((candidate) => candidate.key === item.id);
     const isFuzzyRange = occurrence !== undefined && isResolvedRelativeEvent(occurrence.event);
-    const rangePosition = isFuzzyRange ? getRangePosition(occurrence, date) : null;
+    const definition = isFuzzyRange && occurrence.event.temporalType === 'fuzzy'
+      ? input.definitions.get(occurrence.event.temporalDefinitionId)
+      : undefined;
+    const rangePosition = occurrence !== undefined
+      && occurrence.occurrenceStartDate < occurrence.occurrenceThroughDate
+      ? getRangePosition(occurrence, date)
+      : null;
     const positionLabel = rangePosition === 'start'
       ? '期間の開始'
       : rangePosition === 'middle'
@@ -109,6 +137,12 @@ function createDayViewModel(
       colorId: occurrence?.event.colorId ?? input.calendarColorId,
       isInteractive: true,
       ...(rangePosition === null ? {} : { rangePosition }),
+      ...(isFuzzyRange && occurrence !== undefined ? {
+        rangeStartDate: occurrence.occurrenceStartDate,
+        rangeThroughDate: occurrence.occurrenceThroughDate,
+        fadeInRatio: definition?.fadeInRatio ?? 0,
+        fadeOutRatio: definition?.fadeOutRatio ?? 0,
+      } : {}),
       accessibilityLabel: positionLabel === null
         ? item.accessibilityLabel
         : `${item.accessibilityLabel}、${positionLabel}`,
@@ -150,6 +184,75 @@ function createDayViewModel(
     timelineItems,
     accessibilityLabel: labels.join('、'),
   };
+}
+
+const ALL_DAY_LANE_LIMIT = 2;
+
+/** 予備列を含む日付列を横断して、同じ予定を一本の帯へまとめる。 */
+export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[]): TwoDayAllDayLayout {
+  const candidates: { item: TwoDayAllDayItemViewModel; startIndex: number; endIndex: number }[] = [];
+  const consumed = new Set<string>();
+  strip.forEach((day, dayIndex) => day.allDayItems.forEach((item) => {
+    if (consumed.has(item.id)) return;
+    consumed.add(item.id);
+    let endIndex = dayIndex;
+    while (endIndex + 1 < strip.length && strip[endIndex + 1].allDayItems.some((candidate) => candidate.id === item.id)) {
+      endIndex += 1;
+    }
+    candidates.push({ item, startIndex: dayIndex, endIndex });
+  }));
+  candidates.sort((a, b) => {
+    const aSpan = a.endIndex - a.startIndex;
+    const bSpan = b.endIndex - b.startIndex;
+    return bSpan - aSpan
+      || (a.item.kind === 'holiday' ? 0 : 1) - (b.item.kind === 'holiday' ? 0 : 1)
+      || a.startIndex - b.startIndex
+      || a.item.id.localeCompare(b.item.id);
+  });
+
+  const laneOccupancies: { startIndex: number; endIndex: number }[][] = Array.from(
+    { length: ALL_DAY_LANE_LIMIT },
+    () => [],
+  );
+  const hiddenCounts = Array.from({ length: strip.length }, () => 0);
+  const segments: TwoDayAllDaySegmentViewModel[] = [];
+  for (const candidate of candidates) {
+    const lane = laneOccupancies.findIndex((occupancies) => occupancies.every((occupied) =>
+      occupied.endIndex < candidate.startIndex || candidate.endIndex < occupied.startIndex));
+    if (lane < 0) {
+      for (let index = candidate.startIndex; index <= candidate.endIndex; index += 1) hiddenCounts[index] += 1;
+      continue;
+    }
+    laneOccupancies[lane].push({ startIndex: candidate.startIndex, endIndex: candidate.endIndex });
+    const clipStartDate = strip[candidate.startIndex].date;
+    const clipThroughDate = strip[candidate.endIndex].date;
+    const isFuzzyRange = candidate.item.kind === 'fuzzyRange';
+    const rangeStartDate = candidate.item.rangeStartDate;
+    const rangeThroughDate = candidate.item.rangeThroughDate;
+    const hasGradientRange = rangeStartDate !== undefined && rangeThroughDate !== undefined;
+    const lastItem = strip[candidate.endIndex].allDayItems.find((item) => item.id === candidate.item.id);
+    segments.push({
+      id: candidate.item.id,
+      item: candidate.item,
+      startIndex: candidate.startIndex,
+      spanDays: candidate.endIndex - candidate.startIndex + 1,
+      lane,
+      isFuzzyRange,
+      startsAtRangeStart: candidate.item.rangePosition !== 'middle' && candidate.item.rangePosition !== 'end',
+      endsAtRangeEnd: lastItem?.rangePosition !== 'middle' && lastItem?.rangePosition !== 'start',
+      opacityStops: hasGradientRange
+        ? createDateRangeOpacityStops({
+          rangeStartDate: rangeStartDate ?? clipStartDate,
+          rangeThroughDate: rangeThroughDate ?? clipThroughDate,
+          clipStartDate,
+          clipThroughDate,
+          fadeInRatio: candidate.item.fadeInRatio ?? 0,
+          fadeOutRatio: candidate.item.fadeOutRatio ?? 0,
+        })
+        : [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
+    });
+  }
+  return { segments, hiddenCounts };
 }
 
 export function createTwoDayViewModels(input: Readonly<{

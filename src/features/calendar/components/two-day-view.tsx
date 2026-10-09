@@ -11,9 +11,10 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useNowIndicator } from '../hooks/use-now-indicator';
 import { useTimelineZoom } from '../hooks/use-timeline-zoom';
 import { TIMELINE_HEIGHT, computeNowLineTop, computeTimelineScale } from '../timeline-layout';
-import type { TwoDayViewModel } from '../two-day-view-model';
+import { createTwoDayAllDayLayout, type TwoDayViewModel } from '../two-day-view-model';
 import { TimelineAxis } from './timeline-axis';
 import { TwoDayColumn } from './two-day-column';
+import { TwoDayAllDayLayer } from './two-day-all-day-layer';
 
 export function TwoDayView({
   strip, bufferDays, columnWidth, translateX, panHandlers, onCarouselLayout, now, onEditEvent, onCreateExactAt,
@@ -56,6 +57,10 @@ export function TwoDayView({
   const nowTop = computeNowLineTop(indicator.minutesOfDay, zoom.scale);
 
   const stripWidth = strip.length * columnWidth;
+  const allDayLayout = useMemo(() => createTwoDayAllDayLayout(strip), [strip]);
+  const allDayLaneCount = allDayLayout.segments.reduce((count, segment) => Math.max(count, segment.lane + 1), 0);
+  const allDayHeight = Math.max(30, allDayLaneCount * 44 + 4)
+    + (allDayLayout.hiddenCounts.some((count) => count > 0) ? 24 : 0);
   const timelineHeight = TIMELINE_HEIGHT * zoom.scale;
   const isTimelineScrollable = zoom.scale > fitScale + 0.001;
 
@@ -72,7 +77,9 @@ export function TwoDayView({
         >
           <Animated.View testID="two-day-calendar.summary-strip"
             style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
-            {strip.map((day) => <TwoDayColumn key={day.date} day={day} onEditEvent={onEditEvent} />)}
+            {strip.map((day, index) => <TwoDayColumn key={day.date} day={day} sharedAllDayLayout
+              sharedAllDayHeight={allDayHeight} hiddenAllDayItemCount={allDayLayout.hiddenCounts[index]} onEditEvent={onEditEvent} />)}
+            <TwoDayAllDayLayer layout={allDayLayout} columnWidth={columnWidth} height={allDayHeight} onEditEvent={onEditEvent} />
           </Animated.View>
         </View>
       </View>

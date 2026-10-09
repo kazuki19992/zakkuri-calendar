@@ -55,6 +55,7 @@ function createWeeks(days: readonly MonthDayViewModel[]): readonly MonthWeekView
       weekIndex, lane: 0, startWeekday: 0, spanDays: 3, position: 'start' as const, startsInWeek: true, endsInWeek: true,
       continuesFromPreviousWeek: false, continuesToNextWeek: false, colorId: 'red' as const,
       title: '通院', temporalLabel: '10:00', accessibilityLabel: '通院、10:00、繰り返し予定',
+      isFuzzyRange: false, opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
     }] : [],
   }));
 }

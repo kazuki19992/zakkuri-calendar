@@ -577,6 +577,22 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
   });
 
+  it('日をまたぐ時刻予定は前日と翌日へ続く辺の角丸を外す', async () => {
+    const continuedDay = { ...day1, timelineItems: [{
+      ...timelineItem,
+      continuesFromPreviousDay: true,
+      continuesToNextDay: true,
+    }] };
+    const view = await renderTwoDayView({ strip: [prevBuffer, continuedDay, day2, nextBuffer] });
+
+    expect(StyleSheet.flatten(view.getByTestId('timeline-event.event-1.card').props.style)).toMatchObject({
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+    });
+  });
+
   it('FABを56ptの軽いshadow付き円形ボタンとして表示する', async () => {
     const view = await render(<CalendarAddEventButton onPress={jest.fn()} />);
     expect(StyleSheet.flatten(view.getByRole('button', { name: '予定を追加' }).props.style)).toMatchObject({

@@ -2,6 +2,7 @@ import type { CalendarEvent } from '@/domain/calendar/event';
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
+  createTwoDayAllDayLayout,
   createTwoDayStripDates,
   createTwoDayStripViewModels,
   createTwoDayViewModels,
@@ -217,6 +218,8 @@ describe('2日表示の表示用モデル', () => {
         label: '今週中',
         granularity: 'week',
         resolverConfig: { kind: 'weekRemainder', selectionWeekOffset: 0 },
+        fadeInRatio: 1,
+        fadeOutRatio: 0,
       }]]),
       undeterminedFadeMinutes: 120,
       holidayCoverage,
@@ -233,6 +236,17 @@ describe('2日表示の表示用モデル', () => {
       rangePosition: 'middle',
       temporalLabel: '今週中・9月30日〜10月2日',
       accessibilityLabel: expect.stringContaining('相対予定、期間の途中'),
+    });
+
+    const layout = createTwoDayAllDayLayout(result);
+    expect(layout.segments.find((segment) => segment.id === 'relative-range')).toMatchObject({
+      startIndex: 0,
+      spanDays: 2,
+      isFuzzyRange: true,
+      opacityStops: [
+        { offset: 0, opacity: 0 },
+        { offset: 1, opacity: 0.666667 },
+      ],
     });
   });
 

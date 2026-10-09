@@ -1,6 +1,7 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { MonthGridDate } from '@/domain/calendar/month';
+import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   createAgendaItems,
   createMonthDayViewModels,
@@ -292,6 +293,59 @@ describe('月表示の表示用モデル', () => {
       temporalLabel: '今週中・9月21日〜9月25日',
       accessibilityLabel: expect.stringContaining('相対予定'),
     })]);
+  });
+
+  it('複数日のざっくり予定は保存期間全体のフェード比率を月の帯へ反映する', () => {
+    const event: CalendarEvent = {
+      ...baseEvent,
+      anchorDate: '2026-09-21',
+      temporalType: 'fuzzy',
+      temporalDefinitionId: 'personal-default:this_week',
+      endDate: '2026-09-25',
+      resolutionContext: {
+        version: 1,
+        referenceDate: '2026-09-21',
+        periodAnchorDate: '2026-09-21',
+        parameterSnapshot: { thisWeekDeadlineWeekday: 5 },
+      },
+    };
+    const definition: TemporalDefinition = {
+      id: event.temporalDefinitionId,
+      calendarId: event.calendarId,
+      key: 'this_week',
+      label: '今週中',
+      granularity: 'week',
+      resolverConfig: { kind: 'weekRemainder', selectionWeekOffset: 0 },
+      fadeInRatio: 1,
+      fadeOutRatio: 0,
+      isSystem: true,
+      isEnabled: true,
+      sortOrder: 100,
+      createdAt: event.createdAt,
+      updatedAt: event.updatedAt,
+    };
+    const grid = Array.from({ length: 7 }, (_, index): MonthGridDate => ({
+      date: `2026-09-${String(index + 21).padStart(2, '0')}`,
+      dayNumber: index + 21,
+      weekday: index + 1,
+      isCurrentMonth: true,
+    }));
+    const input = {
+      grid,
+      occurrences: [asOccurrence(event)],
+      definitionLabels: new Map([[definition.id, definition.label]]),
+      definitions: new Map([[definition.id, definition]]),
+      calendarColorId: 'blue' as const,
+    } as Parameters<typeof createMonthWeekViewModels>[0] & {
+      definitions: ReadonlyMap<string, TemporalDefinition>;
+    };
+
+    const [week] = createMonthWeekViewModels(input);
+
+    expect(week.segments[0]).toMatchObject({
+      isFuzzyRange: true,
+      opacityStops: [{ offset: 0, opacity: 0 }, { offset: 1, opacity: 1 }],
+    });
   });
 
   it('定義が見つからないざっくり予定はざっくりへフォールバックする', () => {

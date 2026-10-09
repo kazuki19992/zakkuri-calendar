@@ -3,7 +3,7 @@ import { createStandardTemporalDefinitions } from '@/domain/temporal/standard-de
 import type { AppDatabase } from './database';
 
 export const DATABASE_NAME = 'zakkuri-calendar.db';
-export const LATEST_SCHEMA_VERSION = 5;
+export const LATEST_SCHEMA_VERSION = 6;
 
 export type MigrationEnvironment = Readonly<{
   now: () => string;
@@ -292,6 +292,22 @@ export async function migrateDatabase(
          VALUES ($version, $appliedAt)
          ON CONFLICT DO NOTHING`,
         { $version: 5, $appliedAt: environment.now() },
+      );
+    }
+
+    if (currentVersion < 6) {
+      const now = environment.now();
+      await transaction.run(
+        `UPDATE temporal_definitions
+         SET fade_in_ratio = $fadeInRatio, fade_out_ratio = $fadeOutRatio, updated_at = $updatedAt
+         WHERE key = $key AND is_system = 1`,
+        { $key: 'this_week', $fadeInRatio: 1, $fadeOutRatio: 0, $updatedAt: now },
+      );
+      await transaction.run(
+        `INSERT INTO schema_migrations (version, applied_at)
+         VALUES ($version, $appliedAt)
+         ON CONFLICT DO NOTHING`,
+        { $version: 6, $appliedAt: now },
       );
     }
     });

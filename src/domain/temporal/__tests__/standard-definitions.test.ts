@@ -14,7 +14,7 @@ const expected = [
   ['evening', '夕方', 'day', { kind: 'timeOfDay', startMinute: 960, endMinute: 1140 }, 0.25, 0.25],
   ['night', '夜', 'day', { kind: 'timeOfDay', startMinute: 1080, endMinute: 1380 }, 0.25, 0.25],
   ['late_night', '深夜', 'day', { kind: 'timeOfDay', startMinute: 1320, endMinute: 1560 }, 0.25, 0.25],
-  ['this_week', '今週中', 'week', { kind: 'weekRemainder', selectionWeekOffset: 0 }, 0, 0],
+  ['this_week', '今週中', 'week', { kind: 'weekRemainder', selectionWeekOffset: 0 }, 1, 0],
   ['this_week_first_half', '今週前半', 'week', { kind: 'week', selectionWeekOffset: 0, startWeekday: 1, endWeekday: 3 }, 0, 0],
   ['this_week_second_half', '今週後半', 'week', { kind: 'week', selectionWeekOffset: 0, startWeekday: 4, endWeekday: 5 }, 0, 0],
   ['this_weekend', '今週末', 'week', { kind: 'week', selectionWeekOffset: 0, startWeekday: 6, endWeekday: 7 }, 0, 0],

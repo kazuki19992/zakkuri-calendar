@@ -6,6 +6,8 @@ import {
 } from '@/domain/calendar/calendar-view-mode';
 import type { SettingsRepository } from '@/domain/calendar/repositories';
 import type { AppDatabase } from './database';
+import type { WeekStartsOn } from '@/domain/calendar/month';
+import { DEFAULT_CALENDAR_WEEK_STARTS_ON, parseCalendarWeekStartsOn } from '@/domain/calendar/week-start';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
 
 type SettingRow = Readonly<{ value_json: string }>;
@@ -33,6 +35,25 @@ function parseEventEditorTab(value: unknown): EventEditorTab | null {
 
 export class SqliteSettingsRepository implements SettingsRepository {
   constructor(private readonly database: AppDatabase) {}
+
+  async getCalendarWeekStartsOn(): Promise<WeekStartsOn> {
+    const row = await this.database.first<SettingRow>(
+      'SELECT value_json FROM app_settings WHERE key = $key',
+      { $key: 'calendar_week_starts_on' },
+    );
+    return parseCalendarWeekStartsOn(row ? parseJson(row.value_json) : undefined)
+      ?? DEFAULT_CALENDAR_WEEK_STARTS_ON;
+  }
+
+  async setCalendarWeekStartsOn(value: WeekStartsOn, updatedAt: string): Promise<void> {
+    if (parseCalendarWeekStartsOn(value) === null) throw new Error('Invalid calendar week start');
+    await this.database.run(
+      `INSERT INTO app_settings (key, value_json, updated_at)
+       VALUES ($key, $valueJson, $updatedAt)
+       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+      { $key: 'calendar_week_starts_on', $valueJson: JSON.stringify(value), $updatedAt: updatedAt },
+    );
+  }
 
   async getDefaultExactDuration(): Promise<ExactDuration> {
     const row = await this.database.first<SettingRow>(

@@ -8,6 +8,8 @@ function repository(): jest.Mocked<SettingsRepository> {
     getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(),
     getLastEventEditorTab: jest.fn(), setLastEventEditorTab: jest.fn(),
     getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn(),
+    getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1),
+    setCalendarWeekStartsOn: jest.fn().mockResolvedValue(undefined),
     getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(6),
     setThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(undefined),
   };

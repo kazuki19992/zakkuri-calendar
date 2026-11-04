@@ -48,4 +48,4 @@
 
 - [x] README・設計を実装状態へ同期。
 - [x] typecheck、lint、全テスト、diff-check、iOS/Android exportを確認。
-- [ ] fresh reviewの有効な指摘を回帰テストで修正し、commit/push、develop宛てPR（Closes #9）を作成。
+- [x] fresh reviewの有効な指摘を確認し、commit/push、develop宛てPR #49（Closes #9）を作成。Critical／Importantの指摘なし。

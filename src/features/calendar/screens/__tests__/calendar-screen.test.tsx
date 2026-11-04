@@ -111,6 +111,14 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
 describe('カレンダー画面', () => {
   beforeEach(() => jest.clearAllMocks());
 
+  it('表示を維持した期間エラーでも再読み込みできる', async () => {
+    const user = userEvent.setup();
+    await renderWithSafeArea(<CalendarScreen state={createState({ periodError: '表示期間を読み込めませんでした' })} onAddEvent={jest.fn()} />);
+    expect(screen.getByTestId('two-day-calendar')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'カレンダーを再読み込み' }));
+    expect(callbacks.retry).toHaveBeenCalledTimes(1);
+  });
+
   it('初期2日表示へトップバーと常設追加ボタンを表示する', async () => {
     const onAddEvent = jest.fn();
     const user = userEvent.setup();

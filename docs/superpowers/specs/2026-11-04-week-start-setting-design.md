@@ -1,6 +1,6 @@
 # カレンダーの週開始曜日設定（Issue #10）
 
-状態: 設計承認済み・実装済み。typecheck、lint、67 suites / 623 tests、iOS／Android export成功。実機未確認。
+状態: 設計承認済み・実装済み。typecheck、lint、67 suites / 624 tests、iOS／Android export成功。実機未確認。
 
 ## 目的と合意事項
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getMonthStart, moveMonth } from '@/domain/calendar/month';
 import { useTheme } from '@/hooks/use-theme';
@@ -79,7 +79,14 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
           onOpenMenu={() => setViewMenuVisible(true)} onToggleDatePicker={toggleDatePicker}
           onToday={() => void state.showToday()} />
         {state.periodError !== null ? (
-          <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
+          <View>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="カレンダーを再読み込み"
+              accessibilityState={{ disabled: state.isPeriodLoading }} disabled={state.isPeriodLoading}
+              style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 }} onPress={() => void state.retry()}>
+              <Text style={{ color: theme.calendarAccent }}>再読み込み</Text>
+            </Pressable>
+          </View>
         ) : null}
         {state.viewModePersistenceError !== null ? (
           <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.error, { color: theme.calendarHoliday }]}>{state.viewModePersistenceError}</Text>

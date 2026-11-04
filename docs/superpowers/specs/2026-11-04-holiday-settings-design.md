@@ -1,6 +1,6 @@
 # 祝日カレンダーと今週中の締切調整（Issue #9）
 
-状態: 設計確認待ち。実装未着手。
+状態: 設計承認済み・実装済み。typecheck、lint、72 suites / 657 tests、iOS／Android export成功。独立レビューでCritical／Importantの指摘なし。実機未確認。
 
 ## 1. 目的と合意事項
 

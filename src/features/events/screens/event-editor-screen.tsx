@@ -34,7 +34,7 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
-        <EventEditorHeader mode={state.mode} busy={busy} ready={state.status === 'ready'} onCancel={onCancel} onSave={onSave} />
+        <EventEditorHeader mode={state.mode} busy={busy} ready={state.status === 'ready' && !state.isSaveDisabled} onCancel={onCancel} onSave={onSave} />
         {state.status === 'loading' ? <View style={styles.center}><ActivityIndicator /></View> : null}
         {state.status === 'error' ? <View style={styles.center}>
           <Text style={{ color: theme.text }}>予定を読み込めませんでした</Text>

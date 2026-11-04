@@ -2,6 +2,7 @@ import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import type { Calendar } from './calendar';
 import type { CalendarViewMode } from './calendar-view-mode';
 import type { WeekStartsOn } from './month';
+import type { HolidayPreferencesV1 } from './holiday-preferences';
 import type { CalendarEvent, EventEditorTab, ExactDuration } from './event';
 import type { EventColorId } from './event-color';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
@@ -66,6 +67,8 @@ export interface EventRepository {
 }
 
 export interface SettingsRepository {
+  getHolidayPreferences(): Promise<HolidayPreferencesV1>;
+  setHolidayPreferences(value: HolidayPreferencesV1, updatedAt: string): Promise<void>;
   getCalendarWeekStartsOn(): Promise<WeekStartsOn>;
   setCalendarWeekStartsOn(value: WeekStartsOn, updatedAt: string): Promise<void>;
   getDefaultExactDuration(): Promise<ExactDuration>;

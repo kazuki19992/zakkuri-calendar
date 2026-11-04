@@ -99,7 +99,7 @@ function createDependencies() {
     getLastEventEditorTab: jest.fn(),
     setLastEventEditorTab: jest.fn(),
     getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'),
-    getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1),
+    getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1),
     setCalendarWeekStartsOn: jest.fn().mockResolvedValue(undefined),
     setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined),
     getThisWeekDeadlineWeekday: jest.fn(),
@@ -109,6 +109,17 @@ function createDependencies() {
 }
 
 describe('カレンダー表示の状態調整', () => {
+  it('祝日カレンダー無効時は祝日を隠して予定を維持する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getHolidayPreferences.mockResolvedValue({ version: 1, calendarId: 'none', adjustThisWeekDeadline: false });
+    const { result } = await renderHook(() => useCalendarView({ ...dependencies, now: () => new Date(2026, 8, 8, 12) }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.twoDayDays[1].holidayName).toBeNull();
+    expect(result.current.twoDayDays[1].timelineItems).toHaveLength(1);
+    await act(async () => { await result.current.loadDatePickerMonth('2026-09-01'); });
+    expect(result.current.datePickerDays.every((day) => day.holidayName === null)).toBe(true);
+    expect(dependencies.holidayProvider.list).not.toHaveBeenCalled();
+  });
   it.each([
     [2027, 0, '2026-12-27', '2027-02-06'],
     [2028, 1, '2028-01-30', '2028-03-11'],

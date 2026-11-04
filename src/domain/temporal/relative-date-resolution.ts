@@ -2,6 +2,7 @@ import { addDays, addMonths, endOfMonth, getISODay, parse, startOfMonth, startOf
 import { isCalendarDate, toCalendarDate } from '@/domain/calendar/month';
 import type { Result } from '@/domain/shared/result';
 import type { TemporalDefinition } from './temporal-definition';
+import type { DeadlineAdjustmentV1 } from '@/domain/calendar/holiday-preferences';
 
 export type ThisWeekDeadlineWeekday = 5 | 6 | 7;
 
@@ -10,7 +11,7 @@ export type RelativeDateResolution = Readonly<{
   periodAnchorDate: string;
   startDate: string;
   endDate: string;
-  parameterSnapshot: Readonly<{ thisWeekDeadlineWeekday?: ThisWeekDeadlineWeekday }>;
+  parameterSnapshot: Readonly<{ thisWeekDeadlineWeekday?: ThisWeekDeadlineWeekday; deadlineAdjustment?: DeadlineAdjustmentV1 }>;
 }>;
 
 export type RelativeDateResolutionError = Readonly<{ message: string }>;

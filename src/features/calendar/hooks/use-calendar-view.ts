@@ -28,6 +28,7 @@ import type {
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
+import { selectHolidayProvider } from '@/data/holidays/selected-holiday-provider';
 import { DEFAULT_CALENDAR_WEEK_STARTS_ON } from '@/domain/calendar/week-start';
 import {
   createAgendaItems,
@@ -191,6 +192,8 @@ function withViewMode(target: ViewTarget, mode: CalendarViewMode): ViewTarget {
 
 async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Promise<CalendarSnapshot> {
   const weekStartsOn = await input.settings.getCalendarWeekStartsOn();
+  const preferences = await input.settings.getHolidayPreferences();
+  const holidayProvider = selectHolidayProvider(input.holidayProvider, preferences.calendarId);
   const calendar = await input.calendars.getDefault();
   const range = getTargetRange(target, weekStartsOn);
   const [schedule, isCalendarVisible, undeterminedFadeMinutes] = await Promise.all([
@@ -202,7 +205,7 @@ async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Pr
     const monthRange = getMonthRange(month);
     return {
       ...monthRange,
-      result: input.holidayProvider.list(monthRange.from, monthRange.through),
+      result: holidayProvider.list(monthRange.from, monthRange.through),
     };
   });
   const expanded = expandEventOccurrences({ snapshot: schedule, from: range.from, through: range.through });

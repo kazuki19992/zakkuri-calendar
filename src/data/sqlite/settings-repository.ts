@@ -6,6 +6,7 @@ import {
 } from '@/domain/calendar/calendar-view-mode';
 import type { SettingsRepository } from '@/domain/calendar/repositories';
 import type { AppDatabase } from './database';
+import { DEFAULT_HOLIDAY_PREFERENCES, parseHolidayPreferences, type HolidayPreferencesV1 } from '@/domain/calendar/holiday-preferences';
 import type { WeekStartsOn } from '@/domain/calendar/month';
 import { DEFAULT_CALENDAR_WEEK_STARTS_ON, parseCalendarWeekStartsOn } from '@/domain/calendar/week-start';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
@@ -35,6 +36,21 @@ function parseEventEditorTab(value: unknown): EventEditorTab | null {
 
 export class SqliteSettingsRepository implements SettingsRepository {
   constructor(private readonly database: AppDatabase) {}
+
+  async getHolidayPreferences(): Promise<HolidayPreferencesV1> {
+    const row = await this.database.first<SettingRow>('SELECT value_json FROM app_settings WHERE key = $key', { $key: 'holiday_preferences' });
+    return parseHolidayPreferences(row ? parseJson(row.value_json) : undefined) ?? DEFAULT_HOLIDAY_PREFERENCES;
+  }
+
+  async setHolidayPreferences(value: HolidayPreferencesV1, updatedAt: string): Promise<void> {
+    const parsed = parseHolidayPreferences(value);
+    if (parsed === null) throw new Error('Invalid holiday preferences');
+    await this.database.run(
+      `INSERT INTO app_settings (key, value_json, updated_at) VALUES ($key, $valueJson, $updatedAt)
+       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+      { $key: 'holiday_preferences', $valueJson: JSON.stringify(parsed), $updatedAt: updatedAt },
+    );
+  }
 
   async getCalendarWeekStartsOn(): Promise<WeekStartsOn> {
     const row = await this.database.first<SettingRow>(

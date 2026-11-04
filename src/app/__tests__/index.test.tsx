@@ -111,7 +111,7 @@ describe('ホームルート', () => {
         getLastEventEditorTab: jest.fn(),
         setLastEventEditorTab: jest.fn(),
         getLastCalendarViewMode: jest.fn(),
-    getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1),
+    getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1),
     setCalendarWeekStartsOn: jest.fn().mockResolvedValue(undefined),
         setLastCalendarViewMode: jest.fn(),
         getThisWeekDeadlineWeekday: jest.fn(),

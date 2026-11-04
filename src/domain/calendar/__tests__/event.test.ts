@@ -18,6 +18,15 @@ const validFuzzy = { ...base, ...metadata, temporalType: 'fuzzy' as const,
   temporalDefinitionId: 'personal-default:morning', endDate: base.anchorDate, resolutionContext: null };
 
 describe('parseEventDraft', () => {
+  it('締切調整contextを旧形式と区別して保持し、不正な調整値を拒否する', () => {
+    const context = { version: 1, referenceDate: '2026-09-08', periodAnchorDate: '2026-09-07',
+      parameterSnapshot: { thisWeekDeadlineWeekday: 5, deadlineAdjustment: { version: 1, calendarId: 'jp', unadjustedDeadlineDate: '2026-09-11' } } };
+    const draft = { ...validFuzzy, resolutionContext: context };
+    expect(parseEventDraft(draft)).toMatchObject({ ok: true, value: { resolutionContext: context } });
+    expect(parseEventDraft({ ...draft, resolutionContext: { ...context, parameterSnapshot: {
+      ...context.parameterSnapshot, deadlineAdjustment: { ...context.parameterSnapshot.deadlineAdjustment, calendarId: 'unknown' },
+    } } }).ok).toBe(false);
+  });
   it.each([validExact, validAllDay, validFuzzy])('accepts valid temporal variants', (draft) => {
     expect(parseEventDraft(draft)).toEqual({ ok: true, value: draft });
   });

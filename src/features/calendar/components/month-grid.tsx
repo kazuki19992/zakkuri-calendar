@@ -4,7 +4,7 @@ import type { MonthDayViewModel, MonthWeekViewModel } from '../month-view-model'
 import { MonthDayCell } from './month-day-cell';
 import { MonthWeekEventLayer } from './month-week-event-layer';
 
-const weekdayLabels = ['月', '火', '水', '木', '金', '土', '日'] as const;
+const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
 export type MonthGridProps = Readonly<{
   days: readonly MonthDayViewModel[];
@@ -17,14 +17,16 @@ export type MonthGridProps = Readonly<{
 
 export function MonthGrid({ days, onSelectDate, weekModels, onOpenDay, onEditEvent, variant = 'month' }: MonthGridProps) {
   const theme = useTheme();
+  const firstWeekday = days[0]?.weekday ?? 1;
+  const weekdays = Array.from({ length: 7 }, (_, index) => (firstWeekday + index) % 7);
   const dayWeeks = Array.from({ length: 6 }, (_, index) => days.slice(index * 7, index * 7 + 7));
   return (
     <View testID="month-calendar" style={variant === 'month' ? styles.monthGrid : undefined}>
       <View style={[styles.weekdays, { borderBottomColor: theme.calendarBorder }] }>
-        {weekdayLabels.map((label, index) => (
-          <Text key={label} testID="month-calendar.weekday" accessibilityLabel={`${label}曜日`}
-            style={[styles.weekday, variant === 'picker' && styles.pickerWeekday, { color: theme.textSecondary }, index === 5 && { color: theme.calendarSaturday }, index === 6 && { color: theme.calendarHoliday }]}>
-            {label}
+        {weekdays.map((weekday) => (
+          <Text key={weekday} testID="month-calendar.weekday" accessibilityLabel={`${weekdayLabels[weekday]}曜日`}
+            style={[styles.weekday, variant === 'picker' && styles.pickerWeekday, { color: theme.textSecondary }, weekday === 6 && { color: theme.calendarSaturday }, weekday === 0 && { color: theme.calendarHoliday }]}>
+            {weekdayLabels[weekday]}
           </Text>
         ))}
       </View>

@@ -28,6 +28,7 @@ import type {
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
+import { DEFAULT_CALENDAR_WEEK_STARTS_ON } from '@/domain/calendar/week-start';
 import {
   createAgendaItems,
   occursOnCalendarDate,
@@ -52,7 +53,6 @@ export type UseCalendarViewInput = Readonly<{
   settings: SettingsRepository;
   temporalDefinitions: TemporalDefinitionRepository;
   holidayProvider: HolidayProvider;
-  weekStartsOn: WeekStartsOn;
   refreshRevision?: number;
   now?: () => Date;
 }>;
@@ -99,6 +99,7 @@ export type CalendarViewState = Readonly<{
 }>;
 
 type CalendarSnapshot = Readonly<{
+  weekStartsOn: WeekStartsOn;
   calendarId: string;
   calendarName: string;
   calendarColorId: EventColorId;
@@ -136,6 +137,7 @@ type DatePickerState = Readonly<{
 }>;
 
 const emptySnapshot: CalendarSnapshot = {
+  weekStartsOn: DEFAULT_CALENDAR_WEEK_STARTS_ON,
   calendarId: DEFAULT_CALENDAR_ID,
   calendarName: 'マイカレンダー',
   calendarColorId: 'blue',
@@ -188,14 +190,15 @@ function withViewMode(target: ViewTarget, mode: CalendarViewMode): ViewTarget {
 }
 
 async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Promise<CalendarSnapshot> {
+  const weekStartsOn = await input.settings.getCalendarWeekStartsOn();
   const calendar = await input.calendars.getDefault();
-  const range = getTargetRange(target, input.weekStartsOn);
+  const range = getTargetRange(target, weekStartsOn);
   const [schedule, isCalendarVisible, undeterminedFadeMinutes] = await Promise.all([
     input.events.listSchedule(calendar.id, range.from, range.through),
     input.settings.getCalendarVisible(calendar.id),
     input.settings.getUndeterminedFadeMinutes(),
   ]);
-  const holidayCoverage = getHolidayMonths(target, input.weekStartsOn).map((month) => {
+  const holidayCoverage = getHolidayMonths(target, weekStartsOn).map((month) => {
     const monthRange = getMonthRange(month);
     return {
       ...monthRange,
@@ -218,6 +221,7 @@ async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Pr
   );
 
   return {
+    weekStartsOn,
     calendarId: calendar.id,
     calendarName: calendar.name,
     calendarColorId: calendar.colorId,
@@ -259,6 +263,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   const modeSelectionBusyRef = useRef(false);
   const modeSelectionVersionRef = useRef(0);
   const datePickerRequestIdRef = useRef(0);
+  const datePickerTargetRef = useRef<string | null>(null);
   const calendarVisibilityBusyRef = useRef(false);
   const calendarVisibilityVersionRef = useRef(0);
   const latestCalendarVisibilityRef = useRef(emptySnapshot.isCalendarVisible);
@@ -308,6 +313,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
 
   useEffect(() => {
     const requestId = ++requestIdRef.current;
+    const pickerRequestId = ++datePickerRequestIdRef.current;
     const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
     if (stateRef.current.status === 'error') {
       setState((current) => ({ ...current, status: 'loading', periodError: null }));
@@ -332,13 +338,29 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
           isPeriodLoading: false,
           periodError: null,
         }));
+        const pickerMonth = datePickerTargetRef.current;
+        if (pickerMonth !== null && pickerRequestId === datePickerRequestIdRef.current) {
+          setDatePickerState((current) => ({ ...current, isLoading: true, error: null }));
+          try {
+            const pickerSnapshot = await loadSnapshot(inputRef.current, { ...target, mode: 'month', visibleMonth: pickerMonth });
+            if (!mountedRef.current || pickerRequestId !== datePickerRequestIdRef.current) return;
+            setDatePickerState({ month: pickerMonth, snapshot: resolveCalendarVisibility(pickerSnapshot, calendarVisibilityVersion), isLoading: false, error: null });
+          } catch {
+            if (!mountedRef.current || pickerRequestId !== datePickerRequestIdRef.current) return;
+            setDatePickerState((current) => ({ ...current, isLoading: false, error: '月の予定を読み込めませんでした' }));
+          }
+        }
       } catch {
         if (!mountedRef.current || requestId !== requestIdRef.current) return;
+        if (datePickerTargetRef.current !== null && pickerRequestId === datePickerRequestIdRef.current) {
+          setDatePickerState((current) => ({ ...current, isLoading: false, error: '月の予定を読み込めませんでした' }));
+        }
         setState((current) => ({
           ...current,
-          status: 'error',
-          snapshot: emptySnapshot,
+          status: current.status === 'ready' ? 'ready' : 'error',
+          snapshot: current.snapshot,
           isPeriodLoading: false,
+          periodError: current.status === 'ready' ? '表示期間を読み込めませんでした' : null,
         }));
       }
     })();
@@ -349,7 +371,6 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     input.refreshRevision,
     input.settings,
     input.temporalDefinitions,
-    input.weekStartsOn,
     getInitialMode,
     resolveCalendarVisibility,
   ]);
@@ -475,6 +496,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     [transitionTo],
   );
   const loadDatePickerMonth = useCallback(async (month: string): Promise<boolean> => {
+    datePickerTargetRef.current = month;
     const requestId = ++datePickerRequestIdRef.current;
     const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
     setDatePickerState((current) => ({ ...current, isLoading: true, error: null }));
@@ -603,7 +625,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   const monthDays = useMemo(
     () =>
       createMonthDayViewModels({
-        grid: getMonthGrid(state.visibleMonth, input.weekStartsOn),
+        grid: getMonthGrid(state.visibleMonth, state.snapshot.weekStartsOn),
         selectedDate: state.selectedDate,
         today: state.today,
         occurrences: visibleOccurrences,
@@ -611,13 +633,13 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         definitionLabels: new Map([...state.snapshot.definitions.values()]
           .map((definition) => [definition.id, definition.label] as const)),
       }),
-    [input.weekStartsOn, state.selectedDate, state.snapshot.definitions,
+    [state.snapshot.weekStartsOn, state.selectedDate, state.snapshot.definitions,
       state.snapshot.holidayCoverage, state.today, state.visibleMonth, visibleOccurrences],
   );
   const datePickerDays = useMemo(
     () =>
       createMonthDayViewModels({
-        grid: getMonthGrid(datePickerState.month, input.weekStartsOn),
+        grid: getMonthGrid(datePickerState.month, datePickerState.snapshot.weekStartsOn),
         selectedDate: state.selectedDate,
         today: state.today,
         occurrences: datePickerVisibleOccurrences,
@@ -626,19 +648,19 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
           .map((definition) => [definition.id, definition.label] as const)),
       }),
     [datePickerState.month, datePickerState.snapshot.definitions,
-      datePickerState.snapshot.holidayCoverage, datePickerVisibleOccurrences, input.weekStartsOn,
+      datePickerState.snapshot.holidayCoverage, datePickerVisibleOccurrences, datePickerState.snapshot.weekStartsOn,
       state.selectedDate, state.today],
   );
   const monthWeeks = useMemo(
     () => createMonthWeekViewModels({
-      grid: getMonthGrid(state.visibleMonth, input.weekStartsOn),
+      grid: getMonthGrid(state.visibleMonth, state.snapshot.weekStartsOn),
       occurrences: visibleOccurrences,
       definitionLabels: new Map([...state.snapshot.definitions.values()]
         .map((definition) => [definition.id, definition.label] as const)),
       definitions: state.snapshot.definitions,
       calendarColorId: state.snapshot.calendarColorId,
     }),
-    [input.weekStartsOn, state.snapshot.calendarColorId, state.snapshot.definitions, state.visibleMonth, visibleOccurrences],
+    [state.snapshot.weekStartsOn, state.snapshot.calendarColorId, state.snapshot.definitions, state.visibleMonth, visibleOccurrences],
   );
   const selectedAgendaItems = useMemo(
     () =>

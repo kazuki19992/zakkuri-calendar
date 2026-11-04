@@ -1,6 +1,7 @@
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import type { Calendar } from './calendar';
 import type { CalendarViewMode } from './calendar-view-mode';
+import type { WeekStartsOn } from './month';
 import type { CalendarEvent, EventEditorTab, ExactDuration } from './event';
 import type { EventColorId } from './event-color';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
@@ -65,6 +66,8 @@ export interface EventRepository {
 }
 
 export interface SettingsRepository {
+  getCalendarWeekStartsOn(): Promise<WeekStartsOn>;
+  setCalendarWeekStartsOn(value: WeekStartsOn, updatedAt: string): Promise<void>;
   getDefaultExactDuration(): Promise<ExactDuration>;
   setDefaultExactDuration(value: ExactDuration, updatedAt: string): Promise<void>;
   getUndeterminedFadeMinutes(): Promise<number>;

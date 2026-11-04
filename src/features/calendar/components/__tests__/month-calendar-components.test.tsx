@@ -61,6 +61,15 @@ function createWeeks(days: readonly MonthDayViewModel[]): readonly MonthWeekView
 }
 
 describe('独自月カレンダー表示', () => {
+  it('日曜始まりの曜日見出しと土日色を実曜日に合わせる', async () => {
+    const days = createDays();
+    const sunday = { ...days[0], date: '2026-08-30', weekday: 0 };
+    const view = await render(<MonthGrid days={[sunday, ...days.slice(0, 41)]} onSelectDate={jest.fn()} />);
+    const labels = view.getAllByTestId('month-calendar.weekday');
+    expect(labels.map((label) => label.props.children)).toEqual(['日', '月', '火', '水', '木', '金', '土']);
+    expect(StyleSheet.flatten(labels[0].props.style).color).toBe(Colors.light.calendarHoliday);
+    expect(StyleSheet.flatten(labels[6].props.style).color).toBe(Colors.light.calendarSaturday);
+  });
   it('日付数字と他N件は1日ビューを開き、予定blockは発生回を編集する', async () => {
     const days = createDays();
     const onOpenDay = jest.fn();

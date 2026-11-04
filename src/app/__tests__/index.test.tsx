@@ -111,6 +111,8 @@ describe('ホームルート', () => {
         getLastEventEditorTab: jest.fn(),
         setLastEventEditorTab: jest.fn(),
         getLastCalendarViewMode: jest.fn(),
+    getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1),
+    setCalendarWeekStartsOn: jest.fn().mockResolvedValue(undefined),
         setLastCalendarViewMode: jest.fn(),
         getThisWeekDeadlineWeekday: jest.fn(),
         setThisWeekDeadlineWeekday: jest.fn(),
@@ -130,7 +132,6 @@ describe('ホームルート', () => {
       temporalDefinitions: repositories.temporalDefinitions,
       holidayProvider: expect.objectContaining({ constructor: expect.any(Function) }),
       refreshRevision: 4,
-      weekStartsOn: 1,
     });
     expect(screen.getByText('カレンダー画面:twoDay')).toBeTruthy();
     await user.press(screen.getByRole('button', { name: '予定を追加' }));

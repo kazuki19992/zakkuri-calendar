@@ -16,6 +16,10 @@ import {
   type ExactDuration,
 } from '@/domain/calendar/event';
 import type { EventAggregate } from '@/domain/calendar/event-reminder';
+import type { HolidayProvider } from '@/domain/calendar/holiday';
+import { DEFAULT_HOLIDAY_PREFERENCES, type HolidayPreferencesV1 } from '@/domain/calendar/holiday-preferences';
+import { adjustThisWeekDeadline } from '@/domain/temporal/adjust-this-week-deadline';
+import { selectHolidayProvider } from '@/data/holidays/selected-holiday-provider';
 import {
   buildSeriesScopedAggregate,
   getChangedEventFields,
@@ -96,6 +100,7 @@ export type EventEditorState = Readonly<{
   reminderError: string | null;
   saveError: string | null;
   isSaving: boolean;
+  isSaveDisabled: boolean;
   isDeleting: boolean;
   usesRecurrenceScope: boolean;
   scopeRequest: ScopeRequest | null;
@@ -135,6 +140,7 @@ type UseEventEditorInput = Readonly<{
   events: EventRepository;
   settings: SettingsRepository;
   temporalDefinitions: TemporalDefinitionRepository;
+  holidayProvider?: HolidayProvider;
   initial: Readonly<{
     date: string;
     startTime: string;
@@ -152,6 +158,7 @@ type UseEventEditorInput = Readonly<{
 }>;
 
 const defaultNow = (): string => new Date().toISOString();
+const unsupportedHolidayProvider: HolidayProvider = { list: () => ({ status: 'unsupported' }) };
 const defaultTimeZone = (): string => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const optionalText = (value: string): string | null => value.trim() || null;
 
@@ -166,6 +173,7 @@ export function useEventEditor({
   events,
   settings,
   temporalDefinitions,
+  holidayProvider = unsupportedHolidayProvider,
   initial,
   initialTab,
   eventId,
@@ -203,6 +211,8 @@ export function useEventEditor({
   const [definitions, setDefinitions] = useState<readonly TemporalDefinition[]>([]);
   const [selectedDefinitionId, setSelectedDefinitionId] = useState<string | null>(null);
   const [thisWeekDeadlineWeekday, setThisWeekDeadlineWeekday] = useState<ThisWeekDeadlineWeekday>(5);
+  const [holidayPreferences, setHolidayPreferences] = useState<HolidayPreferencesV1>(DEFAULT_HOLIDAY_PREFERENCES);
+  const [temporalReselected, setTemporalReselected] = useState(false);
   const [colorId, setColorIdValue] = useState<EventColorId | null>(null);
   const [location, setLocationValue] = useState('');
   const [noteDocument, setNoteDocument] = useState<EventNoteDocumentV1 | null>(null);
@@ -226,7 +236,7 @@ export function useEventEditor({
     let active = true;
     const load = async (): Promise<void> => {
       try {
-        const [calendar, loadedValue, savedTab, deadlineWeekday] = await Promise.all([
+        const [calendar, loadedValue, savedTab, deadlineWeekday, loadedHolidayPreferences] = await Promise.all([
           calendars.getDefault(),
           eventId === undefined
             ? Promise.resolve(null)
@@ -240,6 +250,7 @@ export function useEventEditor({
             ? settings.getLastEventEditorTab()
             : Promise.resolve(null),
           settings.getThisWeekDeadlineWeekday(),
+          settings.getHolidayPreferences(),
         ]);
         if (!active) return;
         const loadedOccurrenceData = occurrenceDate === undefined
@@ -288,6 +299,8 @@ export function useEventEditor({
         setCalendarColorId(calendar.colorId);
         setDefinitions(loadedDefinitions);
         setThisWeekDeadlineWeekday(deadlineWeekday);
+        setHolidayPreferences(loadedHolidayPreferences);
+        setTemporalReselected(false);
         setSelectedDefinitionId(
           loadedDefinitions.find((definition) => definition.granularity === 'day')?.id
             ?? loadedDefinitions[0]?.id
@@ -349,6 +362,7 @@ export function useEventEditor({
   const setTitle = useCallback((value: string) => { setTitleValue(value); clearErrors(); }, [clearErrors]);
   const setEditorTab = useCallback((value: EventEditorTab) => {
     if (value === editorTab) return;
+    setTemporalReselected(true);
     setEditorTabValue(value);
     clearErrors();
     if (status === 'ready') void settings.setLastEventEditorTab(value, now()).catch(() => {});
@@ -363,7 +377,10 @@ export function useEventEditor({
   const setEndDate = useCallback((value: string) => { setEndDateValue(value); clearErrors(); }, [clearErrors]);
   const setStartTime = useCallback((value: string) => { setStartTimeValue(value); clearErrors(); }, [clearErrors]);
   const setEndTime = useCallback((value: string) => { setEndTimeValue(value); clearErrors(); }, [clearErrors]);
-  const selectDefinition = useCallback((value: string) => { setSelectedDefinitionId(value); setSaveError(null); }, []);
+  const selectDefinition = useCallback((value: string) => {
+    if (value !== selectedDefinitionId) setTemporalReselected(true);
+    setSelectedDefinitionId(value); clearErrors();
+  }, [clearErrors, selectedDefinitionId]);
   const setColorId = useCallback((value: EventColorId | null) => { setColorIdValue(value); clearErrors(); }, [clearErrors]);
   const setLocation = useCallback((value: string) => { setLocationValue(value); clearErrors(); }, [clearErrors]);
   const openNoteEditor = useCallback(() => {
@@ -428,7 +445,7 @@ export function useEventEditor({
   const retry = useCallback(() => { setStatus('loading'); setLoadRevision((value) => value + 1); }, []);
 
   const selectedDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
-  const existingRelativeEvent = existingAggregate?.event.temporalType === 'fuzzy' &&
+  const existingRelativeEvent = !temporalReselected && existingAggregate?.event.temporalType === 'fuzzy' &&
     existingAggregate.event.temporalDefinitionId === selectedDefinitionId &&
     existingAggregate.event.resolutionContext !== null
     ? existingAggregate.event
@@ -438,6 +455,7 @@ export function useEventEditor({
     existingRelativeEvent !== null
   );
   let relativeResolution: RelativeDateResolution | null = null;
+  let relativeDateError: string | null = null;
   if (isRelativeDefinition) {
     const existingEvent = existingRelativeEvent;
     if (existingEvent !== null && existingEvent.resolutionContext !== null) {
@@ -451,16 +469,27 @@ export function useEventEditor({
       };
     } else if (selectedDefinition !== null) {
       const resolution = resolveRelativeDateRange(startDate, selectedDefinition, thisWeekDeadlineWeekday);
-      if (resolution.ok) relativeResolution = resolution.value;
+      if (resolution.ok) {
+        if (selectedDefinition.resolverConfig.kind === 'weekRemainder' && holidayPreferences.adjustThisWeekDeadline) {
+          const provider = selectHolidayProvider(holidayProvider, holidayPreferences.calendarId);
+          const adjusted = adjustThisWeekDeadline(resolution.value, holidayPreferences,
+            provider.list(resolution.value.referenceDate, resolution.value.endDate));
+          if (adjusted.ok) relativeResolution = adjusted.value;
+          else relativeDateError = adjusted.error === 'noBusinessDay'
+            ? '対象となる平日がありません。基準日または締切設定を見直してください。'
+            : 'この期間の祝日情報に対応していないため、締切を確定できません。';
+        } else relativeResolution = resolution.value;
+      }
     }
   }
   const relativeDatePreview = relativeResolution === null
     ? null
-    : `${formatEditorDate(relativeResolution.startDate)}〜${formatEditorDate(relativeResolution.endDate)}`;
+    : `${formatEditorDate(relativeResolution.startDate)}〜${formatEditorDate(relativeResolution.endDate)}${relativeResolution.parameterSnapshot.deadlineAdjustment === undefined ? '' : relativeResolution.parameterSnapshot.deadlineAdjustment.calendarId === 'none' ? '（土日を考慮した締切）' : '（土日祝を考慮した締切）'}`;
 
   const save = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || status !== 'ready') return false;
     clearErrors();
+    if (relativeDateError !== null) { setDateError(relativeDateError); return false; }
     const existingEvent = existingAggregate?.event;
     const targetDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
     const isExistingRelative = existingEvent?.temporalType === 'fuzzy' &&
@@ -554,7 +583,7 @@ export function useEventEditor({
     }
   }, [calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
     getTimeZoneId, isAllDay, location, newEventId, noteDocument, now, recurrenceDraft, reminders,
-    definitions, occurrenceEditData, relativeResolution, selectedDefinitionId,
+    definitions, occurrenceEditData, relativeResolution, relativeDateError, selectedDefinitionId,
     startDate, startTime, status, title]);
 
   const remove = useCallback(async (): Promise<boolean> => {
@@ -716,12 +745,13 @@ export function useEventEditor({
     recurrenceDraft,
     reminders,
     titleError,
-    dateError,
+    dateError: dateError ?? relativeDateError,
     endTimeError,
     recurrenceError,
     reminderError,
     saveError,
     isSaving,
+    isSaveDisabled: relativeDateError !== null,
     isDeleting,
     usesRecurrenceScope: occurrenceEditData !== null,
     scopeRequest,

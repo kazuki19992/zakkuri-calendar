@@ -27,10 +27,23 @@ function createDependencies() {
   };
   const temporalDefinitions: jest.Mocked<TemporalDefinitionRepository> = { listEnabled: jest.fn(), getById: jest.fn(), disable: jest.fn() };
   const holidayProvider: jest.Mocked<HolidayProvider> = { list: jest.fn().mockReturnValue({ status: 'available', holidays: [{ date: '2026-09-21', name: '敬老の日' }] }) };
-  return { calendars, events, temporalDefinitions, holidayProvider };
+  const settings = { getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }) };
+  return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }
 
 describe('1日表示の状態調整', () => {
+  it('祝日無効と情報未対応を区別し予定を維持する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getHolidayPreferences.mockResolvedValue({ version: 1, calendarId: 'none', adjustThisWeekDeadline: false });
+    dependencies.holidayProvider.list.mockReturnValue({ status: 'unsupported' });
+    const { result, rerender } = await renderHook(({ revision }: { revision: number }) => useDayCalendar({ ...dependencies, date: '2051-01-01', refreshRevision: revision }), { initialProps: { revision: 0 } });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.holidaySupport).toBe('available');
+    expect(result.current.holidayName).toBeNull();
+    dependencies.settings.getHolidayPreferences.mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false });
+    await rerender({ revision: 1 });
+    await waitFor(() => expect(result.current.holidaySupport).toBe('unsupported'));
+  });
   it('対象日の予定と祝日だけを読み込み、agenda項目へ変換する', async () => {
     const dependencies = createDependencies();
     const { result } = await renderHook(() => useDayCalendar({ ...dependencies, date: '2026-09-21' }));

@@ -7,6 +7,7 @@ jest.mock('@/global.css', () => ({}));
 jest.mock('@/data/sqlite/app-database-provider', () => ({ useRepositories: jest.fn() }));
 jest.mock('@/features/settings/hooks/use-relative-date-settings', () => ({ useRelativeDateSettings: jest.fn() }));
 jest.mock('@/features/settings/hooks/use-week-start-settings', () => ({ useWeekStartSettings: jest.fn() }));
+jest.mock('@/features/settings/hooks/use-holiday-preferences', () => ({ useHolidayPreferences: jest.fn() }));
 jest.mock('@/features/calendar/calendar-refresh-context', () => ({ useCalendarRefresh: () => ({ notifyChanged: jest.fn() }) }));
 jest.mock('@/features/settings/screens/settings-screen', () => {
   const React = jest.requireActual<typeof import('react')>('react');

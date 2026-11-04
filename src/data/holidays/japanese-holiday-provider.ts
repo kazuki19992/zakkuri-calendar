@@ -34,7 +34,6 @@ export class JapaneseHolidayProvider implements HolidayProvider {
         name: holiday.nameJa,
       }),
     );
-    // TODO(v1, #9): 祝日カレンダーと、ざっくり期間・業務日計算への反映を設定可能にする。
     return { status: 'available', holidays };
   }
 }

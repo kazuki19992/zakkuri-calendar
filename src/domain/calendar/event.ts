@@ -3,6 +3,7 @@ import { parseEventColorId, type EventColorId } from './event-color';
 import { isCalendarDate } from './month';
 import { parseRecurrenceRule, type RecurrenceRuleV1 } from './recurrence';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
+import { parseDeadlineAdjustment, type DeadlineAdjustmentV1 } from './holiday-preferences';
 import {
   normalizeEventNoteDocument,
   parseEventNoteDocument,
@@ -18,7 +19,7 @@ export type FuzzyResolutionContextV1 = Readonly<{
   version: 1;
   referenceDate: string;
   periodAnchorDate: string;
-  parameterSnapshot: Readonly<{ thisWeekDeadlineWeekday?: ThisWeekDeadlineWeekday }>;
+  parameterSnapshot: Readonly<{ thisWeekDeadlineWeekday?: ThisWeekDeadlineWeekday; deadlineAdjustment?: DeadlineAdjustmentV1 }>;
 }>;
 
 type EventDraftBase = Readonly<{
@@ -68,11 +69,17 @@ function parseFuzzyResolutionContext(value: unknown): FuzzyResolutionContextV1 |
       !isCalendarDate(value.periodAnchorDate) || !isRecord(value.parameterSnapshot)) return undefined;
   const deadline = value.parameterSnapshot.thisWeekDeadlineWeekday;
   if (deadline !== undefined && deadline !== 5 && deadline !== 6 && deadline !== 7) return undefined;
+  const rawAdjustment = value.parameterSnapshot.deadlineAdjustment;
+  const adjustment = rawAdjustment === undefined ? undefined : parseDeadlineAdjustment(rawAdjustment);
+  if (adjustment === null) return undefined;
   return {
     version: 1,
     referenceDate: value.referenceDate,
     periodAnchorDate: value.periodAnchorDate,
-    parameterSnapshot: deadline === undefined ? {} : { thisWeekDeadlineWeekday: deadline },
+    parameterSnapshot: {
+      ...(deadline === undefined ? {} : { thisWeekDeadlineWeekday: deadline }),
+      ...(adjustment === undefined ? {} : { deadlineAdjustment: adjustment }),
+    },
   };
 }
 

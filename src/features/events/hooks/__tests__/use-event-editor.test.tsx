@@ -24,13 +24,76 @@ function createRepositories(): Readonly<{ calendars: jest.Mocked<CalendarReposit
     events: { create: jest.fn(), getById: jest.fn().mockResolvedValue(null), listByAnchorRange: jest.fn(),
       listSchedule: jest.fn(), getOccurrenceEditData: jest.fn(), saveOccurrenceException: jest.fn(),
       deleteOccurrenceException: jest.fn(), applyRecurrenceMutation: jest.fn(), update: jest.fn(), delete: jest.fn() },
-    settings: { getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
+    settings: { getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
     temporalDefinitions: { listEnabled: jest.fn().mockResolvedValue([morning]), getById: jest.fn(), disable: jest.fn() },
   };
 }
 const initial = { date: '2026-09-09', startTime: '09:30', endTime: '11:45', temporalType: 'fuzzy' as const };
 
 describe('予定編集の主要状態', () => {
+  it('保存済み期間は維持し、別表現から再指定したときだけ新policyで調整する', async () => {
+    const repositories = createRepositories();
+    const thisWeek: TemporalDefinition = { ...nextWeek, id: 'this-week', key: 'this_week', label: '今週中', resolverConfig: { kind: 'weekRemainder', selectionWeekOffset: 0 } };
+    const context = { version: 1, referenceDate: '2026-03-16', periodAnchorDate: '2026-03-16', parameterSnapshot: { thisWeekDeadlineWeekday: 5 } } as const;
+    repositories.events.getById.mockResolvedValue({ event: { ...exactEvent, temporalType: 'fuzzy', recurrenceRule: null,
+      anchorDate: '2026-03-16', endDate: '2026-03-20', temporalDefinitionId: thisWeek.id, resolutionContext: context }, reminders: [] });
+    repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning, thisWeek]);
+    repositories.settings.getHolidayPreferences.mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: true });
+    const holidayProvider = { list: jest.fn().mockReturnValue({ status: 'available', holidays: [{ date: '2026-03-20', name: '春分の日' }] }) };
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, holidayProvider, initial, eventId: exactEvent.id }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.setTitle('タイトルのみ変更'); await result.current.save(); });
+    expect(repositories.events.update).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ endDate: '2026-03-20', resolutionContext: context }) }));
+    expect(holidayProvider.list).not.toHaveBeenCalled();
+    await act(async () => { result.current.selectDefinition(morning.id); });
+    await act(async () => { result.current.selectDefinition(thisWeek.id); });
+    expect(result.current.relativeDatePreview).toContain('3月19日');
+    await act(async () => { await result.current.save(); });
+    expect(repositories.events.update).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ endDate: '2026-03-19' }) }));
+  });
+
+  it('祝日設定の読込失敗を既定値で保存しない', async () => {
+    const repositories = createRepositories();
+    repositories.settings.getHolidayPreferences.mockRejectedValue(new Error('failed'));
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    await act(async () => { expect(await result.current.save()).toBe(false); });
+    expect(repositories.events.create).not.toHaveBeenCalled();
+  });
+  it('今週中の祝日締切を繰り上げ、contextを保存する', async () => {
+    const repositories = createRepositories();
+    const thisWeek: TemporalDefinition = { ...nextWeek, id: 'this-week', key: 'this_week', label: '今週中', resolverConfig: { kind: 'weekRemainder', selectionWeekOffset: 0 } };
+    repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning, thisWeek]);
+    repositories.settings.getHolidayPreferences.mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: true });
+    const holidayProvider = { list: jest.fn().mockReturnValue({ status: 'available', holidays: [{ date: '2026-03-20', name: '春分の日' }] }) };
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, holidayProvider,
+      initial: { ...initial, date: '2026-03-16' }, createId: () => 'new' }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.setTitle('提出'); result.current.selectDefinition(thisWeek.id); });
+    expect(result.current.relativeDatePreview).toContain('3月19日');
+    await act(async () => { expect(await result.current.save()).toBe(true); });
+    expect(repositories.events.create).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({
+      anchorDate: '2026-03-16', endDate: '2026-03-19', resolutionContext: expect.objectContaining({
+        parameterSnapshot: { thisWeekDeadlineWeekday: 5, deadlineAdjustment: { version: 1, calendarId: 'jp', unadjustedDeadlineDate: '2026-03-20' } },
+      }),
+    }) }));
+  });
+
+  it.each(['noBusinessDay', 'unsupported'] as const)('締切が%sでは本文を維持して保存を拒否する', async (reason) => {
+    const repositories = createRepositories();
+    const thisWeek: TemporalDefinition = { ...nextWeek, id: 'this-week', resolverConfig: { kind: 'weekRemainder', selectionWeekOffset: 0 } };
+    repositories.temporalDefinitions.listEnabled.mockResolvedValue([thisWeek]);
+    repositories.settings.getHolidayPreferences.mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: true });
+    const holidayProvider = { list: jest.fn().mockReturnValue(reason === 'unsupported' ? { status: 'unsupported' } : { status: 'available', holidays: [{ date: '2026-03-20', name: '春分の日' }] }) };
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, holidayProvider, initial: { ...initial, date: '2026-03-20' } }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.setTitle('残す本文'); });
+    expect(result.current.isSaveDisabled).toBe(true);
+    await act(async () => { expect(await result.current.save()).toBe(false); });
+    expect(result.current.dateError).toContain(reason === 'unsupported' ? '祝日情報' : '対象となる平日');
+    expect(result.current.title).toBe('残す本文');
+    expect(repositories.events.create).not.toHaveBeenCalled();
+  });
   it('繰り返しOccurrenceは保存時に範囲を選び単発例外として保存できる', async () => {
     const repositories = createRepositories();
     repositories.events.getOccurrenceEditData.mockResolvedValue({

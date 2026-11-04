@@ -2,11 +2,14 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { BackHandler } from 'react-native';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
+import { JapaneseHolidayProvider } from '@/data/holidays/japanese-holiday-provider';
 import { toCalendarDate } from '@/domain/calendar/month';
 import { toWallClockTime } from '@/domain/calendar/time';
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
 import { useEventEditor } from '@/features/events/hooks/use-event-editor';
 import { EventEditorScreen } from '@/features/events/screens/event-editor-screen';
+
+const holidayProvider = new JapaneseHolidayProvider();
 
 export default function NewEventRoute() {
   const router = useRouter();
@@ -19,7 +22,7 @@ export default function NewEventRoute() {
     calendars: repositories.calendars,
     events: repositories.events,
     settings: repositories.settings,
-    temporalDefinitions: repositories.temporalDefinitions,
+    temporalDefinitions: repositories.temporalDefinitions, holidayProvider,
     initial: {
       date: params.date ?? toCalendarDate(new Date()),
       startTime,

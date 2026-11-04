@@ -18,7 +18,7 @@ const state: EventEditorState = {
   noteLinkError: null,
   recurrenceDraft: { preset: 'none', frequency: 'weekly', intervalText: '1', weekdays: [5], endType: 'never', untilDate: '2026-09-25', countText: '1' },
   reminders: [], titleError: null, dateError: null, endTimeError: null, recurrenceError: null, reminderError: null, saveError: null,
-  isSaving: false, isDeleting: false, usesRecurrenceScope: false, scopeRequest: null,
+  isSaving: false, isSaveDisabled: false, isDeleting: false, usesRecurrenceScope: false, scopeRequest: null,
   setTitle: jest.fn(), setEditorTab: jest.fn(), setAllDay: jest.fn(), setStartDate: jest.fn(), setEndDate: jest.fn(),
   setStartTime: jest.fn(), setEndTime: jest.fn(), selectDefinition: jest.fn(), setColorId: jest.fn(), setLocation: jest.fn(),
   openNoteEditor: jest.fn(), cancelNoteEditor: jest.fn(), completeNoteEditor: jest.fn(), openNoteLink: jest.fn(),
@@ -29,6 +29,11 @@ const state: EventEditorState = {
 };
 
 describe('予定編集フォーム', () => {
+  it('調整不能の期間では保存を無効化し日時エラーを表示する', async () => {
+    const view = await render(<EventEditorScreen state={{ ...state, isSaveDisabled: true, dateError: '対象となる平日がありません' }} onSave={jest.fn()} onDelete={jest.fn()} onCancel={jest.fn()} />);
+    expect(view.getByRole('button', { name: '保存' })).toBeDisabled();
+    expect(view.getByText('対象となる平日がありません')).toBeOnTheScreen();
+  });
   it('設計順の作成フォームと日本語日時を表示する', async () => {
     const view = await render(<EventEditorScreen state={state} onSave={jest.fn()} onDelete={jest.fn()} onCancel={jest.fn()} />);
 

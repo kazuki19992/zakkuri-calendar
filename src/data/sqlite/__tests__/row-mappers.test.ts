@@ -40,6 +40,13 @@ const exceptionRow: RecurrenceExceptionRow = {
 };
 
 describe('row mappers', () => {
+  it('保存済みの締切調整contextを欠落させず復元する', () => {
+    const context = { version: 1, referenceDate: '2026-03-16', periodAnchorDate: '2026-03-16',
+      parameterSnapshot: { thisWeekDeadlineWeekday: 5, deadlineAdjustment: { version: 1, calendarId: 'jp', unadjustedDeadlineDate: '2026-03-20' } } };
+    expect(mapEventRow({ ...eventRow, temporal_type: 'fuzzy', anchor_date: '2026-03-16', end_date: '2026-03-19',
+      temporal_definition_id: 'this-week', fuzzy_resolution_context_json: JSON.stringify(context),
+    })).toMatchObject({ resolutionContext: context, endDate: '2026-03-19' });
+  });
   it('maps snake-case calendar columns', () => {
     expect(mapCalendarRow({
       id: 'personal-default', name: 'マイカレンダー', time_zone_id: 'Asia/Tokyo',

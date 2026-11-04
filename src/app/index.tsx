@@ -11,7 +11,6 @@ export default function IndexRoute() {
   const router = useRouter();
   const { calendars, events, settings, temporalDefinitions } = useRepositories();
   const { revision } = useCalendarRefresh();
-  // TODO(v1, #9): 祝日カレンダーと、ざっくり期間・業務日計算への反映を設定可能にする。
   const state = useCalendarView({
     calendars,
     events,

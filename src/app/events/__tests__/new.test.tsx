@@ -72,6 +72,7 @@ describe('予定作成ルート', () => {
       events: repositories.events,
       settings: repositories.settings,
       temporalDefinitions: repositories.temporalDefinitions,
+      holidayProvider: expect.objectContaining({ list: expect.any(Function) }),
       initial: expect.objectContaining({
         date: '2026-09-21',
         temporalType: 'fuzzy',

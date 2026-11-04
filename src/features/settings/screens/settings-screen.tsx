@@ -1,18 +1,20 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import { SingleSelectSheet } from '@/shared/components/single-select-sheet';
 import type { WeekStartSettingsState } from '../hooks/use-week-start-settings';
 import { useTheme } from '@/hooks/use-theme';
 import type { RelativeDateSettingsState } from '../hooks/use-relative-date-settings';
+import type { HolidayPreferencesState } from '../hooks/use-holiday-preferences';
+import { HolidaySettingsSection } from '../components/holiday-settings-section';
 
 const OPTIONS = [[5, '金曜日'], [6, '土曜日'], [7, '日曜日']] as const;
 
-export function SettingsScreen({ state, weekStart }: Readonly<{ state: RelativeDateSettingsState; weekStart: WeekStartSettingsState }>) {
+export function SettingsScreen({ state, weekStart, holidays }: Readonly<{ state: RelativeDateSettingsState; weekStart: WeekStartSettingsState; holidays: HolidayPreferencesState }>) {
   const theme = useTheme();
   const [selecting, setSelecting] = useState(false);
   const disabled = weekStart.status !== 'ready' || weekStart.isSaving;
   return (
-    <View style={[styles.root, { backgroundColor: theme.background }]}>
+    <ScrollView style={{ backgroundColor: theme.background }} contentContainerStyle={styles.root}>
       <Text accessibilityRole="header" style={[styles.heading, { color: theme.text }]}>設定</Text>
       <View style={[styles.section, { borderBottomColor: theme.calendarBorder }]}>
         <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>カレンダー</Text>
@@ -29,6 +31,7 @@ export function SettingsScreen({ state, weekStart }: Readonly<{ state: RelativeD
       <SingleSelectSheet visible={selecting} title="週の開始曜日" value={weekStart.value}
         options={[{ value: 1, label: '月曜日' }, { value: 0, label: '日曜日' }]} disabled={disabled}
         onClose={() => setSelecting(false)} onSelect={(value) => { void weekStart.setValue(value); }} />
+      <HolidaySettingsSection state={holidays} />
       <View style={[styles.section, { borderBottomColor: theme.calendarBorder }]}>
         <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ざっくり予定</Text>
         <Text style={[styles.label, { color: theme.text }]}>今週中の締切</Text>
@@ -45,12 +48,12 @@ export function SettingsScreen({ state, weekStart }: Readonly<{ state: RelativeD
         <Text style={[styles.note, { color: theme.textSecondary }]}>設定変更は保存済みの予定には影響しません</Text>
         {state.error ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.error}</Text> : null}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, paddingHorizontal: 20, paddingVertical: 24 },
+  root: { flexGrow: 1, paddingHorizontal: 20, paddingVertical: 24 },
   heading: { fontSize: 22, fontWeight: '500' },
   section: { borderBottomWidth: StyleSheet.hairlineWidth, gap: 10, paddingVertical: 20 },
   sectionTitle: { fontSize: 13 },

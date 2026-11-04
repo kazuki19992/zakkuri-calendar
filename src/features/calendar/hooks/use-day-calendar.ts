@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { expandEventOccurrences } from '@/domain/calendar/event-occurrence';
-import type { HolidayProvider } from '@/domain/calendar/holiday';
-import type { CalendarRepository, EventRepository, SettingsRepository, TemporalDefinitionRepository } from '@/domain/calendar/repositories';
-import { selectHolidayProvider } from '@/data/holidays/selected-holiday-provider';
+import { getMonthStart } from '@/domain/calendar/month';
+import { loadCalendarSnapshot, type CalendarSnapshotInput } from '../calendar-snapshot';
+import { createDayViewModel } from '../two-day-view-model';
 import { createAgendaItems, type AgendaItemViewModel } from '../calendar-view-model';
 
 export type DayCalendarState = Readonly<{
@@ -13,15 +12,11 @@ export type DayCalendarState = Readonly<{
   retry(): void;
 }>;
 
-export function useDayCalendar(input: Readonly<{
+export function useDayCalendar(input: CalendarSnapshotInput & Readonly<{
   date: string;
-  calendars: CalendarRepository;
-  events: EventRepository;
-  temporalDefinitions: TemporalDefinitionRepository;
-  settings: Pick<SettingsRepository, 'getHolidayPreferences'>;
-  holidayProvider: HolidayProvider;
   refreshRevision?: number;
 }>): DayCalendarState {
+  const { date, calendars, events, settings, temporalDefinitions, holidayProvider, refreshRevision } = input;
   const [state, setState] = useState<Omit<DayCalendarState, 'retry'>>({ status: 'loading', items: [], holidayName: null, holidaySupport: 'available' });
   const retryRevision = useRef(0);
   const [retry, setRetry] = useState(0);
@@ -31,27 +26,24 @@ export function useDayCalendar(input: Readonly<{
     const requestId = ++request.current;
     void (async () => {
       try {
-        const preferences = await input.settings.getHolidayPreferences();
-        const calendar = await input.calendars.getDefault();
-        const schedule = await input.events.listSchedule(calendar.id, input.date, input.date);
-        const expanded = expandEventOccurrences({ snapshot: schedule, from: input.date, through: input.date });
-        if (!expanded.ok) throw new Error('event occurrence expansion failed');
-        const definitions = await Promise.all([...new Set(expanded.value.flatMap((occurrence) =>
-          occurrence.event.temporalType === 'fuzzy' ? [occurrence.event.temporalDefinitionId] : []))]
-          .map((id) => input.temporalDefinitions.getById(id)));
+        const snapshot = await loadCalendarSnapshot({ calendars, events, settings, temporalDefinitions, holidayProvider }, { mode: 'day', today: date,
+          anchorDate: date, selectedDate: date, visibleMonth: getMonthStart(date) });
         if (requestId !== request.current) return;
-        const holiday = selectHolidayProvider(input.holidayProvider, preferences.calendarId).list(input.date, input.date);
+        const occurrences = snapshot.isCalendarVisible ? snapshot.occurrences : [];
+        const day = createDayViewModel(date, { ...snapshot, occurrences, today: date });
+        const visibleIds = new Set([...day.allDayItems, ...day.timelineItems].map((item) => item.id));
         setState({
           status: 'ready',
-          items: createAgendaItems(expanded.value, new Map(definitions.flatMap((value) => value === null ? [] : [[value.id, value.label] as const]))),
-          holidayName: holiday.status === 'available' ? holiday.holidays[0]?.name ?? null : null,
-          holidaySupport: holiday.status,
+          items: createAgendaItems(occurrences, new Map([...snapshot.definitions.values()].map((value) => [value.id, value.label])))
+            .filter((item) => visibleIds.has(item.id)),
+          holidayName: day.holidayName,
+          holidaySupport: day.holidaySupport,
         });
       } catch {
         if (requestId === request.current) setState({ status: 'error', items: [], holidayName: null, holidaySupport: 'available' });
       }
     })();
     return () => { request.current += 1; };
-  }, [input.calendars, input.date, input.events, input.holidayProvider, input.refreshRevision, input.settings, input.temporalDefinitions, retry]);
+  }, [calendars, date, events, holidayProvider, refreshRevision, settings, temporalDefinitions, retry]);
   return { ...state, retry: reload };
 }

@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor, within } from '@testing-library/react-native';
+import { fireEvent, render, userEvent, waitFor, within } from '@testing-library/react-native';
 import { Animated, PixelRatio, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/theme';
 import {
@@ -106,6 +106,27 @@ function renderTwoDayView(overrides: Partial<{
 }
 
 describe('2日カレンダー表示コンポーネント', () => {
+  it('1日表示は予備列を含む3列で当日の件数と日付を表示する', async () => {
+    const view = await render(<TwoDayView visibleDayCount={1} strip={[prevBuffer, { ...day1, allDayItems: [allDayItem] }, day2]}
+      bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={{}} onCarouselLayout={jest.fn()} />);
+    expect(view.getByTestId('single-day-calendar')).toBeOnTheScreen();
+    expect(view.getByText('9月8日（火）')).toBeOnTheScreen();
+    expect(view.getByText('終日欄 1件')).toBeOnTheScreen();
+    expect(view.queryByText('9月7日（月）')).toBeNull();
+  });
+  it('1日の多数終日予定は高さを制限して全件をスクロールでき発生回を編集する', async () => {
+    const onEditEvent = jest.fn();
+    const items = Array.from({ length: 12 }, (_, index) => ({ ...allDayItem, id: `series:${index}`, eventId: 'series',
+      originalOccurrenceDate: '2026-09-08', title: `予定${index}`, accessibilityLabel: `予定${index}、終日` }));
+    const view = await render(<TwoDayView visibleDayCount={1} strip={[prevBuffer, { ...day1, allDayItems: items }, day2]}
+      bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={{}} onCarouselLayout={jest.fn()} onEditEvent={onEditEvent} />);
+    await fireEvent(view.getByTestId('single-day-calendar'), 'layout', { nativeEvent: { layout: { width: 390, height: 420 } } });
+    expect(StyleSheet.flatten(view.getByTestId('single-day.all-day.2026-09-08').props.style).height).toBeLessThanOrEqual(140);
+    const region = within(view.getByTestId('single-day.all-day.2026-09-08'));
+    expect(region.getAllByRole('button')).toHaveLength(12);
+    await userEvent.setup().press(region.getByRole('button', { name: '予定11、終日' }));
+    expect(onEditEvent).toHaveBeenCalledWith('series', '2026-09-08');
+  });
   it('予備列を含む全列を横並びで描画し、共通24時間軸・予定・空状態・祝日未対応を示す', async () => {
     const view = await renderTwoDayView({
       now: () => new Date(2026, 8, 8, 10, 0),

@@ -1,5 +1,5 @@
 import { render, screen, userEvent } from '@testing-library/react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import IndexRoute from '../index';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
@@ -7,7 +7,8 @@ import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context
 import { useCalendarView, type CalendarViewState } from '@/features/calendar/hooks/use-calendar-view';
 
 jest.mock('@/global.css', () => ({}));
-jest.mock('expo-router', () => ({ useRouter: jest.fn() }));
+jest.mock('expo-router', () => ({ useRouter: jest.fn(), useLocalSearchParams: jest.fn(() => ({})) }));
+jest.mock('@/features/calendar/components/calendar-day-preview', () => ({ CalendarDayPreview: () => null }));
 
 jest.mock('expo-device', () => ({ isDevice: false }));
 
@@ -79,6 +80,21 @@ jest.mock('@/components/themed-view', () => ({
 jest.mock('@/components/web-badge', () => ({ WebBadge: () => null }));
 
 describe('ホームルート', () => {
+  it('初回URLの日付を最初の取得へ渡し、履歴を追加せず1日表示へ切り替える', async () => {
+    const showDay = jest.fn().mockResolvedValue(true);
+    const setParams = jest.fn();
+    jest.mocked(useLocalSearchParams).mockReturnValue({ day: '2026-12-31', request: 'preview-a' });
+    jest.mocked(useRepositories).mockReturnValue({} as ReturnType<typeof useRepositories>);
+    jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged: jest.fn() });
+    jest.mocked(useCalendarView).mockReturnValue({ status: 'ready', mode: 'day', isPeriodLoading: false, showDay } as unknown as CalendarViewState);
+    jest.mocked(useRouter).mockReturnValue({ setParams } as unknown as ReturnType<typeof useRouter>);
+    await render(<IndexRoute />);
+    expect(useCalendarView).toHaveBeenLastCalledWith(expect.objectContaining({ initialDay: '2026-12-31' }));
+    expect(showDay).toHaveBeenCalledWith('2026-12-31');
+    await screen.findByText('カレンダー画面:day');
+    expect(setParams).toHaveBeenCalledWith({ day: undefined, request: undefined });
+    jest.mocked(useLocalSearchParams).mockReturnValue({});
+  });
   it('Repositoryと祝日providerを組み立てて画面へ状態だけを渡す', async () => {
     const user = userEvent.setup();
     const push = jest.fn();

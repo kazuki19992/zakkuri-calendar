@@ -1,6 +1,6 @@
 # 1日ビューの時間軸表示と常用モード
 
-状態: 設計確認待ち。実装未着手。
+状態: 承認済み。Issue #50で実装。実機での外観・操作・iOSプレビューの履歴確認は未実施。
 
 ## 1. 目的と合意範囲
 
@@ -30,7 +30,7 @@
 
 前後日移動、day／month／twoDayの切替はすべてメイン画面内の状態変更とし、ナビゲーションの履歴へ追加しない。Androidのシステム戻るにも「dayからmonthへ戻す」特別処理を設けない。予定作成・編集と設定画面の既存の戻る操作は維持し、閉じた先は表示中のdayとする。
 
-既存 `/calendar/day/[date]` は通常の遷移先として使わない。旧URLから直接開かれた場合だけ対象日のメインday表示へ履歴を残さず正規化する互換入口にする。不正日付では安全なエラーとメインカレンダーへの導線を提供する。main画面が背後にある場合も同じmainを重複して積まない。
+通常タップはroute遷移を使わない。既存 `/calendar/day/[date]` は旧URLの互換入口とiOSプレビュー確定時の内部中継に使う。フォーカスされたときだけ `dismissTo` で対象日のメインday表示へ正規化する。先読み中はmodeや設定へ触れず、確定後の中継履歴は残さない。不正日付では安全なエラーとメインカレンダーへの導線を提供する。main画面が背後にある場合も同じmainを重複して積まない。
 
 ## 4. 画面構成
 
@@ -80,9 +80,9 @@ snapshotにはdefinitions、未定時間設定、calendar色、表示ON/OFF、�
 
 月セルの `Link.Preview` にはカスタムchildrenとしてコンパクトな日付・祝日・予定一覧を渡す。長押し表示だけでメイン画面のmode・選択日・永続化設定を変更しない。狭いpreviewへ24時間を圧縮せず、予定名と時間表現を読めることを優先する。
 
-previewでは追加・編集・日移動・ピンチのアプリ操作は無効とする。OSでpreviewを確定した場合は、既存mainをリンク先とし、day／date要求を渡して同じday切替を実行する。リンク先へ1日詳細画面を追加しない。main側は要求を一度だけ処理し、snapshot成功後にmodeを保存する。要求済みparamsが後のメニュー切替・日移動を巻き戻さないよう消費・無効化する。
+previewでは追加・編集・日移動・ピンチのアプリ操作は無効とする。OSでpreviewを確定した場合は、中継routeから既存mainへ履歴を閉じ、day／date要求を渡して同じday切替を実行する。中継は本文・戻るヘッダーを持たず、先読み中は要求を渡さない。main側は要求を一度だけ処理し、snapshot成功後にmodeを保存する。要求済みparamsが後のメニュー切替・日移動を巻き戻さないよう消費・無効化する。
 
-iOSの通常タップとpreview確定が二重にday切替を実行しないよう、入口ごとのイベント経路と要求IDを整理する。Androidの通常タップは直接同じday切替callbackを使う。[SDK 57のLink.Preview](https://docs.expo.dev/versions/v57.0.0/sdk/router/link/)はカスタムchildrenに対応するが、現在インストール済みの`LinkWithPreview`実装は`replace`との併用を明示的に拒否する。このためpreview付きLinkへ`replace`を付ける設計にはしない。確定時の既存mainへのnavigateで画面が再利用されること、旧snapshotが保持されること、戻る履歴・main重複が生じないことを実装時に検証する。OS上の確認項目にも含める。
+iOSの通常タップとpreview確定が二重にday切替を実行しないよう、入口ごとのイベント経路と要求IDを整理する。Androidの通常タップは直接同じday切替callbackを使う。[SDK 57のLink.Preview](https://docs.expo.dev/versions/v57.0.0/sdk/router/link/)はカスタムchildrenに対応するが、現在インストール済みの`LinkWithPreview`実装は`replace`との併用を明示的に拒否する。このためpreview付きLinkへ`replace`を付ける設計にはしない。さらにインストール済みRouterはカスタムpreviewでも遷移先を先読みし、preview確定では新しいroute keyを使用する。mainを直接リンク先にすると先読み時の設定変更や元snapshot喪失が起こるため、フォーカス時だけ `dismissTo` する中継を使う。RouterのPOP_TO実装で既存mainのkey保持と中継履歴除去を確認した。確定アニメーションとnative stackの同期は実機確認項目とする。OS上の確認項目にも含める。
 
 ## 9. コンポーネント境界
 
@@ -91,7 +91,7 @@ iOSの通常タップとpreview確定が二重にday切替を実行しないよ�
 - feature hook: carouselの列幅計算を表示日数1／2へ対応させる。既存useTwoDayCarouselの契約を保つwrapperまたは互換既定値で2日表示を維持する。
 - feature UI: 時間軸・zoom・列描画は実際に共用する部分だけを抽出する。1日と2日で終日欄を差し替えられる構成とする。
 - 共通UIは実際に複数画面で共用するものだけ `src/shared/components`。カレンダー専用の時間軸・計算は `src/features/calendar` に維持する。
-- route: mainはday／date要求の検証とfeature hookへの組立を担当する。旧 `/calendar/day/[date]` は互換入口としてmainへ正規化し、通常画面の戻る履歴を作らない。
+- route: mainはday／date要求の検証とfeature hookへの組立を担当する。旧 `/calendar/day/[date]` は互換入口・preview内部中継としてフォーカス時だけmainへ正規化し、通常画面の戻る履歴を作らない。
 
 新しいカレンダーライブラリ・native依存・global storeは追加しない。2日ビュー全体の大規模な作り直しを避け、共有化には既存のレイアウト・gesture・日跨ぎテストを伴わせる。
 

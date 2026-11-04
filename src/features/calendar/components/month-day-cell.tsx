@@ -2,15 +2,18 @@ import { Link } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { MonthDayViewModel } from '../month-view-model';
 import { useTheme } from '@/hooks/use-theme';
+import { useId, type ReactNode } from 'react';
 
 export type MonthDayCellProps = Readonly<{
   day: MonthDayViewModel;
   onPress(date: string): void;
   onOpenDay?(date: string): void;
   variant?: 'month' | 'picker';
+  renderDayPreview?(date: string): ReactNode;
 }>;
 
-export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: MonthDayCellProps) {
+export function MonthDayCell({ day, onPress, onOpenDay, renderDayPreview, variant = 'month' }: MonthDayCellProps) {
+  const requestId = useId();
   const theme = useTheme();
   const isHoliday = day.holidayName !== null || day.weekday === 0;
   const isSaturday = day.weekday === 6;
@@ -20,8 +23,9 @@ export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: Mon
       accessibilityRole="button"
       accessibilityLabel={onOpenDay === undefined ? day.accessibilityLabel : `${day.accessibilityLabel}を開く`}
       accessibilityState={{ selected: day.isSelected }}
-      onPress={() => {
-        if (Platform.OS !== 'ios' && onOpenDay !== undefined) {
+      onPress={(event) => {
+        if (onOpenDay !== undefined) {
+          event?.preventDefault?.();
           onOpenDay(day.date);
           return;
         }
@@ -75,9 +79,9 @@ export function MonthDayCell({ day, onPress, onOpenDay, variant = 'month' }: Mon
   if (onOpenDay === undefined || Platform.OS !== 'ios') return content;
   return (
     <View testID={`month-calendar.day-link.${day.date}`} style={styles.linkCell}>
-      <Link href={{ pathname: '/calendar/day/[date]', params: { date: day.date } }}>
+      <Link href={{ pathname: '/calendar/day/[date]', params: { date: day.date, request: requestId } }}>
         <Link.Trigger>{content}</Link.Trigger>
-        <Link.Preview />
+        <Link.Preview>{renderDayPreview?.(day.date)}</Link.Preview>
       </Link>
     </View>
   );

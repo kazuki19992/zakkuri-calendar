@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 import type { Calendar } from '@/domain/calendar/calendar';
 import type { CalendarViewMode } from '@/domain/calendar/calendar-view-mode';
 import type { CalendarEvent } from '@/domain/calendar/event';
@@ -10,6 +11,7 @@ import type {
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
 import { useCalendarView } from '../use-calendar-view';
+import { useCalendarDayRequest } from '../use-calendar-day-request';
 
 const calendar: Calendar = {
   id: 'personal-default',
@@ -109,6 +111,110 @@ function createDependencies() {
 }
 
 describe('カレンダー表示の状態調整', () => {
+  beforeEach(() => {
+    jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
+  });
+  it('初回URLはsnapshotを一度だけ取得し、表示成功後に保存して要求を消費する', async () => {
+    const dependencies = createDependencies();
+    dependencies.events.listSchedule.mockResolvedValueOnce({ events: [], exceptions: [], replacementEvents: [] })
+      .mockRejectedValue(new Error('2回目は失敗する'));
+    const clearRequest = jest.fn();
+    const { result } = await renderHook(() => {
+      const state = useCalendarView({ ...dependencies, initialDay: '2026-12-31', now: () => new Date(2026, 8, 8, 12) });
+      useCalendarDayRequest({ day: '2026-12-31', request: 'initial', ready: state.status === 'ready' && !state.isViewModeUpdating,
+        isPeriodLoading: state.isPeriodLoading, showDay: state.showDay, clearRequest });
+      return state;
+    });
+    await waitFor(() => expect(clearRequest).toHaveBeenCalledTimes(1));
+    expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(1);
+    expect(dependencies.settings.setLastCalendarViewMode).toHaveBeenCalledWith('day', expect.any(String));
+    expect(result.current.periodError).toBeNull();
+  });
+  it('別モードの保存中に来たURL要求は保存完了まで待ってから適用する', async () => {
+    const dependencies = createDependencies();
+    const saved = createDeferred<void>();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('month');
+    dependencies.settings.setLastCalendarViewMode.mockReturnValueOnce(saved.promise);
+    const clearRequest = jest.fn();
+    const { result, rerender } = await renderHook(({ day }: { day?: string }) => {
+      const state = useCalendarView({ ...dependencies, now: () => new Date(2026, 8, 8, 12) });
+      useCalendarDayRequest({ day, request: 'a', ready: state.status === 'ready' && !state.isViewModeUpdating,
+        isPeriodLoading: state.isPeriodLoading, showDay: state.showDay, clearRequest });
+      return state;
+    }, { initialProps: { day: undefined } });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    let switching!: Promise<boolean>;
+    await act(async () => { switching = result.current.selectMode('twoDay'); });
+    await waitFor(() => expect(result.current.mode).toBe('twoDay'));
+    await rerender({ day: '2026-12-31' });
+    expect(clearRequest).not.toHaveBeenCalled();
+    await act(async () => { saved.resolve(); await switching; });
+    await waitFor(() => expect(result.current.anchorDate).toBe('2026-12-31'));
+    expect(result.current.mode).toBe('day');
+    expect(clearRequest).toHaveBeenCalledTimes(1);
+  });
+  it('日付をまたいで復帰したら表示日を維持して今日判定だけを更新する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('day');
+    let current = new Date(2026, 8, 8, 23, 59);
+    let onChange!: (state: AppStateStatus) => void;
+    const listener = jest.spyOn(AppState, 'addEventListener').mockImplementation((_, handler) => {
+      onChange = handler;
+      return { remove: jest.fn() };
+    });
+    const { result } = await renderHook(() => useCalendarView({ ...dependencies, now: () => current }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const pending = createDeferred<Awaited<ReturnType<EventRepository['listSchedule']>>>();
+    dependencies.events.listSchedule.mockReturnValueOnce(pending.promise);
+    let moving!: Promise<boolean>;
+    await act(async () => { moving = result.current.showNextPeriod(); });
+    current = new Date(2026, 8, 9, 0, 1);
+    await act(() => onChange('active'));
+    expect(result.current.today).toBe('2026-09-09');
+    expect(result.current.anchorDate).toBe('2026-09-08');
+    expect(result.current.dayStrip[1].isToday).toBe(false);
+    await act(async () => { pending.resolve({ events: [], exceptions: [], replacementEvents: [] }); await moving; });
+    expect(result.current.today).toBe('2026-09-09');
+    expect(result.current.dayStrip[1].isToday).toBe(true);
+    listener.mockRestore();
+  });
+  it('保存済みdayを今日の3列stripとして復元し1日ずつ移動する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('day');
+    const { result } = await renderHook(() => useCalendarView({ ...dependencies, now: () => new Date(2026, 8, 30, 12) }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.mode).toBe('day');
+    expect(result.current.dayStrip.map((day) => day.date)).toEqual(['2026-09-29', '2026-09-30', '2026-10-01']);
+    expect(dependencies.events.listSchedule).toHaveBeenCalledWith(calendar.id, '2026-09-28', '2026-10-01');
+    await act(async () => { await result.current.showNextPeriod(); });
+    expect(result.current.anchorDate).toBe('2026-10-01');
+  });
+  it('URLの対象日は保存済みモードより優先して最初のsnapshotから取得する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('month');
+    const { result } = await renderHook(() => useCalendarView({ ...dependencies, initialDay: '2026-12-31', now: () => new Date(2026, 8, 8, 12) }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current).toMatchObject({ mode: 'day', anchorDate: '2026-12-31', selectedDate: '2026-12-31' });
+    expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(1);
+    expect(dependencies.events.listSchedule).toHaveBeenCalledWith(calendar.id, '2026-12-29', '2027-01-01');
+    expect(dependencies.settings.getLastCalendarViewMode).not.toHaveBeenCalled();
+    await act(async () => { await result.current.showNextPeriod(); });
+    expect(result.current.anchorDate).toBe('2027-01-01');
+  });
+  it('月の日付からdayへ原子的に切り替え、失敗時は月と選択日を維持する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('month');
+    const { result } = await renderHook(() => useCalendarView({ ...dependencies, now: () => new Date(2026, 8, 8, 12) }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    dependencies.events.listSchedule.mockRejectedValueOnce(new Error('failed'));
+    await act(async () => { expect(await result.current.showDay('2026-10-01')).toBe(false); });
+    expect(result.current.mode).toBe('month');
+    expect(result.current.selectedDate).toBe('2026-09-08');
+    expect(dependencies.settings.setLastCalendarViewMode).not.toHaveBeenCalled();
+    await act(async () => { expect(await result.current.showDay('2026-10-01')).toBe(true); });
+    expect(result.current).toMatchObject({ mode: 'day', anchorDate: '2026-10-01', selectedDate: '2026-10-01' });
+    expect(dependencies.settings.setLastCalendarViewMode).toHaveBeenCalledWith('day', expect.any(String));
+  });
   it('祝日カレンダー無効時は祝日を隠して予定を維持する', async () => {
     const dependencies = createDependencies();
     dependencies.settings.getHolidayPreferences.mockResolvedValue({ version: 1, calendarId: 'none', adjustThisWeekDeadline: false });

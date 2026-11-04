@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react-native';
-import { Animated } from 'react-native';
+import { Animated, PanResponder, type GestureResponderEvent, type PanResponderGestureState } from 'react-native';
 import { shouldCaptureTwoDaySwipe, useTwoDayCarousel } from '../use-two-day-carousel';
 
 function collectValues(value: Animated.Value): number[] {
@@ -9,6 +9,27 @@ function collectValues(value: Animated.Value): number[] {
 }
 
 describe('2日ビューの予備列付きスワイプカルーセル', () => {
+  it('スワイプ捕捉後に2本指へ変わった操作は日移動に確定しない', async () => {
+    const create = jest.spyOn(PanResponder, 'create');
+    const onNext = jest.fn().mockResolvedValue(true);
+    await renderHook(() => useTwoDayCarousel({ onPrevious: jest.fn(), onNext,
+      reduceMotion: true, bufferDays: 1, leadingDate: '2026-09-07', visibleDayCount: 1 }));
+    const handlers = create.mock.calls[0][0];
+    const event = {} as GestureResponderEvent;
+    const gesture: PanResponderGestureState = { stateID: 1, moveX: 0, moveY: 0, x0: 0, y0: 0, dx: -100, dy: 0, vx: -1, vy: 0, numberActiveTouches: 1, _accountsForMovesUpTo: 0 };
+    await act(() => {
+      handlers.onPanResponderGrant?.(event, gesture);
+      handlers.onPanResponderMove?.(event, { ...gesture, numberActiveTouches: 2 });
+      handlers.onPanResponderRelease?.(event, { ...gesture, numberActiveTouches: 0 });
+    });
+    expect(onNext).not.toHaveBeenCalled();
+  });
+  it('1日表示では計測幅全体を1列へ割り当てる', async () => {
+    const { result } = await renderHook(() => useTwoDayCarousel({ onPrevious: jest.fn(), onNext: jest.fn(),
+      reduceMotion: true, bufferDays: 1, leadingDate: '2026-09-07', visibleDayCount: 1 }));
+    await act(() => result.current.onLayout(390));
+    expect(result.current.columnWidth).toBe(390);
+  });
   afterEach(() => jest.restoreAllMocks());
 
   it('計測した幅の半分を1列の幅にし、予備列分だけ左へ寄せた基準位置で静止する', async () => {

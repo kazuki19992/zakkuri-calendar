@@ -19,7 +19,9 @@ export type UseTwoDayCarouselInput = Readonly<{
    * ジャンプではなく瞬時の同期として基準位置へ戻す。
    */
   leadingDate: string;
-  visibleDayCount?: 1 | 2;
+  visibleDayCount?: 1 | 2 | 7;
+  stepDays?: 1 | 7;
+  navigationKey?: unknown;
 }>;
 
 export type TwoDayCarousel = Readonly<{
@@ -30,6 +32,7 @@ export type TwoDayCarousel = Readonly<{
   movePrevious(): Promise<boolean>;
   moveNext(): Promise<boolean>;
   isAnimating: boolean;
+  isDragging: boolean;
   onLayout(width: number): void;
 }>;
 
@@ -46,10 +49,27 @@ export function shouldCaptureTwoDaySwipe(
 // 1本指で捕捉した後でも、2本指になった操作全体をpinchとして扱う。
 function createTouchSession() {
   let multiTouch = false;
+  let gestureVersion = 0;
+  let active = false;
   return {
-    reset() { multiTouch = false; },
+    reset(version = 0) { multiTouch = false; gestureVersion = version; active = true; },
+    isActive() { return active; },
+    finish() { active = false; },
+    version() { return gestureVersion; },
     observe(count: number) { if (count > 1) multiTouch = true; return multiTouch; },
     isMultiTouch() { return multiTouch; },
+  };
+}
+
+function createOperationVersion() {
+  let version = 0;
+  let awaitingCallback = false;
+  return {
+    current: () => version,
+    arm() { awaitingCallback = true; },
+    callbackStarted() { awaitingCallback = false; },
+    awaitingCallback: () => awaitingCallback,
+    invalidate() { version += 1; awaitingCallback = false; },
   };
 }
 
@@ -64,51 +84,59 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
   const [translateX] = useState(() => new Animated.Value(0));
   const [width, setWidth] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [operation] = useState(createOperationVersion);
   const [transitionGate] = useState(() => createTransitionGate());
   const [touchSession] = useState(createTouchSession);
   const columnWidth = width / (input.visibleDayCount ?? 2);
   const baseOffset = -input.bufferDays * columnWidth;
 
-  // 計測幅が変わるたび、表示2日がちょうど収まる基準位置へ即座に合わせる。
+  // 新しい要求は遅延callbackを無効化する。自分自身の取得開始では予備列を戻さない。
   useLayoutEffect(() => {
+    if (!operation.awaitingCallback()) return;
+    operation.invalidate();
+    translateX.stopAnimation();
     translateX.setValue(baseOffset);
-  }, [baseOffset, translateX]);
+  }, [input.navigationKey, baseOffset, operation, translateX]);
 
-  // 移動が確定してストリップの先頭日が変わったら、描画と同じタイミングで
-  // 基準位置へ同期する。予備列はすでに正しい内容で描画済みのため、
-  // 見た目のピクセルは変わらず、跳躍として見えない。
   useLayoutEffect(() => {
+    operation.invalidate();
+    translateX.stopAnimation();
     translateX.setValue(baseOffset);
-    // baseOffsetは幅変更時の上のeffectで既に反映されるため、
-    // ここではleadingDateの変化だけを検知したい。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input.leadingDate]);
+    return () => operation.invalidate();
+  }, [input.leadingDate, baseOffset, operation, translateX]);
 
   const move = useCallback(
     async (direction: SwipeDirection): Promise<boolean> => {
       if (!transitionGate.tryEnter()) return false;
       setIsAnimating(true);
+      operation.arm();
+      const version = operation.current();
       const callback = direction === 'previous' ? input.onPrevious : input.onNext;
-      const target = direction === 'previous' ? baseOffset + columnWidth : baseOffset - columnWidth;
+      const stepWidth = columnWidth * (input.stepDays ?? 1);
+      const target = direction === 'previous' ? baseOffset + stepWidth : baseOffset - stepWidth;
       try {
         if (!input.reduceMotion) await runAnimation(translateX, target);
         else translateX.setValue(target);
+        if (version !== operation.current()) return false;
+        operation.callbackStarted();
         const succeeded = await callback();
-        if (!succeeded) {
+        if (!succeeded && version === operation.current()) {
           // 取得に失敗した場合は先頭日が変わらないため、ここで基準位置へ戻す。
           if (!input.reduceMotion) await runAnimation(translateX, baseOffset);
           else translateX.setValue(baseOffset);
         }
         return succeeded;
       } catch {
-        translateX.setValue(baseOffset);
+        if (version === operation.current()) translateX.setValue(baseOffset);
         return false;
       } finally {
+        operation.callbackStarted();
         transitionGate.leave();
         setIsAnimating(false);
       }
     },
-    [baseOffset, columnWidth, input.onNext, input.onPrevious, input.reduceMotion, transitionGate, translateX],
+    [baseOffset, columnWidth, input.onNext, input.onPrevious, input.reduceMotion, input.stepDays, transitionGate, translateX, operation],
   );
 
   const movePrevious = useCallback(() => move('previous'), [move]);
@@ -116,28 +144,37 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
 
   const panResponder = useMemo(
     () => PanResponder.create({
-        onMoveShouldSetPanResponderCapture: (_, gesture) => shouldCaptureTwoDaySwipe(gesture, isAnimating),
-        onPanResponderGrant: () => touchSession.reset(),
+        onMoveShouldSetPanResponderCapture: (_, gesture) => shouldCaptureTwoDaySwipe(gesture, isAnimating || touchSession.isActive()),
+        onPanResponderGrant: () => { touchSession.reset(operation.current()); operation.arm(); setIsDragging(true); },
+        onPanResponderStart: (_, gesture) => { touchSession.observe(gesture.numberActiveTouches); },
         onPanResponderMove: (_, gesture) => {
+          if (touchSession.version() !== operation.current()) return;
           if (touchSession.observe(gesture.numberActiveTouches)) { translateX.setValue(baseOffset); return; }
           if (!isAnimating) translateX.setValue(baseOffset + gesture.dx);
         },
         onPanResponderRelease: (_, gesture) => {
-          if (touchSession.isMultiTouch()) { translateX.setValue(baseOffset); return; }
+          if (touchSession.version() !== operation.current()) { touchSession.finish(); setIsDragging(false); return; }
+          if (touchSession.isMultiTouch()) { translateX.setValue(baseOffset); operation.callbackStarted(); touchSession.finish(); setIsDragging(false); return; }
           const direction = getSwipeDirection(gesture);
           if (direction === null) {
-            if (input.reduceMotion) translateX.setValue(baseOffset);
-            else void runAnimation(translateX, baseOffset);
+            if (input.reduceMotion) { translateX.setValue(baseOffset); operation.callbackStarted(); touchSession.finish(); setIsDragging(false); }
+            else void runAnimation(translateX, baseOffset).finally(() => { operation.callbackStarted(); touchSession.finish(); setIsDragging(false); });
             return;
           }
           void move(direction);
+          touchSession.finish();
+          setIsDragging(false);
         },
         onPanResponderTerminate: () => {
+          touchSession.finish();
+          setIsDragging(false);
+          operation.callbackStarted();
+          if (touchSession.version() !== operation.current()) return;
           if (input.reduceMotion) translateX.setValue(baseOffset);
           else void runAnimation(translateX, baseOffset);
         },
       }),
-    [baseOffset, input.reduceMotion, isAnimating, move, translateX, touchSession],
+    [baseOffset, input.reduceMotion, isAnimating, move, translateX, touchSession, operation],
   );
 
   return {
@@ -147,6 +184,7 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
     movePrevious,
     moveNext,
     isAnimating,
+    isDragging,
     onLayout: (layoutWidth) => {
       setWidth(Math.max(layoutWidth, 1));
     },

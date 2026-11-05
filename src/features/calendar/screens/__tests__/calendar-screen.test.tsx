@@ -6,6 +6,7 @@ import { Colors } from '@/constants/theme';
 import type { CalendarViewState } from '../../hooks/use-calendar-view';
 import { useTwoDayCarousel } from '../../hooks/use-two-day-carousel';
 import { CalendarScreen } from '../calendar-screen';
+import { offsetCalendarDate } from '@/domain/calendar/month';
 
 // iPhoneのノッチ・ホームインジケーター相当の値を固定し、セーフエリア適用を検証できるようにする。
 const safeAreaMetrics: Metrics = {
@@ -97,10 +98,10 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
   return {
     status: 'ready', mode: 'twoDay', today: '2026-09-08', anchorDate: '2026-09-08',
     visibleMonth: '2026-09-01', selectedDate: '2026-09-08',
-    twoDayDays, twoDayStrip, dayStrip: twoDayStrip.slice(0, 3),
+    twoDayDays, twoDayStrip, dayStrip: twoDayStrip.slice(0, 3), weekStrip: [],
     monthDays: [], monthWeeks: [], datePickerMonth: '2026-09-01', datePickerDays: [],
     selectedAgendaItems: [], selectedHolidayName: null,
-    holidaySupport: 'available', isPeriodLoading: false, isViewModeUpdating: false, periodError: null,
+    holidaySupport: 'available', isPeriodLoading: false, navigationRevision: 0, isViewModeUpdating: false, periodError: null,
     viewModePersistenceError: null,
     isDatePickerLoading: false, datePickerError: null,
     calendarName: 'マイカレンダー', calendarColorId: 'blue', isCalendarVisible: true,
@@ -111,6 +112,28 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
 
 describe('カレンダー画面', () => {
   beforeEach(() => jest.clearAllMocks());
+  it('picker読込や表示設定の再描画ではカルーセルのナビゲーショントークンを変えない', async () => {
+    const state = createState();
+    const view = await renderWithSafeArea(<CalendarScreen state={state} onAddEvent={jest.fn()} />);
+    const originalKey = jest.mocked(useTwoDayCarousel).mock.calls.at(-1)?.[0].navigationKey;
+    await view.rerender(<SafeAreaProvider initialMetrics={safeAreaMetrics}>
+      <CalendarScreen state={{ ...state, isDatePickerLoading: true, isCalendarVisibilityUpdating: true }} onAddEvent={jest.fn()} />
+    </SafeAreaProvider>);
+    expect(jest.mocked(useTwoDayCarousel).mock.calls.at(-1)?.[0].navigationKey).toBe(originalKey);
+  });
+  it('週モードの範囲と週移動を表示し日付から履歴なしで1日へ切り替える', async () => {
+    const weekStrip = Array.from({ length: 21 }, (_, index) => ({ ...twoDayDays[0],
+      date: offsetCalendarDate('2026-09-07', index - 7), isToday: index === 8 }));
+    const state = createState({ mode: 'week', weekStrip });
+    const user = userEvent.setup();
+    await renderWithSafeArea(<CalendarScreen state={state} onAddEvent={jest.fn()} />);
+    expect(screen.getByText('9月7日〜9月13日')).toBeOnTheScreen();
+    expect(useTwoDayCarousel).toHaveBeenLastCalledWith(expect.objectContaining({ visibleDayCount: 7, stepDays: 7, bufferDays: 7 }));
+    await user.press(within(screen.getByTestId('week-day-header.2026-09-08')).getByRole('button'));
+    expect(state.showDay).toHaveBeenCalledWith('2026-09-08');
+    await user.press(screen.getByRole('button', { name: '前週へ移動' }));
+    expect(jest.mocked(useTwoDayCarousel).mock.results.at(-1)?.value.movePrevious).toHaveBeenCalledTimes(1);
+  });
 
   it('1日モードは一列時間軸と前後日操作を表示する', async () => {
     const user = userEvent.setup();
@@ -144,6 +167,7 @@ describe('カレンダー画面', () => {
       onNext: state.showNextPeriod,
       reduceMotion: false,
       bufferDays: 1,
+      navigationKey: state.navigationRevision,
       leadingDate: '2026-09-07',
     });
     await user.press(screen.getByRole('button', { name: '予定を追加' }));

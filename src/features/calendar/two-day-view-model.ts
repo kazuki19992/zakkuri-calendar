@@ -3,7 +3,7 @@ import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/constants/event-col
 import { offsetCalendarDate, type TwoDayRange } from '@/domain/calendar/month';
 import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
-import { getDay, parse } from 'date-fns';
+import { differenceInCalendarDays, getDay, parse } from 'date-fns';
 import {
   createAgendaItems,
   getHolidayInfo,
@@ -136,7 +136,8 @@ export function createDayViewModel(
       eventId: item.eventId,
       colorId: occurrence?.event.colorId ?? input.calendarColorId,
       isInteractive: true,
-      ...(rangePosition === null ? {} : { rangePosition }),
+      ...(rangePosition === null || occurrence === undefined ? {} : { rangePosition,
+        rangeStartDate: occurrence.occurrenceStartDate, rangeThroughDate: occurrence.occurrenceThroughDate }),
       ...(isFuzzyRange && occurrence !== undefined ? {
         rangeStartDate: occurrence.occurrenceStartDate,
         rangeThroughDate: occurrence.occurrenceThroughDate,
@@ -189,7 +190,7 @@ export function createDayViewModel(
 const ALL_DAY_LANE_LIMIT = 2;
 
 /** 予備列を含む日付列を横断して、同じ予定を一本の帯へまとめる。 */
-export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[]): TwoDayAllDayLayout {
+export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[], laneLimit = ALL_DAY_LANE_LIMIT, useSavedRangePriority = false): TwoDayAllDayLayout {
   const candidates: { item: TwoDayAllDayItemViewModel; startIndex: number; endIndex: number }[] = [];
   const consumed = new Set<string>();
   strip.forEach((day, dayIndex) => day.allDayItems.forEach((item) => {
@@ -208,14 +209,17 @@ export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[]): Two
       candidate.item.rangePosition !== undefined || candidate.endIndex > candidate.startIndex
         ? 0
         : candidate.item.kind === 'holiday' ? 1 : 2;
+    const duration = (candidate: typeof a, fallback: number) => candidate.item.rangeStartDate !== undefined && candidate.item.rangeThroughDate !== undefined
+      ? differenceInCalendarDays(parse(candidate.item.rangeThroughDate, 'yyyy-MM-dd', new Date()), parse(candidate.item.rangeStartDate, 'yyyy-MM-dd', new Date()))
+      : fallback;
     return priority(a) - priority(b)
-      || bSpan - aSpan
-      || a.startIndex - b.startIndex
+      || (useSavedRangePriority ? duration(b, bSpan) - duration(a, aSpan) : bSpan - aSpan)
+      || (useSavedRangePriority ? (a.item.rangeStartDate ?? strip[a.startIndex].date).localeCompare(b.item.rangeStartDate ?? strip[b.startIndex].date) : a.startIndex - b.startIndex)
       || a.item.id.localeCompare(b.item.id);
   });
 
   const laneOccupancies: { startIndex: number; endIndex: number }[][] = Array.from(
-    { length: ALL_DAY_LANE_LIMIT },
+    { length: Math.max(0, Math.floor(laneLimit)) },
     () => [],
   );
   const hiddenCounts = Array.from({ length: strip.length }, () => 0);

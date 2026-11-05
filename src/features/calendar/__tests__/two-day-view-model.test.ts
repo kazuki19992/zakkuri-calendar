@@ -364,6 +364,18 @@ describe('2日ビューのスワイプ用予備列', () => {
 });
 
 describe('2日表示の終日レーン', () => {
+  it('2日表示は従来どおり表示区間の長い帯を優先し、週だけ保存期間で並べる', () => {
+    const ranges = [['a', '2026-10-01', '2026-11-04'], ['b', '2026-11-04', '2026-11-06'], ['c', '2026-11-04', '2026-11-07']];
+    const strip = ['2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06'].map((date) => ({
+      date, dateLabel: date, weekdayLabel: '火', isToday: false, holidayName: null, holidaySupport: 'available' as const,
+      timelineItems: [], accessibilityLabel: date, allDayItems: ranges.filter(([, from, through]) => date >= from && date <= through).map(([id, from, through]) => ({
+        kind: 'event' as const, id, eventId: id, colorId: 'red' as const, title: id, temporalLabel: '終日', accessibilityLabel: id, isInteractive: true,
+        rangeStartDate: from, rangeThroughDate: through, rangePosition: date === from ? 'start' as const : date === through ? 'end' as const : 'middle' as const,
+      })),
+    }));
+    expect(createTwoDayAllDayLayout(strip).segments.map((segment) => segment.id)).toEqual(['b', 'c']);
+    expect(createTwoDayAllDayLayout(strip, 2, true).segments.map((segment) => segment.id)).toEqual(['a', 'c']);
+  });
   it('表示端で1日だけ見える複数日予定を祝日と単日予定より優先する', () => {
     const day = {
       date: '2026-09-08', dateLabel: '9月8日', weekdayLabel: '火', isToday: false,
@@ -384,5 +396,8 @@ describe('2日表示の終日レーン', () => {
 
     expect(layout.segments.map((segment) => segment.id)).toEqual(['z-multi', 'holiday:2026-09-08']);
     expect(layout.hiddenCounts).toEqual([1]);
+    expect(createTwoDayAllDayLayout([day], 1).segments.map((segment) => segment.id)).toEqual(['z-multi']);
+    expect(createTwoDayAllDayLayout([day], 1).hiddenCounts).toEqual([2]);
+    expect(createTwoDayAllDayLayout([day], 0)).toEqual({ segments: [], hiddenCounts: [3] });
   });
 });

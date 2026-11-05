@@ -114,6 +114,62 @@ describe('カレンダー表示の状態調整', () => {
   beforeEach(() => {
     jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   });
+  it('ナビゲーション開始だけでトークンを進め、picker・表示設定・refreshでは維持する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('week');
+    const { result, rerender } = await renderHook(({ revision }: { revision: number }) => useCalendarView({
+      ...dependencies, now: () => new Date(2026, 8, 8, 12), refreshRevision: revision,
+    }), { initialProps: { revision: 0 } });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const originalToken = result.current.navigationRevision;
+    expect(originalToken).toBe(0);
+    await act(async () => { await result.current.loadDatePickerMonth('2026-10-01'); });
+    expect(result.current.navigationRevision).toBe(originalToken);
+    await act(async () => { await result.current.setCalendarVisible(false); });
+    expect(result.current.navigationRevision).toBe(originalToken);
+    await rerender({ revision: 1 });
+    await waitFor(() => expect(result.current.isCalendarVisible).toBe(true));
+    expect(result.current.navigationRevision).toBe(originalToken);
+    await act(async () => { await result.current.showNextPeriod(); });
+    expect(result.current.navigationRevision).toBe(originalToken + 1);
+    await act(async () => { await result.current.showDay(result.current.anchorDate); });
+    expect(result.current.navigationRevision).toBe(originalToken + 2);
+    const loadCount = dependencies.events.listSchedule.mock.calls.length;
+    await act(async () => { await result.current.showDay(result.current.anchorDate); });
+    expect(result.current.navigationRevision).toBe(originalToken + 3);
+    expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(loadCount);
+  });
+  it('週を復元し22日分取得して21列を用意し7日ずつ移動する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('week');
+    const { result, rerender } = await renderHook(({ revision }: { revision: number }) => useCalendarView({ ...dependencies,
+      now: () => new Date(2027, 0, 1, 12), refreshRevision: revision }), { initialProps: { revision: 0 } });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.weekStrip).toHaveLength(21);
+    expect(result.current.weekStrip[7].date).toBe('2026-12-28');
+    expect(result.current.weekStrip[13].date).toBe('2027-01-03');
+    expect(dependencies.events.listSchedule).toHaveBeenCalledWith(calendar.id, '2026-12-20', '2027-01-10');
+    await act(async () => { await result.current.showNextPeriod(); });
+    expect(result.current.selectedDate).toBe('2027-01-08');
+    expect(result.current.weekStrip[7].date).toBe('2027-01-04');
+    dependencies.settings.getCalendarWeekStartsOn.mockResolvedValue(0);
+    await rerender({ revision: 1 });
+    await waitFor(() => expect(result.current.weekStrip[7].date).toBe('2027-01-03'));
+    expect(result.current.selectedDate).toBe('2027-01-08');
+  });
+
+  it('週の保存失敗では週を維持し、1日切替の取得失敗でも週と選択日を維持する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() => useCalendarView({ ...dependencies, now: () => new Date(2026, 8, 9, 12) }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    dependencies.settings.setLastCalendarViewMode.mockRejectedValueOnce(new Error('save failed'));
+    await act(async () => { expect(await result.current.selectMode('week')).toBe(true); });
+    expect(result.current.mode).toBe('week');
+    expect(result.current.viewModePersistenceError).not.toBeNull();
+    dependencies.events.listSchedule.mockRejectedValueOnce(new Error('load failed'));
+    await act(async () => { expect(await result.current.showDay('2026-09-12')).toBe(false); });
+    expect(result.current).toMatchObject({ mode: 'week', selectedDate: '2026-09-09' });
+  });
   it('初回URLはsnapshotを一度だけ取得し、表示成功後に保存して要求を消費する', async () => {
     const dependencies = createDependencies();
     dependencies.events.listSchedule.mockResolvedValueOnce({ events: [], exceptions: [], replacementEvents: [] })

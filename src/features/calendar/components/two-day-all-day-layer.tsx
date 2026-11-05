@@ -10,17 +10,19 @@ function withOpacity(color: string, opacity: number): string {
   return color;
 }
 
-export function TwoDayAllDayLayer({ layout, columnWidth, height, visibleStartIndex, visibleDayCount, onEditEvent }: Readonly<{
+export function TwoDayAllDayLayer({ layout, columnWidth, height, visibleStartIndex, visibleDayCount, top = 58, hideOffscreen = false, onEditEvent }: Readonly<{
   layout: TwoDayAllDayLayout;
   columnWidth: number;
   height: number;
   visibleStartIndex: number;
   visibleDayCount: number;
+  top?: number;
+  hideOffscreen?: boolean;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
 }>) {
   const theme = useTheme();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  return <View pointerEvents="box-none" style={[styles.layer, { height }]}>
+  return <View pointerEvents="box-none" style={[styles.layer, { height, top }]}>
     {layout.segments.map((segment) => {
       const { item } = segment;
       const color = item.colorId === 'holiday'
@@ -62,18 +64,19 @@ export function TwoDayAllDayLayer({ layout, columnWidth, height, visibleStartInd
       !segment.endsAtRangeEnd ? styles.continuesToNext : null];
       return item.isInteractive ? <Pressable key={segment.id}
         testID={segment.isFuzzyRange ? `two-day-calendar.fuzzy-range.${segment.id}` : `two-day-calendar.all-day-segment.${segment.id}`}
+        accessibilityElementsHidden={hideOffscreen && !overlapsVisibleRange} importantForAccessibility={hideOffscreen && !overlapsVisibleRange ? 'no-hide-descendants' : 'auto'}
         accessibilityRole="button" accessibilityLabel={item.accessibilityLabel}
         onPress={() => item.eventId === null ? undefined : item.originalOccurrenceDate === undefined
           ? onEditEvent?.(item.eventId)
           : onEditEvent?.(item.eventId, item.originalOccurrenceDate)}
         style={style}>{content}</Pressable>
-        : <View key={segment.id} accessible accessibilityRole="text" accessibilityLabel={item.accessibilityLabel} style={style}>{content}</View>;
+        : <View key={segment.id} accessibilityElementsHidden={hideOffscreen && !overlapsVisibleRange} importantForAccessibility={hideOffscreen && !overlapsVisibleRange ? 'no-hide-descendants' : 'auto'} accessible accessibilityRole="text" accessibilityLabel={item.accessibilityLabel} style={style}>{content}</View>;
     })}
   </View>;
 }
 
 const styles = StyleSheet.create({
-  layer: { position: 'absolute', top: 58, left: 0, right: 0 },
+  layer: { position: 'absolute', left: 0, right: 0 },
   segment: { position: 'absolute', height: 42, borderRadius: 3, paddingHorizontal: 6, justifyContent: 'center', overflow: 'hidden' },
   title: { fontSize: 11, fontWeight: '500' },
   time: { fontSize: 10, marginTop: 1 },

@@ -4,11 +4,11 @@ import {
 } from '../calendar-view-mode';
 
 describe('カレンダー表示モード', () => {
-  it.each(['day', 'twoDay', 'month'] as const)('既知の表示モード%sを受け入れる', (value) => {
+  it.each(['day', 'twoDay', 'week', 'month'] as const)('既知の表示モード%sを受け入れる', (value) => {
     expect(parseCalendarViewMode(value)).toBe(value);
   });
 
-  it.each([undefined, null, 'week', 2, {}, []])('不正値%pを拒否する', (value) => {
+  it.each([undefined, null, 'agenda', 2, {}, []])('不正値%pを拒否する', (value) => {
     expect(parseCalendarViewMode(value)).toBeNull();
   });
 

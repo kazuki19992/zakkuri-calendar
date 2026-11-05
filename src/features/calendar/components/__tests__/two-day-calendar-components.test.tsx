@@ -106,6 +106,43 @@ function renderTwoDayView(overrides: Partial<{
 }
 
 describe('2日カレンダー表示コンポーネント', () => {
+  it('別の列へ指を置いた複数指操作でも過去のタップを引き継がない', async () => {
+    const onCreateExactAt = jest.fn();
+    const view = await renderTwoDayView({ onCreateExactAt });
+    const root = view.getByTestId('two-day-calendar');
+    const [first, second] = view.getAllByTestId('two-day-calendar.timeline-column').slice(1, 3);
+    await fireEvent(first, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    await fireEvent(root, 'touchStart', { nativeEvent: { touches: [{}, {}] } });
+    await fireEvent(second, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    await fireEvent(root, 'touchStart', { nativeEvent: { touches: [{}] } });
+    await fireEvent(first, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    expect(onCreateExactAt).not.toHaveBeenCalled();
+  });
+  it('ダブルタップの途中に複数指操作が挟まっても予定を追加しない', async () => {
+    const onCreateExactAt = jest.fn();
+    const view = await renderTwoDayView({ onCreateExactAt });
+    const column = view.getAllByTestId('two-day-calendar.timeline-column')[1];
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    await fireEvent(column, 'touchStart', { nativeEvent: { touches: [{}, {}] } });
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: 100, touches: [{}] } });
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    expect(onCreateExactAt).not.toHaveBeenCalled();
+    await fireEvent(column, 'touchStart', { nativeEvent: { touches: [{}] } });
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    expect(onCreateExactAt).not.toHaveBeenCalled();
+  });
+  it('週表示は7列に密集予定の省略件数を示して対象日を開く', async () => {
+    const onOpenDay = jest.fn();
+    const weekStrip = Array.from({ length: 21 }, (_, index) => ({ ...day1, date: `2026-09-${String(index + 1).padStart(2, '0')}`,
+      timelineItems: [timelineItem, { ...timelineItem, id: 'second' }], allDayItems: [] }));
+    const view = await render(<TwoDayView visibleDayCount={7} strip={weekStrip} selectedDate="2026-09-08" bufferDays={7}
+      columnWidth={342 / 7} translateX={new Animated.Value(-342)} panHandlers={{}} onCarouselLayout={jest.fn()} onOpenDay={onOpenDay} />);
+    expect(view.getByTestId('week-calendar')).toBeOnTheScreen();
+    expect(view.getAllByText('他1件')).toHaveLength(7);
+    await userEvent.setup().press(within(view.getByTestId('week-day-header.2026-09-08')).getByRole('button'));
+    expect(onOpenDay).toHaveBeenCalledWith('2026-09-08');
+    expect(view.getAllByTestId('two-day-calendar.timeline-column')).toHaveLength(7);
+  });
   it('1日表示は予備列を含む3列で当日の件数と日付を表示する', async () => {
     const view = await render(<TwoDayView visibleDayCount={1} strip={[prevBuffer, { ...day1, allDayItems: [allDayItem] }, day2]}
       bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={{}} onCarouselLayout={jest.fn()} />);

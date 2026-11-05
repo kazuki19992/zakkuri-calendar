@@ -1,4 +1,6 @@
-import { createWeekTimelineLayout, formatWeekRange, getWeekAllDayLaneLimit } from '../week-view-layout';
+import { createWeekStripLayout, createWeekTimelineLayout, formatWeekRange, getWeekAllDayLaneLimit } from '../week-view-layout';
+import type { TwoDayViewModel } from '../two-day-view-model';
+import { offsetCalendarDate } from '@/domain/calendar/month';
 import { getTimelineItemFrame, TIMELINE_HEIGHT, type TimelineItemViewModel } from '../timeline-layout';
 
 function item(id: string, top: number): TimelineItemViewModel {
@@ -8,6 +10,32 @@ function item(id: string, top: number): TimelineItemViewModel {
     isInstant: false, continuesFromPreviousDay: false, continuesToNextDay: false };
 }
 describe('週の密集表示', () => {
+  it('終日と時刻の省略を重複なく数え、高さ不足では終日を全件省略する', () => {
+    const day: TwoDayViewModel = { date: '2026-11-05', dateLabel: '11月5日', weekdayLabel: '木', isToday: false,
+      holidayName: null, holidaySupport: 'available', accessibilityLabel: '木曜日', timelineItems: [item('a', 100), item('b', 100)],
+      allDayItems: [{ kind: 'event', id: 'b', eventId: 'b', colorId: 'red', isInteractive: true, title: 'b', temporalLabel: '終日', accessibilityLabel: 'b' }] };
+    const result = createWeekStripLayout([day], 1, 40, 100, 0);
+    expect(result.hiddenCounts).toEqual([1]);
+    expect(result.allDayHeight).toBeLessThanOrEqual(100 / 3);
+    expect(result.allDayLayout.segments).toEqual([]);
+  });
+  it('週を進めても保存済み期間に沿うフェードと期間途中の形を維持する', () => {
+    const makeStrip = (start: string): readonly TwoDayViewModel[] => Array.from({ length: 21 }, (_, index) => {
+      const date = offsetCalendarDate(start, index);
+      return { date, dateLabel: date, weekdayLabel: '木', isToday: false, holidayName: null, holidaySupport: 'available',
+        accessibilityLabel: date, timelineItems: [], allDayItems: date >= '2026-11-01' && date <= '2026-11-14' ? [{
+          kind: 'fuzzyRange', id: 'range', eventId: 'range', colorId: 'red', isInteractive: true, title: '期間', temporalLabel: 'ざっくり', accessibilityLabel: '期間',
+          rangeStartDate: '2026-11-01', rangeThroughDate: '2026-11-14', rangePosition: date === '2026-11-01' ? 'start' : date === '2026-11-14' ? 'end' : 'middle',
+          fadeInRatio: 1, fadeOutRatio: 0,
+        }] : [] };
+    });
+    const before = createWeekStripLayout(makeStrip('2026-10-26'), 1, 40, 600, 7).allDayLayout.segments[0];
+    const after = createWeekStripLayout(makeStrip('2026-11-02'), 1, 40, 600, 7).allDayLayout.segments[0];
+    expect(before.opacityStops[0].opacity).toBe(0);
+    expect(after.opacityStops[0].opacity).toBeGreaterThan(0);
+    expect(after.opacityStops.at(-1)?.opacity).toBe(1);
+    expect(after.startsAtRangeStart).toBe(false);
+  });
   it('縮小後の最小高で衝突する予定を省略し、拡大すると再表示する', () => {
     const values = [item('a', 100), item('b', 200)];
     expect(createWeekTimelineLayout(values, 0.25, 45).hiddenIds).toEqual(['b']);

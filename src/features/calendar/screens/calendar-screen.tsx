@@ -15,6 +15,7 @@ import { TwoDayView } from '../components/two-day-view';
 import { useHorizontalSwipeTransition } from '../hooks/use-horizontal-swipe-transition';
 import { useTwoDayCarousel } from '../hooks/use-two-day-carousel';
 import type { CalendarViewState } from '../hooks/use-calendar-view';
+import { formatWeekRange } from '../week-view-layout';
 import { TWO_DAY_SWIPE_BUFFER_DAYS } from '../two-day-view-model';
 
 export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt, onOpenSettings, renderDayPreview }: Readonly<{
@@ -38,13 +39,17 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
   });
   // 2日ビューは前後に取得済みの予備列を持つため、取得完了を待たずに
   // 1列分だけジャンプなく連続スライドできる。
+  const isWeek = state.mode === 'week';
+  const timelineStrip = isWeek ? state.weekStrip : state.mode === 'day' ? state.dayStrip : state.twoDayStrip;
+  const bufferDays = isWeek ? 7 : TWO_DAY_SWIPE_BUFFER_DAYS;
   const carousel = useTwoDayCarousel({
+    ...(isWeek ? { visibleDayCount: 7 as const, stepDays: 7 as const } : {}),
     ...(state.mode === 'day' ? { visibleDayCount: 1 as const } : {}),
     onPrevious: state.showPreviousPeriod,
     onNext: state.showNextPeriod,
     reduceMotion,
-    bufferDays: TWO_DAY_SWIPE_BUFFER_DAYS,
-    leadingDate: (state.mode === 'day' ? state.dayStrip : state.twoDayStrip)[0]?.date ?? state.anchorDate,
+    bufferDays,
+    leadingDate: timelineStrip[0]?.date ?? state.anchorDate,
   });
   const isTwoDay = state.mode === 'twoDay';
   const isTimeline = state.mode !== 'month';
@@ -114,11 +119,15 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
           // 2日表示は画面の残り高さいっぱいにタイムラインを収め、ページ全体のスクロールを行わない。
           // 横スワイプは予備列を持つTwoDayView自身が担うため、外側の変形・不透明度制御は不要。
           <>
+            {isWeek && state.weekStrip[7] !== undefined && state.weekStrip[13] !== undefined ? <Text accessibilityRole="header"
+              style={[styles.weekRange, { color: theme.text }]}>{formatWeekRange(state.weekStrip[7].date, state.weekStrip[13].date)}</Text> : null}
             <TwoDayView
               key={state.mode}
-              visibleDayCount={isTwoDay ? 2 : 1}
-              strip={isTwoDay ? state.twoDayStrip : state.dayStrip}
-              bufferDays={TWO_DAY_SWIPE_BUFFER_DAYS}
+              visibleDayCount={isWeek ? 7 : isTwoDay ? 2 : 1}
+              strip={timelineStrip}
+              bufferDays={bufferDays}
+              selectedDate={state.selectedDate}
+              onOpenDay={(date) => void state.showDay(date)}
               columnWidth={carousel.columnWidth}
               translateX={carousel.translateX}
               panHandlers={carousel.panHandlers}
@@ -126,11 +135,11 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
               onEditEvent={onEditEvent}
               onCreateExactAt={onCreateExactAt}
             />
-            {state.mode === 'day' ? <View style={styles.dayNavigation}>
-              <Pressable accessibilityRole="button" accessibilityLabel="前日へ移動" disabled={state.isPeriodLoading || isMoving}
-                style={styles.dayNavigationButton} onPress={() => void carousel.movePrevious()}><Text style={{ color: theme.calendarAccent }}>前日</Text></Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel="翌日へ移動" disabled={state.isPeriodLoading || isMoving}
-                style={styles.dayNavigationButton} onPress={() => void carousel.moveNext()}><Text style={{ color: theme.calendarAccent }}>翌日</Text></Pressable>
+            {state.mode === 'day' || isWeek ? <View style={styles.dayNavigation}>
+              <Pressable accessibilityRole="button" accessibilityLabel={isWeek ? '前週へ移動' : '前日へ移動'} disabled={state.isPeriodLoading || isMoving}
+                style={styles.dayNavigationButton} onPress={() => void carousel.movePrevious()}><Text style={{ color: theme.calendarAccent }}>{isWeek ? '前週' : '前日'}</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={isWeek ? '翌週へ移動' : '翌日へ移動'} disabled={state.isPeriodLoading || isMoving}
+                style={styles.dayNavigationButton} onPress={() => void carousel.moveNext()}><Text style={{ color: theme.calendarAccent }}>{isWeek ? '翌週' : '翌日'}</Text></Pressable>
             </View> : null}
             <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
           </>
@@ -158,6 +167,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   monthContent: { flex: 1, paddingTop: 8 },
   error: { fontSize: 13, paddingHorizontal: 16, paddingBottom: 8 },
+  weekRange: { fontSize: 13, paddingHorizontal: 16, paddingVertical: 4 },
   dayNavigation: { flexDirection: 'row', paddingRight: 72 },
   dayNavigationButton: { minHeight: 44, minWidth: 72, justifyContent: 'center', alignItems: 'center' },
 });

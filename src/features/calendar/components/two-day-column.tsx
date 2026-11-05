@@ -14,7 +14,7 @@ const ALL_DAY_VISIBLE_ITEM_LIMIT = 2;
 /** 罫線の太さ。位置を下端内へ収める計算とstyleの両方で参照する。 */
 const HOUR_LINE_THICKNESS = StyleSheet.hairlineWidth;
 
-export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = null, sharedAllDayLayout = false, sharedAllDayHeight, hiddenAllDayItemCount = 0, hidden = false, onEditEvent, onCreateExactAt }: Readonly<{
+export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = null, sharedAllDayLayout = false, sharedAllDayHeight, hiddenAllDayItemCount = 0, hidden = false, compactTimeline = false, onEditEvent, onCreateExactAt }: Readonly<{
   day: TwoDayViewModel;
   variant?: 'summary' | 'timeline';
   scale?: number;
@@ -23,6 +23,7 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
   sharedAllDayHeight?: number;
   hiddenAllDayItemCount?: number;
   hidden?: boolean;
+  compactTimeline?: boolean;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
 }>) {
@@ -36,7 +37,10 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
         accessibilityElementsHidden={hidden}
         importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
         style={[styles.timelineColumn, { height: TIMELINE_HEIGHT * scale, borderColor: theme.calendarBorder }]}
+        onTouchStart={(event) => { if ((event.nativeEvent.touches?.length ?? 0) > 1) lastTap.current = null; }}
+        onTouchCancel={() => { lastTap.current = null; }}
         onTouchEnd={(event) => {
+          if (onCreateExactAt === undefined || (event.nativeEvent.touches?.length ?? 0) > 0) { lastTap.current = null; return; }
           const timestamp = Date.now();
           if (lastTap.current !== null && timestamp - lastTap.current <= 300) {
             onCreateExactAt?.(day.date, resolveNearestTimelineHour(event.nativeEvent.locationY, scale));
@@ -44,7 +48,7 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
           } else lastTap.current = timestamp;
         }}
       >
-        {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} onPress={onEditEvent} />)}
+        {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} compact={compactTimeline} onPress={onEditEvent} />)}
         {hourLines.map((hour) => (
           <View
             key={hour}

@@ -5,7 +5,7 @@ import type { CalendarViewMode } from '@/domain/calendar/calendar-view-mode';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
-const viewOptions = [['day', '1日'], ['twoDay', '2日'], ['month', '月']] as const;
+const viewOptions = [['day', '1日'], ['twoDay', '2日'], ['week', '週'], ['month', '月']] as const;
 const CLOSED_TRANSLATE_X = -360;
 const SLIDE_DURATION_MS = 220;
 

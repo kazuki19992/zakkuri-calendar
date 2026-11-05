@@ -28,34 +28,34 @@
 Files: `src/domain/calendar/month.ts`、`calendar-view-mode.ts`、`src/features/calendar/calendar-snapshot.ts`、`hooks/use-calendar-view.ts`、各既存test。
 Interfaces: `getWeekRange(date, weekStartsOn): MonthRange`、state `weekStrip: readonly TwoDayViewModel[]`。
 
-- [ ] RED: week parser、年跨ぎ／閏年／日月開始の週範囲、week復元時21列、listScheduleの22日範囲をassert。
-- [ ] RED: 7日移動で曜日維持、設定refreshで選択日不変、week保存失敗と1日切替失敗で元表示維持。
-- [ ] getWeekRange、weekの明示分岐、snapshotの週開始値による21列モデルを実装。
-- [ ] `npm test -- --runInBand month.test calendar-view-mode.test use-calendar-view.test` → GREEN。
-- [ ] 型検証後、週状態の変更をcommit。
+- [x] RED: week parser、年跨ぎ／閏年／日月開始の週範囲、week復元時21列、listScheduleの22日範囲をassert。
+- [x] RED: 7日移動で曜日維持、設定refreshで選択日不変、week保存失敗と1日切替失敗で元表示維持。
+- [x] getWeekRange、weekの明示分岐、snapshotの週開始値による21列モデルを実装。
+- [x] `npm test -- --runInBand month.test calendar-view-mode.test use-calendar-view.test` → GREEN。
+- [x] 型検証後、週状態の変更をcommit。
 
 ### Task 2: 表示矩形、密集、省略、carousel
 
 Files: `timeline-layout.ts`、新規`week-view-layout.ts`、`two-day-view-model.ts`、`hooks/use-two-day-carousel.ts`、各test。
 Interfaces: `getTimelineItemFrame(item,scale): {top,height}`、`createWeekTimelineLayout(items,scale,columnWidth): {items,hiddenIds}`、`getWeekAllDayLaneLimit(height):number`、`formatWeekRange(from,through):string`。
 
-- [ ] RED: 縮小時の36pt衝突、24時下端、1/2レーン、省略の安定性と拡大時の再出現、範囲文字列をassert。
-- [ ] RED: 7列の幅と7列分の移動・失敗復帰、既存1/2列の既定値維持。
-- [ ] 描画と同じ矩形計算を共用し、週レーンを純粋関数で作る。終日layoutに任意laneLimit（既定2）を追加。
-- [ ] carouselをvisibleDayCount=1|2|7、stepDays（既定1）へ拡張。
-- [ ] `npm test -- --runInBand week-view-layout.test use-two-day-carousel.test two-day-view-model.test` → GREEN。
-- [ ] 型検証後、表示計算をcommit。
+- [x] RED: 縮小時の36pt衝突、24時下端、1/2レーン、省略の安定性と拡大時の再出現、範囲文字列をassert。
+- [x] RED: 7列の幅と7列分の移動・失敗復帰、既存1/2列の既定値維持。
+- [x] 描画と同じ矩形計算を共用し、週レーンを純粋関数で作る。終日layoutに任意laneLimit（既定2）を追加。
+- [x] carouselをvisibleDayCount=1|2|7、stepDays（既定1）へ拡張。
+- [x] `npm test -- --runInBand week-view-layout.test use-two-day-carousel.test two-day-view-model.test` → GREEN。
+- [x] 型検証後、表示計算をcommit。
 
 ### Task 3: 週UIと操作接続
 
 Files: 新規`components/week-day-header.tsx`、`components/two-day-view.tsx`、`two-day-column.tsx`、`timeline-event-block.tsx`、`two-day-all-day-layer.tsx`、`screens/calendar-screen.tsx`、`calendar-side-menu.tsx`、各test。
 Consumes: Task 1 weekStrip、Task 2の表示モデル・可変レーン・carousel。
 
-- [ ] RED: 7列、週範囲、週メニュー、前後週、日付／他N件→showDay、編集ID、空き時刻追加、省略数と終日高の上限をassert。
-- [ ] weekだけ実縮尺レイアウトと上限を適用し、表示headerと終日帯のtopを合わせる。bufferは読み上げ対象外。
-- [ ] week modeの選択日・今日・週開始設定、ピンチ抑止を接続。新規の週routeは作らない。
-- [ ] `npm test -- --runInBand calendar-screen.test two-day-calendar-components.test week-day-header.test` → GREEN。
-- [ ] 型検証後、週UIをcommit。
+- [x] RED: 7列、週範囲、週メニュー、前後週、日付／他N件→showDay、編集ID、空き時刻追加、省略数と終日高の上限をassert。
+- [x] weekだけ実縮尺レイアウトと上限を適用し、表示headerと終日帯のtopを合わせる。bufferは読み上げ対象外。
+- [x] week modeの選択日・今日・週開始設定、ピンチ抑止を接続。新規の週routeは作らない。
+- [x] `npm test -- --runInBand calendar-screen.test two-day-calendar-components.test week-day-header.test` → GREEN。
+- [x] 型検証後、週UIをcommit。
 
 ### Task 4: 回帰検証とPR
 

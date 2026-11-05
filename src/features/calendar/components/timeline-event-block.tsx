@@ -17,9 +17,10 @@ function withOpacity(hex: string, opacity: number): string {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
-export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
+export function TimelineEventBlock({ item, scale = 1, compact = false, onPress }: Readonly<{
   item: TimelineItemViewModel;
   scale?: number;
+  compact?: boolean;
   onPress?(id: string, originalOccurrenceDate?: string): void;
 }>) {
   const theme = useTheme();
@@ -67,7 +68,7 @@ export function TimelineEventBlock({ item, scale = 1, onPress }: Readonly<{
         />
         {item.isInstant ? <View style={[styles.instantLine, { backgroundColor: eventColor }]} /> : null}
         <View testID={`timeline-event.${item.id}.text`} style={[styles.text, { justifyContent: textAnchor }]}>
-          <Text numberOfLines={2} style={[styles.title, { color: theme.background, backgroundColor: eventColor }]}>{item.title}</Text>
+          <Text numberOfLines={compact ? 1 : 2} style={[styles.title, { color: theme.background, backgroundColor: eventColor }]}>{item.title}</Text>
           <Text numberOfLines={1} style={[styles.time, { color: theme.background, backgroundColor: eventColor }]}>{item.temporalLabel}</Text>
         </View>
       </View>

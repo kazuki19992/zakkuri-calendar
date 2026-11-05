@@ -1,4 +1,5 @@
 import { getTimelineItemFrame, type TimelineItemViewModel } from './timeline-layout';
+import { createTwoDayAllDayLayout, type TwoDayViewModel } from './two-day-view-model';
 
 export const WEEK_MIN_LANE_WIDTH = 36;
 export const WEEK_ALL_DAY_ROW_HEIGHT = 44;
@@ -39,4 +40,21 @@ export function createWeekTimelineLayout(items: readonly TimelineItemViewModel[]
   }
   finishGroup();
   return { items: visible, hiddenIds };
+}
+
+export function createWeekStripLayout(strip: readonly TwoDayViewModel[], scale: number, columnWidth: number, availableHeight: number, bufferDays: number) {
+  const timeline = strip.map((day) => createWeekTimelineLayout(day.timelineItems, scale, columnWidth));
+  const allDayLayout = createTwoDayAllDayLayout(strip, getWeekAllDayLaneLimit(availableHeight));
+  const visibleSegments = allDayLayout.segments.filter((segment) => segment.startIndex < bufferDays + 7 && segment.startIndex + segment.spanDays > bufferDays);
+  const usedLanes = Math.max(0, ...visibleSegments.map((segment) => segment.lane + 1));
+  const hiddenCounts = strip.map((day, index) => {
+    const visibleIds = new Set(allDayLayout.segments.filter((segment) => index >= segment.startIndex && index < segment.startIndex + segment.spanDays).map((segment) => segment.id));
+    return new Set([...day.allDayItems.filter((item) => !visibleIds.has(item.id)).map((item) => item.id), ...timeline[index].hiddenIds]).size;
+  });
+  return {
+    allDayLayout,
+    allDayHeight: usedLanes === 0 ? Math.min(30, Math.max(0, availableHeight / 3)) : usedLanes * WEEK_ALL_DAY_ROW_HEIGHT,
+    strip: strip.map((day, index) => ({ ...day, timelineItems: timeline[index].items })),
+    hiddenCounts,
+  };
 }

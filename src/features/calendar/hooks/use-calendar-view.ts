@@ -77,6 +77,8 @@ export type CalendarViewState = Readonly<{
   selectedHolidayName: string | null;
   holidaySupport: HolidaySupport;
   isPeriodLoading: boolean;
+  /** 表示期間・モードの移動要求だけを識別し、pickerや表示設定の更新で移動を中断させない。 */
+  navigationRevision: number;
   isViewModeUpdating: boolean;
   periodError: string | null;
   viewModePersistenceError: string | null;
@@ -147,6 +149,7 @@ function withViewMode(target: ViewTarget, mode: CalendarViewMode): ViewTarget {
 
 export function useCalendarView(input: UseCalendarViewInput): CalendarViewState {
   const inputRef = useRef(input);
+  const [navigationRevision, setNavigationRevision] = useState(0);
   const [isViewModeUpdating, setViewModeUpdating] = useState(false);
   const [state, setState] = useState<InternalState>(() => {
     const today = toCalendarDate((input.now ?? getSystemTime)());
@@ -298,6 +301,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   ]);
 
   const transitionTo = useCallback(async (target: ViewTarget): Promise<boolean> => {
+    setNavigationRevision((revision) => revision + 1);
     const requestId = ++requestIdRef.current;
     const calendarVisibilityVersion = calendarVisibilityVersionRef.current;
     setState((current) => ({ ...current, isPeriodLoading: true, periodError: null }));
@@ -352,6 +356,8 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         // 初回URLはすでに対象日のsnapshotを取得済み。再取得に依存せずmode保存へ進む。
         const alreadyDisplayed = current.status === 'ready' && current.mode === mode
           && date !== undefined && current.anchorDate === date && current.selectedDate === date;
+        // 同じ日へのURL要求も、先行する未確定のスワイプより優先する。
+        if (alreadyDisplayed) setNavigationRevision((revision) => revision + 1);
         if (!alreadyDisplayed && !(await transitionTo(target))) return false;
         setState((value) => ({ ...value, viewModePersistenceError: null }));
         try {
@@ -644,6 +650,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     selectedHolidayName: selectedDay?.holidayName ?? null,
     holidaySupport: selectedDay?.holidaySupport ?? 'unsupported',
     isPeriodLoading: state.isPeriodLoading,
+    navigationRevision,
     isViewModeUpdating,
     periodError: state.periodError,
     viewModePersistenceError: state.viewModePersistenceError,

@@ -114,6 +114,31 @@ describe('カレンダー表示の状態調整', () => {
   beforeEach(() => {
     jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   });
+  it('ナビゲーション開始だけでトークンを進め、picker・表示設定・refreshでは維持する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('week');
+    const { result, rerender } = await renderHook(({ revision }: { revision: number }) => useCalendarView({
+      ...dependencies, now: () => new Date(2026, 8, 8, 12), refreshRevision: revision,
+    }), { initialProps: { revision: 0 } });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    const originalToken = result.current.navigationRevision;
+    expect(originalToken).toBe(0);
+    await act(async () => { await result.current.loadDatePickerMonth('2026-10-01'); });
+    expect(result.current.navigationRevision).toBe(originalToken);
+    await act(async () => { await result.current.setCalendarVisible(false); });
+    expect(result.current.navigationRevision).toBe(originalToken);
+    await rerender({ revision: 1 });
+    await waitFor(() => expect(result.current.isCalendarVisible).toBe(true));
+    expect(result.current.navigationRevision).toBe(originalToken);
+    await act(async () => { await result.current.showNextPeriod(); });
+    expect(result.current.navigationRevision).toBe(originalToken + 1);
+    await act(async () => { await result.current.showDay(result.current.anchorDate); });
+    expect(result.current.navigationRevision).toBe(originalToken + 2);
+    const loadCount = dependencies.events.listSchedule.mock.calls.length;
+    await act(async () => { await result.current.showDay(result.current.anchorDate); });
+    expect(result.current.navigationRevision).toBe(originalToken + 3);
+    expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(loadCount);
+  });
   it('週を復元し22日分取得して21列を用意し7日ずつ移動する', async () => {
     const dependencies = createDependencies();
     dependencies.settings.getLastCalendarViewMode.mockResolvedValue('week');

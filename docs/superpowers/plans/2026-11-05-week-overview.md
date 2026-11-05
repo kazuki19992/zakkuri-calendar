@@ -64,4 +64,6 @@ Consumes: Task 1 weekStrip、Task 2の表示モデル・可変レーン・carous
 - [x] whole-branch独立レビューを1回行い、重要指摘にはRED→GREENと全体検証で対応。
 - 提出: commit/push後、Closes #52を含むdevelop宛てOpen PRを作成する。
 
-最終検証: typecheck、lint（警告0件）、76 suites／711 tests、diff-check、iOS／Android export成功。America/New_Yorkでの日付計算12件も成功。独立レビューの重要指摘は回帰テストを追加して修正済み。実機の可読性・操作性は未確認。
+最終検証: typecheck、lint（警告0件）、76 suites／713 tests、diff-check、iOS／Android export成功。America/New_Yorkでの日付計算12件も成功。独立レビューの重要指摘は回帰テストを追加して修正済み。実機の可読性・操作性は未確認。
+
+PR #53レビュー対応: picker・表示設定・refreshと期間移動要求を分けるnavigationRevisionを追加。状態オブジェクトの再生成だけでカルーセルを中断しないことと、同じ日へのURL要求が先行する移動に優先することを回帰検証した。

@@ -49,7 +49,7 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
     onNext: state.showNextPeriod,
     reduceMotion,
     bufferDays,
-    navigationKey: state,
+    navigationKey: state.navigationRevision,
     leadingDate: timelineStrip[0]?.date ?? state.anchorDate,
   });
   const isTwoDay = state.mode === 'twoDay';

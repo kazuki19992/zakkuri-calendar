@@ -101,7 +101,7 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
     twoDayDays, twoDayStrip, dayStrip: twoDayStrip.slice(0, 3), weekStrip: [],
     monthDays: [], monthWeeks: [], datePickerMonth: '2026-09-01', datePickerDays: [],
     selectedAgendaItems: [], selectedHolidayName: null,
-    holidaySupport: 'available', isPeriodLoading: false, isViewModeUpdating: false, periodError: null,
+    holidaySupport: 'available', isPeriodLoading: false, navigationRevision: 0, isViewModeUpdating: false, periodError: null,
     viewModePersistenceError: null,
     isDatePickerLoading: false, datePickerError: null,
     calendarName: 'マイカレンダー', calendarColorId: 'blue', isCalendarVisible: true,
@@ -112,6 +112,15 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
 
 describe('カレンダー画面', () => {
   beforeEach(() => jest.clearAllMocks());
+  it('picker読込や表示設定の再描画ではカルーセルのナビゲーショントークンを変えない', async () => {
+    const state = createState();
+    const view = await renderWithSafeArea(<CalendarScreen state={state} onAddEvent={jest.fn()} />);
+    const originalKey = jest.mocked(useTwoDayCarousel).mock.calls.at(-1)?.[0].navigationKey;
+    await view.rerender(<SafeAreaProvider initialMetrics={safeAreaMetrics}>
+      <CalendarScreen state={{ ...state, isDatePickerLoading: true, isCalendarVisibilityUpdating: true }} onAddEvent={jest.fn()} />
+    </SafeAreaProvider>);
+    expect(jest.mocked(useTwoDayCarousel).mock.calls.at(-1)?.[0].navigationKey).toBe(originalKey);
+  });
   it('週モードの範囲と週移動を表示し日付から履歴なしで1日へ切り替える', async () => {
     const weekStrip = Array.from({ length: 21 }, (_, index) => ({ ...twoDayDays[0],
       date: offsetCalendarDate('2026-09-07', index - 7), isToday: index === 8 }));
@@ -158,7 +167,7 @@ describe('カレンダー画面', () => {
       onNext: state.showNextPeriod,
       reduceMotion: false,
       bufferDays: 1,
-      navigationKey: state,
+      navigationKey: state.navigationRevision,
       leadingDate: '2026-09-07',
     });
     await user.press(screen.getByRole('button', { name: '予定を追加' }));

@@ -106,6 +106,18 @@ function renderTwoDayView(overrides: Partial<{
 }
 
 describe('2日カレンダー表示コンポーネント', () => {
+  it('別の列へ指を置いた複数指操作でも過去のタップを引き継がない', async () => {
+    const onCreateExactAt = jest.fn();
+    const view = await renderTwoDayView({ onCreateExactAt });
+    const root = view.getByTestId('two-day-calendar');
+    const [first, second] = view.getAllByTestId('two-day-calendar.timeline-column').slice(1, 3);
+    await fireEvent(first, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    await fireEvent(root, 'touchStart', { nativeEvent: { touches: [{}, {}] } });
+    await fireEvent(second, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    await fireEvent(root, 'touchStart', { nativeEvent: { touches: [{}] } });
+    await fireEvent(first, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    expect(onCreateExactAt).not.toHaveBeenCalled();
+  });
   it('ダブルタップの途中に複数指操作が挟まっても予定を追加しない', async () => {
     const onCreateExactAt = jest.fn();
     const view = await renderTwoDayView({ onCreateExactAt });
@@ -113,6 +125,9 @@ describe('2日カレンダー表示コンポーネント', () => {
     await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
     await fireEvent(column, 'touchStart', { nativeEvent: { touches: [{}, {}] } });
     await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: 100, touches: [{}] } });
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
+    expect(onCreateExactAt).not.toHaveBeenCalled();
+    await fireEvent(column, 'touchStart', { nativeEvent: { touches: [{}] } });
     await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
     expect(onCreateExactAt).not.toHaveBeenCalled();
   });

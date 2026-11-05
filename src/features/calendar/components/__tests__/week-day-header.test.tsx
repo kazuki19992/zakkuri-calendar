@@ -12,6 +12,7 @@ describe('週の日付見出し', () => {
     const button = view.getByRole('button', { name: '2026年11月5日、木曜日、今日、予定3件、他2件、1日表示を開く' });
     expect(button.props.accessibilityState.selected).toBe(true);
     expect(view.getByText('他2件')).toBeOnTheScreen();
+    expect(view.getByText('他2件').props.numberOfLines).toBeUndefined();
     await userEvent.setup().press(button);
     expect(onOpenDay).toHaveBeenCalledWith('2026-11-05');
   });

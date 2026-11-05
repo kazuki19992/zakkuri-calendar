@@ -17,12 +17,13 @@ import { TimelineAxis } from './timeline-axis';
 import { TwoDayColumn } from './two-day-column';
 import { TwoDayAllDayLayer } from './two-day-all-day-layer';
 import { WeekDayHeader } from './week-day-header';
-import { createWeekStripLayout } from '../week-view-layout';
+import { createWeekStripLayout, getWeekHeaderHeight } from '../week-view-layout';
+import { createTimelineTouchSession } from '../timeline-touch-session';
 import { SingleDaySummary } from './single-day-summary';
 
 export function TwoDayView({
   strip, bufferDays, columnWidth, translateX, panHandlers, onCarouselLayout, now, onEditEvent, onCreateExactAt,
-  visibleDayCount = 2, selectedDate, onOpenDay,
+  visibleDayCount = 2, selectedDate, onOpenDay, isMoving = false,
 }: Readonly<{
   /** 予備列→表示2日→予備列の順に並んだ日付の並び。 */
   strip: readonly TwoDayViewModel[];
@@ -37,15 +38,17 @@ export function TwoDayView({
   onCreateExactAt?(date: string, startTime: string): void;
   now?: () => Date;
   visibleDayCount?: 1 | 2 | 7;
+  isMoving?: boolean;
   selectedDate?: string;
   onOpenDay?(date: string): void;
 }>) {
   // timelineRowの実測高さ(親から配分された画面の残り高さ)に24時間軸を合わせ、
   // ヘッダーなどを除いた画面内へ縦スクロールなしで収める。
   const { fontScale } = useWindowDimensions();
-  const weekHeaderHeight = Math.ceil(64 * Math.max(1, fontScale));
   const [fitScale, setFitScale] = useState(1);
   const [availableHeight, setAvailableHeight] = useState(600);
+  const weekHeaderHeight = getWeekHeaderHeight(availableHeight, fontScale);
+  const [tapGuard] = useState(createTimelineTouchSession);
   const zoom = useTimelineZoom(fitScale);
   const { beginPinch, endPinch, updatePinch } = zoom;
   const handleTimelineLayout = useCallback((event: LayoutChangeEvent) => {
@@ -68,8 +71,8 @@ export function TwoDayView({
   const nowTop = computeNowLineTop(indicator.minutesOfDay, zoom.scale);
 
   const stripWidth = strip.length * columnWidth;
-  const weekLayout = useMemo(() => visibleDayCount === 7 ? createWeekStripLayout(strip, zoom.scale, columnWidth, availableHeight, bufferDays) : null,
-    [visibleDayCount, strip, zoom.scale, columnWidth, availableHeight, bufferDays]);
+  const weekLayout = useMemo(() => visibleDayCount === 7 ? createWeekStripLayout(strip, zoom.scale, columnWidth, availableHeight, bufferDays, isMoving, weekHeaderHeight) : null,
+    [visibleDayCount, strip, zoom.scale, columnWidth, availableHeight, bufferDays, isMoving, weekHeaderHeight]);
   const allDayLayout = useMemo(() => weekLayout?.allDayLayout ?? createTwoDayAllDayLayout(strip), [strip, weekLayout]);
   const timelineStrip = weekLayout?.strip ?? strip;
   const allDayLaneCount = allDayLayout.segments.reduce((count, segment) => Math.max(count, segment.lane + 1), 0);
@@ -81,6 +84,8 @@ export function TwoDayView({
 
   return (
     <View testID={visibleDayCount === 7 ? 'week-calendar' : visibleDayCount === 1 ? 'single-day-calendar' : 'two-day-calendar'} style={styles.container} {...(zoom.isPinching ? {} : panHandlers)}
+      onTouchStart={(event) => tapGuard.start(event.nativeEvent.touches?.length ?? 0)}
+      onTouchCancel={() => tapGuard.cancel()}
       onLayout={(event) => setAvailableHeight(event.nativeEvent.layout.height)}>
       <View testID="two-day-calendar.summary" style={styles.summaryRow}>
         <View style={styles.axisSpacer} />
@@ -127,7 +132,7 @@ export function TwoDayView({
                     style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
                     {timelineStrip.map((day, index) => (
                       <TwoDayColumn key={day.date} day={day} variant="timeline" scale={zoom.scale}
-                        hidden={visibleDayCount !== 2 && (index < bufferDays || index >= bufferDays + visibleDayCount)} compactTimeline={visibleDayCount === 7}
+                        hidden={visibleDayCount !== 2 && (index < bufferDays || index >= bufferDays + visibleDayCount)} compactTimeline={visibleDayCount === 7} tapGuard={tapGuard}
                         onEditEvent={onEditEvent} onCreateExactAt={zoom.isPinching ? undefined : onCreateExactAt}
                         nowTop={day.isToday ? nowTop : null} />
                     ))}

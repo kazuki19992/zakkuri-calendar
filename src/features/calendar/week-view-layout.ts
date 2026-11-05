@@ -8,6 +8,10 @@ export function getWeekAllDayLaneLimit(availableHeight: number): number {
   return Math.min(2, Math.max(0, Math.floor(availableHeight / 3 / WEEK_ALL_DAY_ROW_HEIGHT)));
 }
 
+export function getWeekHeaderHeight(availableHeight: number, fontScale: number): number {
+  return Math.min(Math.ceil(64 * Math.max(1, fontScale)), Math.max(44, availableHeight - 44));
+}
+
 export function formatWeekRange(from: string, through: string): string {
   const includeYear = from.slice(0, 4) !== through.slice(0, 4);
   const label = (date: string) => `${includeYear ? `${Number(date.slice(0, 4))}年` : ''}${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
@@ -42,18 +46,28 @@ export function createWeekTimelineLayout(items: readonly TimelineItemViewModel[]
   return { items: visible, hiddenIds };
 }
 
-export function createWeekStripLayout(strip: readonly TwoDayViewModel[], scale: number, columnWidth: number, availableHeight: number, bufferDays: number) {
+export function createWeekStripLayout(strip: readonly TwoDayViewModel[], scale: number, columnWidth: number, availableHeight: number, bufferDays: number, moving = false, headerHeight = 64) {
   const timeline = strip.map((day) => createWeekTimelineLayout(day.timelineItems, scale, columnWidth));
-  const allDayLayout = createTwoDayAllDayLayout(strip, getWeekAllDayLaneLimit(availableHeight));
+  const remaining = Math.max(0, availableHeight - headerHeight - 44);
+  const laneLimit = Math.min(getWeekAllDayLaneLimit(availableHeight), Math.floor(remaining / WEEK_ALL_DAY_ROW_HEIGHT));
+  // 前後週で使ったレーンが表示週を隠さないよう、週ごとに割り当てる。
+  const pages = Array.from({ length: Math.ceil(strip.length / 7) }, (_, page) => ({
+    start: page * 7, layout: createTwoDayAllDayLayout(strip.slice(page * 7, page * 7 + 7), laneLimit, true),
+  }));
+  const allDayLayout = {
+    segments: pages.flatMap(({ start, layout }) => layout.segments.map((segment) => ({ ...segment,
+      id: `${segment.id}:week:${strip[start].date}`, startIndex: segment.startIndex + start }))),
+    hiddenCounts: pages.flatMap(({ layout }) => layout.hiddenCounts),
+  };
   const visibleSegments = allDayLayout.segments.filter((segment) => segment.startIndex < bufferDays + 7 && segment.startIndex + segment.spanDays > bufferDays);
-  const usedLanes = Math.max(0, ...visibleSegments.map((segment) => segment.lane + 1));
+  const usedLanes = Math.max(0, ...(moving ? allDayLayout.segments : visibleSegments).map((segment) => segment.lane + 1));
   const hiddenCounts = strip.map((day, index) => {
-    const visibleIds = new Set(allDayLayout.segments.filter((segment) => index >= segment.startIndex && index < segment.startIndex + segment.spanDays).map((segment) => segment.id));
+    const visibleIds = new Set(allDayLayout.segments.filter((segment) => index >= segment.startIndex && index < segment.startIndex + segment.spanDays).map((segment) => segment.item.id));
     return new Set([...day.allDayItems.filter((item) => !visibleIds.has(item.id)).map((item) => item.id), ...timeline[index].hiddenIds]).size;
   });
   return {
     allDayLayout,
-    allDayHeight: usedLanes === 0 ? Math.min(30, Math.max(0, availableHeight / 3)) : usedLanes * WEEK_ALL_DAY_ROW_HEIGHT,
+    allDayHeight: usedLanes === 0 ? Math.min(30, Math.max(0, availableHeight / 3), remaining) : usedLanes * WEEK_ALL_DAY_ROW_HEIGHT,
     strip: strip.map((day, index) => ({ ...day, timelineItems: timeline[index].items })),
     hiddenCounts,
   };

@@ -49,11 +49,12 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
     onNext: state.showNextPeriod,
     reduceMotion,
     bufferDays,
+    navigationKey: state,
     leadingDate: timelineStrip[0]?.date ?? state.anchorDate,
   });
   const isTwoDay = state.mode === 'twoDay';
   const isTimeline = state.mode !== 'month';
-  const isMoving = isTimeline ? carousel.isAnimating : transition.isAnimating;
+  const isMoving = isTimeline ? (carousel.isAnimating || carousel.isDragging) : transition.isAnimating;
   const displayDate = isTimeline ? state.anchorDate : state.visibleMonth;
   const topBarModel = createCalendarTopBarModel(displayDate, state.today);
 
@@ -123,6 +124,7 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
               style={[styles.weekRange, { color: theme.text }]}>{formatWeekRange(state.weekStrip[7].date, state.weekStrip[13].date)}</Text> : null}
             <TwoDayView
               key={state.mode}
+              isMoving={isMoving}
               visibleDayCount={isWeek ? 7 : isTwoDay ? 2 : 1}
               strip={timelineStrip}
               bufferDays={bufferDays}

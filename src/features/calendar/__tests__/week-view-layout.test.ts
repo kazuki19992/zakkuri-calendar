@@ -1,4 +1,4 @@
-import { createWeekStripLayout, createWeekTimelineLayout, formatWeekRange, getWeekAllDayLaneLimit } from '../week-view-layout';
+import { createWeekStripLayout, createWeekTimelineLayout, formatWeekRange, getWeekAllDayLaneLimit, getWeekHeaderHeight } from '../week-view-layout';
 import type { TwoDayViewModel } from '../two-day-view-model';
 import { offsetCalendarDate } from '@/domain/calendar/month';
 import { getTimelineItemFrame, TIMELINE_HEIGHT, type TimelineItemViewModel } from '../timeline-layout';
@@ -10,6 +10,26 @@ function item(id: string, top: number): TimelineItemViewModel {
     isInstant: false, continuesFromPreviousDay: false, continuesToNextDay: false };
 }
 describe('週の密集表示', () => {
+  it('予備週だけの衝突では表示週の空いている終日レーンを隠さない', () => {
+    const ranges = [['a', '2026-10-17', '2026-11-01'], ['b', '2026-10-17', '2026-11-01'], ['c', '2026-10-31', '2026-11-04']];
+    const strip: TwoDayViewModel[] = Array.from({ length: 21 }, (_, index) => {
+      const date = offsetCalendarDate('2026-10-26', index);
+      return { date, dateLabel: date, weekdayLabel: '月', isToday: false, holidayName: null, holidaySupport: 'available', accessibilityLabel: date, timelineItems: [],
+        allDayItems: ranges.filter(([, from, through]) => date >= from && date <= through).map(([id, from, through]) => ({
+          kind: 'event', id, eventId: id, colorId: 'red', isInteractive: true, title: id, temporalLabel: '終日', accessibilityLabel: id,
+          rangeStartDate: from, rangeThroughDate: through, rangePosition: date === from ? 'start' : date === through ? 'end' : 'middle',
+        })) };
+    });
+    const result = createWeekStripLayout(strip, 1, 40, 600, 7);
+    expect(result.hiddenCounts.slice(7, 10)).toEqual([0, 0, 0]);
+    expect(result.allDayLayout.segments.some((segment) => segment.item.id === 'c' && segment.startIndex === 7)).toBe(true);
+  });
+  it('文字拡大で本文が低くても時間軸の領域を残す', () => {
+    const height = getWeekHeaderHeight(160, 2);
+    const strip: TwoDayViewModel[] = [{ date: '2026-11-05', dateLabel: '11月5日', weekdayLabel: '木', isToday: false, holidayName: null,
+      holidaySupport: 'available', accessibilityLabel: '木', timelineItems: [], allDayItems: [] }];
+    expect(160 - height - createWeekStripLayout(strip, 1, 40, 160, 0, false, height).allDayHeight).toBeGreaterThanOrEqual(44);
+  });
   it('終日と時刻の省略を重複なく数え、高さ不足では終日を全件省略する', () => {
     const day: TwoDayViewModel = { date: '2026-11-05', dateLabel: '11月5日', weekdayLabel: '木', isToday: false,
       holidayName: null, holidaySupport: 'available', accessibilityLabel: '木曜日', timelineItems: [item('a', 100), item('b', 100)],
@@ -30,11 +50,22 @@ describe('週の密集表示', () => {
         }] : [] };
     });
     const before = createWeekStripLayout(makeStrip('2026-10-26'), 1, 40, 600, 7).allDayLayout.segments[0];
-    const after = createWeekStripLayout(makeStrip('2026-11-02'), 1, 40, 600, 7).allDayLayout.segments[0];
+    const afterLayout = createWeekStripLayout(makeStrip('2026-11-02'), 1, 40, 600, 7).allDayLayout;
+    const after = afterLayout.segments[0];
     expect(before.opacityStops[0].opacity).toBe(0);
     expect(after.opacityStops[0].opacity).toBeGreaterThan(0);
-    expect(after.opacityStops.at(-1)?.opacity).toBe(1);
+    expect(afterLayout.segments.at(-1)?.opacityStops.at(-1)?.opacity).toBe(1);
     expect(after.startsAtRangeStart).toBe(false);
+  });
+  it('空週の静止時は最小高とし、移動中は次週の2レーンも確保する', () => {
+    const strip: TwoDayViewModel[] = Array.from({ length: 21 }, (_, index) => ({
+      date: offsetCalendarDate('2026-10-26', index), dateLabel: '日', weekdayLabel: '月', isToday: false, holidayName: null,
+      holidaySupport: 'available', accessibilityLabel: '日', timelineItems: [], allDayItems: index >= 14 ? ['a', 'b'].map((id) => ({
+        kind: 'event', id, eventId: id, colorId: 'red', isInteractive: true, title: id, temporalLabel: '終日', accessibilityLabel: id,
+      })) : [],
+    }));
+    expect(createWeekStripLayout(strip, 1, 40, 600, 7, false).allDayHeight).toBe(30);
+    expect(createWeekStripLayout(strip, 1, 40, 600, 7, true).allDayHeight).toBe(88);
   });
   it('縮小後の最小高で衝突する予定を省略し、拡大すると再表示する', () => {
     const values = [item('a', 100), item('b', 200)];

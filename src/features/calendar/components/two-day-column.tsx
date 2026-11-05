@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -6,6 +6,7 @@ import { getEventColor } from '@/constants/event-colors';
 import { NOW_LINE_HEIGHT, TIMELINE_HEIGHT, computeHourLineTop } from '../timeline-layout';
 import { resolveNearestTimelineHour } from '../timeline-tap-time';
 import type { TwoDayViewModel } from '../two-day-view-model';
+import { createTimelineTouchSession } from '../timeline-touch-session';
 import { TimelineEventBlock } from './timeline-event-block';
 
 const hourLines = Array.from({ length: 25 }, (_, hour) => hour);
@@ -14,7 +15,7 @@ const ALL_DAY_VISIBLE_ITEM_LIMIT = 2;
 /** 罫線の太さ。位置を下端内へ収める計算とstyleの両方で参照する。 */
 const HOUR_LINE_THICKNESS = StyleSheet.hairlineWidth;
 
-export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = null, sharedAllDayLayout = false, sharedAllDayHeight, hiddenAllDayItemCount = 0, hidden = false, compactTimeline = false, onEditEvent, onCreateExactAt }: Readonly<{
+export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = null, sharedAllDayLayout = false, sharedAllDayHeight, hiddenAllDayItemCount = 0, hidden = false, compactTimeline = false, tapGuard, onEditEvent, onCreateExactAt }: Readonly<{
   day: TwoDayViewModel;
   variant?: 'summary' | 'timeline';
   scale?: number;
@@ -24,12 +25,15 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
   hiddenAllDayItemCount?: number;
   hidden?: boolean;
   compactTimeline?: boolean;
+  tapGuard?: ReturnType<typeof createTimelineTouchSession>;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
 }>) {
   const theme = useTheme();
   const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const lastTap = useRef<number | null>(null);
+  const lastTap = useRef<{ at: number; epoch: number } | null>(null);
+  const [localTapGuard] = useState(createTimelineTouchSession);
+  const session = tapGuard ?? localTapGuard;
   if (variant === 'timeline') {
     return (
       <View
@@ -37,15 +41,15 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
         accessibilityElementsHidden={hidden}
         importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
         style={[styles.timelineColumn, { height: TIMELINE_HEIGHT * scale, borderColor: theme.calendarBorder }]}
-        onTouchStart={(event) => { if ((event.nativeEvent.touches?.length ?? 0) > 1) lastTap.current = null; }}
-        onTouchCancel={() => { lastTap.current = null; }}
+        onTouchStart={(event) => session.start(event.nativeEvent.touches?.length ?? 0)}
+        onTouchCancel={() => { lastTap.current = null; session.cancel(); }}
         onTouchEnd={(event) => {
-          if (onCreateExactAt === undefined || (event.nativeEvent.touches?.length ?? 0) > 0) { lastTap.current = null; return; }
+          if (session.isBlocked() || onCreateExactAt === undefined || (event.nativeEvent.touches?.length ?? 0) > 0) { lastTap.current = null; return; }
           const timestamp = Date.now();
-          if (lastTap.current !== null && timestamp - lastTap.current <= 300) {
+          if (lastTap.current !== null && timestamp - lastTap.current.at <= 300 && lastTap.current.epoch === session.epoch()) {
             onCreateExactAt?.(day.date, resolveNearestTimelineHour(event.nativeEvent.locationY, scale));
             lastTap.current = null;
-          } else lastTap.current = timestamp;
+          } else lastTap.current = { at: timestamp, epoch: session.epoch() };
         }}
       >
         {day.timelineItems.map((item) => <TimelineEventBlock key={item.id} item={item} scale={scale} compact={compactTimeline} onPress={onEditEvent} />)}

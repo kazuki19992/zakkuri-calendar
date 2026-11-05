@@ -59,7 +59,9 @@ Consumes: Task 1 weekStrip、Task 2の表示モデル・可変レーン・carous
 
 ### Task 4: 回帰検証とPR
 
-- [ ] README・承認済み設計・計画へ実装状態と実機未確認項目を反映。
-- [ ] typecheck、lint、全test、diff-check、iOS/Android exportを確認。
-- [ ] whole-branch独立レビューを1回行い、重要指摘にはRED→GREENと全体検証で対応。
+- [x] README・承認済み設計・計画へ実装状態と実機未確認項目を反映。
+- [x] typecheck、lint、全test、diff-check、iOS/Android exportを確認。
+- [x] whole-branch独立レビューを1回行い、重要指摘にはRED→GREENと全体検証で対応。
 - 提出: commit/push後、Closes #52を含むdevelop宛てOpen PRを作成する。
+
+最終検証: typecheck、lint（警告0件）、76 suites／711 tests、diff-check、iOS／Android export成功。America/New_Yorkでの日付計算12件も成功。独立レビューの重要指摘は回帰テストを追加して修正済み。実機の可読性・操作性は未確認。

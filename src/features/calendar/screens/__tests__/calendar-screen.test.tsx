@@ -158,6 +158,7 @@ describe('カレンダー画面', () => {
       onNext: state.showNextPeriod,
       reduceMotion: false,
       bufferDays: 1,
+      navigationKey: state,
       leadingDate: '2026-09-07',
     });
     await user.press(screen.getByRole('button', { name: '予定を追加' }));

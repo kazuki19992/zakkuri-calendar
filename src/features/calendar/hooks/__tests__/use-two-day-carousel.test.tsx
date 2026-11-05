@@ -9,6 +9,44 @@ function collectValues(value: Animated.Value): number[] {
 }
 
 describe('2日ビューの予備列付きスワイプカルーセル', () => {
+  it('ドラッグ開始の描画更新で捕捉済みPanResponderを作り直さない', async () => {
+    const create = jest.spyOn(PanResponder, 'create');
+    const onNext = jest.fn();
+    const onPrevious = jest.fn();
+    const { result } = await renderHook(() => useTwoDayCarousel({ onNext, onPrevious,
+      reduceMotion: true, bufferDays: 7, visibleDayCount: 7, stepDays: 7, leadingDate: '2026-10-26' }));
+    const handlers = result.current.panHandlers;
+    const config = create.mock.calls.at(-1)![0];
+    await act(() => config.onPanResponderGrant?.({} as GestureResponderEvent, {} as PanResponderGestureState));
+    expect(result.current.isDragging).toBe(true);
+    expect(result.current.panHandlers).toBe(handlers);
+  });
+  it('自分の取得開始でstateが更新されても予備列を維持し、失敗時に戻す', async () => {
+    let finish!: (value: boolean) => void;
+    const onNext = jest.fn().mockReturnValue(new Promise<boolean>((resolve) => { finish = resolve; }));
+    const { result, rerender } = await renderHook(({ navigationKey }: { navigationKey: number }) => useTwoDayCarousel({ onPrevious: jest.fn(), onNext,
+      reduceMotion: true, bufferDays: 7, visibleDayCount: 7, stepDays: 7, leadingDate: '2026-10-26', navigationKey }), { initialProps: { navigationKey: 1 } });
+    await act(() => result.current.onLayout(350));
+    const values = collectValues(result.current.translateX);
+    let moving!: Promise<boolean>;
+    await act(async () => { moving = result.current.moveNext(); });
+    await rerender({ navigationKey: 2 });
+    expect(values.at(-1)).toBe(-700);
+    await act(async () => { finish(false); await moving; });
+    expect(values.at(-1)).toBe(-350);
+  });
+  it('アニメーション待機中の新しい画面要求で古い日移動を実行しない', async () => {
+    let finish!: () => void;
+    jest.spyOn(Animated, 'timing').mockImplementation(() => ({ start: (callback) => { finish = () => callback?.({ finished: true }); }, stop: jest.fn(), reset: jest.fn() }));
+    const onNext = jest.fn().mockResolvedValue(true);
+    const { result, rerender } = await renderHook(({ navigationKey }: { navigationKey: number }) => useTwoDayCarousel({ onPrevious: jest.fn(), onNext,
+      reduceMotion: false, bufferDays: 7, visibleDayCount: 7, stepDays: 7, leadingDate: '2026-10-26', navigationKey }), { initialProps: { navigationKey: 1 } });
+    let moving!: Promise<boolean>;
+    await act(async () => { moving = result.current.moveNext(); });
+    await rerender({ navigationKey: 2 });
+    await act(async () => { finish(); await moving; });
+    expect(onNext).not.toHaveBeenCalled();
+  });
   it.each([272, 342, 382])('週表示は幅%sを7等分し1回で7列移動する', async (width) => {
     const timing = jest.spyOn(Animated, 'timing');
     const { result } = await renderHook(() => useTwoDayCarousel({ onPrevious: jest.fn().mockResolvedValue(true),
@@ -28,7 +66,7 @@ describe('2日ビューの予備列付きスワイプカルーセル', () => {
     const gesture: PanResponderGestureState = { stateID: 1, moveX: 0, moveY: 0, x0: 0, y0: 0, dx: -100, dy: 0, vx: -1, vy: 0, numberActiveTouches: 1, _accountsForMovesUpTo: 0 };
     await act(() => {
       handlers.onPanResponderGrant?.(event, gesture);
-      handlers.onPanResponderMove?.(event, { ...gesture, numberActiveTouches: 2 });
+      handlers.onPanResponderStart?.(event, { ...gesture, numberActiveTouches: 2 });
       handlers.onPanResponderRelease?.(event, { ...gesture, numberActiveTouches: 0 });
     });
     expect(onNext).not.toHaveBeenCalled();

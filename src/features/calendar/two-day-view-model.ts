@@ -190,7 +190,7 @@ export function createDayViewModel(
 const ALL_DAY_LANE_LIMIT = 2;
 
 /** 予備列を含む日付列を横断して、同じ予定を一本の帯へまとめる。 */
-export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[], laneLimit = ALL_DAY_LANE_LIMIT): TwoDayAllDayLayout {
+export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[], laneLimit = ALL_DAY_LANE_LIMIT, useSavedRangePriority = false): TwoDayAllDayLayout {
   const candidates: { item: TwoDayAllDayItemViewModel; startIndex: number; endIndex: number }[] = [];
   const consumed = new Set<string>();
   strip.forEach((day, dayIndex) => day.allDayItems.forEach((item) => {
@@ -213,8 +213,8 @@ export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[], lane
       ? differenceInCalendarDays(parse(candidate.item.rangeThroughDate, 'yyyy-MM-dd', new Date()), parse(candidate.item.rangeStartDate, 'yyyy-MM-dd', new Date()))
       : fallback;
     return priority(a) - priority(b)
-      || duration(b, bSpan) - duration(a, aSpan)
-      || a.startIndex - b.startIndex
+      || (useSavedRangePriority ? duration(b, bSpan) - duration(a, aSpan) : bSpan - aSpan)
+      || (useSavedRangePriority ? (a.item.rangeStartDate ?? strip[a.startIndex].date).localeCompare(b.item.rangeStartDate ?? strip[b.startIndex].date) : a.startIndex - b.startIndex)
       || a.item.id.localeCompare(b.item.id);
   });
 

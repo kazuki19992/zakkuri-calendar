@@ -15,9 +15,11 @@ import { createTwoDayAllDayLayout, type TwoDayViewModel } from '../two-day-view-
 import { TimelineAxis } from './timeline-axis';
 import { TwoDayColumn } from './two-day-column';
 import { TwoDayAllDayLayer } from './two-day-all-day-layer';
+import { SingleDaySummary } from './single-day-summary';
 
 export function TwoDayView({
   strip, bufferDays, columnWidth, translateX, panHandlers, onCarouselLayout, now, onEditEvent, onCreateExactAt,
+  visibleDayCount = 2,
 }: Readonly<{
   /** 予備列→表示2日→予備列の順に並んだ日付の並び。 */
   strip: readonly TwoDayViewModel[];
@@ -31,10 +33,12 @@ export function TwoDayView({
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
   now?: () => Date;
+  visibleDayCount?: 1 | 2;
 }>) {
   // timelineRowの実測高さ(親から配分された画面の残り高さ)に24時間軸を合わせ、
   // ヘッダーなどを除いた画面内へ縦スクロールなしで収める。
   const [fitScale, setFitScale] = useState(1);
+  const [availableHeight, setAvailableHeight] = useState(600);
   const zoom = useTimelineZoom(fitScale);
   const { beginPinch, endPinch, updatePinch } = zoom;
   const handleTimelineLayout = useCallback((event: LayoutChangeEvent) => {
@@ -51,7 +55,7 @@ export function TwoDayView({
   // 各列の`isToday`だけで判断し、予備列が今日でもその列には表示する。
   // 時間軸の現在時刻ラベルだけは、実際に表示している2日(予備列を除く)を
   // 対象にする。
-  const visibleDays = strip.slice(bufferDays, bufferDays + 2);
+  const visibleDays = strip.slice(bufferDays, bufferDays + visibleDayCount);
   const indicator = useNowIndicator(now);
   const showsToday = visibleDays.some((day) => day.isToday);
   const nowTop = computeNowLineTop(indicator.minutesOfDay, zoom.scale);
@@ -66,7 +70,8 @@ export function TwoDayView({
   const isTimelineScrollable = zoom.scale > fitScale + 0.001;
 
   return (
-    <View testID="two-day-calendar" style={styles.container} {...panHandlers}>
+    <View testID={visibleDayCount === 1 ? 'single-day-calendar' : 'two-day-calendar'} style={styles.container} {...(zoom.isPinching ? {} : panHandlers)}
+      onLayout={(event) => setAvailableHeight(event.nativeEvent.layout.height)}>
       <View testID="two-day-calendar.summary" style={styles.summaryRow}>
         <View style={styles.axisSpacer} />
         <View
@@ -78,10 +83,12 @@ export function TwoDayView({
         >
           <Animated.View testID="two-day-calendar.summary-strip"
             style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
-            {strip.map((day, index) => <TwoDayColumn key={day.date} day={day} sharedAllDayLayout
+            {visibleDayCount === 1 ? strip.map((day, index) => <SingleDaySummary key={day.date} day={day} hidden={index !== bufferDays}
+              height={Math.min(availableHeight / 3, Math.max(30, Math.min(3, Math.max(0, ...visibleDays.map((value) => value.allDayItems.length))) * 46 + 24))}
+              onEditEvent={onEditEvent} />) : strip.map((day, index) => <TwoDayColumn key={day.date} day={day} sharedAllDayLayout
               sharedAllDayHeight={allDayHeight} hiddenAllDayItemCount={allDayLayout.hiddenCounts[index]} onEditEvent={onEditEvent} />)}
-            <TwoDayAllDayLayer layout={allDayLayout} columnWidth={columnWidth} height={allDayHeight}
-              visibleStartIndex={bufferDays} visibleDayCount={2} onEditEvent={onEditEvent} />
+            {visibleDayCount === 2 ? <TwoDayAllDayLayer layout={allDayLayout} columnWidth={columnWidth} height={allDayHeight}
+              visibleStartIndex={bufferDays} visibleDayCount={2} onEditEvent={onEditEvent} /> : null}
           </Animated.View>
         </View>
       </View>
@@ -105,8 +112,9 @@ export function TwoDayView({
                 <View style={styles.viewport}>
                   <Animated.View testID="two-day-calendar.timeline-strip"
                     style={[styles.stripRow, { width: stripWidth, transform: [{ translateX }] }]}>
-                    {strip.map((day) => (
+                    {strip.map((day, index) => (
                       <TwoDayColumn key={day.date} day={day} variant="timeline" scale={zoom.scale}
+                        hidden={visibleDayCount === 1 && index !== bufferDays}
                         onEditEvent={onEditEvent} onCreateExactAt={zoom.isPinching ? undefined : onCreateExactAt}
                         nowTop={day.isToday ? nowTop : null} />
                     ))}

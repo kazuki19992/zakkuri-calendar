@@ -13,7 +13,7 @@ jest.mock('@/global.css', () => ({}));
 jest.mock('expo-router', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    // Link Preview is iOS only. The mock preserves Link layout props for the width contract.
+    // previewをマウントせず、Linkのレイアウト属性と遷移先だけを検証する。
     Link: Object.assign(({ children, ...props }: { children: ReactNode } & ViewProps) => (
       <View {...props}>{children}</View>
     ), {
@@ -142,6 +142,25 @@ describe('独自月カレンダー表示', () => {
       expect(StyleSheet.flatten(view.getByTestId(
         'month-calendar.day-link.2026-09-21',
       ).props.style).flex).toBe(1);
+    } finally {
+      Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
+    }
+  });
+
+  it('iOSの通常タップでも画面をpushせず対象日の切替callbackを一度呼ぶ', async () => {
+    const onOpenDay = jest.fn();
+    const onSelectDate = jest.fn();
+    const platform = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'ios' });
+    try {
+      const view = await render(<MonthGrid days={createDays()} onSelectDate={onSelectDate} onOpenDay={onOpenDay} />);
+      await userEvent.setup().press(view.getByRole('button', { name: '2026年9月21日、敬老の日、選択中、予定ありを開く' }));
+      expect(onOpenDay).toHaveBeenCalledTimes(1);
+      expect(onOpenDay).toHaveBeenCalledWith('2026-09-21');
+      expect(onSelectDate).not.toHaveBeenCalled();
+      const link = view.getByTestId('month-calendar.day-link.2026-09-21').children[0];
+      expect(typeof link).not.toBe('string');
+      if (typeof link !== 'string') expect(link.props.href).toEqual({ pathname: '/calendar/day/[date]', params: { date: '2026-09-21', request: expect.any(String) } });
     } finally {
       Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
     }

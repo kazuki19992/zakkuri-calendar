@@ -19,6 +19,7 @@ export type UseTwoDayCarouselInput = Readonly<{
    * ジャンプではなく瞬時の同期として基準位置へ戻す。
    */
   leadingDate: string;
+  visibleDayCount?: 1 | 2;
 }>;
 
 export type TwoDayCarousel = Readonly<{
@@ -42,6 +43,16 @@ export function shouldCaptureTwoDaySwipe(
     Math.abs(gesture.dx) > Math.abs(gesture.dy) * horizontalDominance;
 }
 
+// 1本指で捕捉した後でも、2本指になった操作全体をpinchとして扱う。
+function createTouchSession() {
+  let multiTouch = false;
+  return {
+    reset() { multiTouch = false; },
+    observe(count: number) { if (count > 1) multiTouch = true; return multiTouch; },
+    isMultiTouch() { return multiTouch; },
+  };
+}
+
 /**
  * 表示2日の前後に予備列を持つストリップを、ジャンプなく連続スライドさせる。
  * 予備列はすでに取得・描画済みのため、移動確定時は基準位置から1列分だけ
@@ -54,7 +65,8 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
   const [width, setWidth] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
   const [transitionGate] = useState(() => createTransitionGate());
-  const columnWidth = width / 2;
+  const [touchSession] = useState(createTouchSession);
+  const columnWidth = width / (input.visibleDayCount ?? 2);
   const baseOffset = -input.bufferDays * columnWidth;
 
   // 計測幅が変わるたび、表示2日がちょうど収まる基準位置へ即座に合わせる。
@@ -103,13 +115,15 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
   const moveNext = useCallback(() => move('next'), [move]);
 
   const panResponder = useMemo(
-    () =>
-      PanResponder.create({
+    () => PanResponder.create({
         onMoveShouldSetPanResponderCapture: (_, gesture) => shouldCaptureTwoDaySwipe(gesture, isAnimating),
+        onPanResponderGrant: () => touchSession.reset(),
         onPanResponderMove: (_, gesture) => {
+          if (touchSession.observe(gesture.numberActiveTouches)) { translateX.setValue(baseOffset); return; }
           if (!isAnimating) translateX.setValue(baseOffset + gesture.dx);
         },
         onPanResponderRelease: (_, gesture) => {
+          if (touchSession.isMultiTouch()) { translateX.setValue(baseOffset); return; }
           const direction = getSwipeDirection(gesture);
           if (direction === null) {
             if (input.reduceMotion) translateX.setValue(baseOffset);
@@ -123,7 +137,7 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
           else void runAnimation(translateX, baseOffset);
         },
       }),
-    [baseOffset, input.reduceMotion, isAnimating, move, translateX],
+    [baseOffset, input.reduceMotion, isAnimating, move, translateX, touchSession],
   );
 
   return {

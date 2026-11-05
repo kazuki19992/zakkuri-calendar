@@ -3,6 +3,7 @@ import { useTheme } from '@/hooks/use-theme';
 import type { MonthDayViewModel, MonthWeekViewModel } from '../month-view-model';
 import { MonthDayCell } from './month-day-cell';
 import { MonthWeekEventLayer } from './month-week-event-layer';
+import type { ReactNode } from 'react';
 
 const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'] as const;
 
@@ -13,9 +14,10 @@ export type MonthGridProps = Readonly<{
   onOpenDay?(date: string): void;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   variant?: 'month' | 'picker';
+  renderDayPreview?(date: string): ReactNode;
 }>;
 
-export function MonthGrid({ days, onSelectDate, weekModels, onOpenDay, onEditEvent, variant = 'month' }: MonthGridProps) {
+export function MonthGrid({ days, onSelectDate, weekModels, onOpenDay, onEditEvent, renderDayPreview, variant = 'month' }: MonthGridProps) {
   const theme = useTheme();
   const firstWeekday = days[0]?.weekday ?? 1;
   const weekdays = Array.from({ length: 7 }, (_, index) => (firstWeekday + index) % 7);
@@ -32,7 +34,7 @@ export function MonthGrid({ days, onSelectDate, weekModels, onOpenDay, onEditEve
       </View>
       {dayWeeks.map((week, index) => (
         <View key={index} testID="month-calendar.week" style={[styles.week, variant === 'month' && styles.monthWeek]}>
-          {week.map((day) => <MonthDayCell key={day.date} day={day} variant={variant} onPress={onSelectDate} onOpenDay={onOpenDay} />)}
+          {week.map((day) => <MonthDayCell key={day.date} day={day} variant={variant} onPress={onSelectDate} onOpenDay={onOpenDay} renderDayPreview={renderDayPreview} />)}
           {variant === 'month' && onOpenDay !== undefined && weekModels?.[index] !== undefined ? <MonthWeekEventLayer week={weekModels[index]} onOpenDay={onOpenDay} onEditEvent={onEditEvent} /> : null}
         </View>
       ))}

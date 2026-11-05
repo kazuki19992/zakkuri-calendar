@@ -1,25 +1,22 @@
+import { loadCalendarSnapshot as loadSnapshot, type CalendarSnapshot, type ViewTarget } from '../calendar-snapshot';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import type { EventColorId } from '@/constants/event-colors';
 import { DEFAULT_CALENDAR_ID } from '@/domain/calendar/calendar';
 import {
   DEFAULT_CALENDAR_VIEW_MODE,
   type CalendarViewMode,
 } from '@/domain/calendar/calendar-view-mode';
-import {
-  expandEventOccurrences,
-  type EventOccurrence,
-} from '@/domain/calendar/event-occurrence';
 import type { HolidayProvider } from '@/domain/calendar/holiday';
 import {
   getMonthGrid,
-  getMonthRange,
   getMonthStart,
   getTwoDayRange,
+  isCalendarDate,
   moveMonth,
   moveTwoDayWindow,
   offsetCalendarDate,
   toCalendarDate,
-  type WeekStartsOn,
 } from '@/domain/calendar/month';
 import type {
   CalendarRepository,
@@ -27,22 +24,19 @@ import type {
   SettingsRepository,
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
-import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
-import { selectHolidayProvider } from '@/data/holidays/selected-holiday-provider';
 import { DEFAULT_CALENDAR_WEEK_STARTS_ON } from '@/domain/calendar/week-start';
 import {
   createAgendaItems,
   occursOnCalendarDate,
   type AgendaItemViewModel,
-  type HolidayRangeCoverage,
   type HolidaySupport,
 } from '../calendar-view-model';
 import { createMonthDayViewModels, createMonthWeekViewModels, type MonthDayViewModel, type MonthWeekViewModel } from '../month-view-model';
 import {
   TWO_DAY_SWIPE_BUFFER_DAYS,
-  createTwoDayStripDates,
   createTwoDayStripViewModels,
   createTwoDayViewModels,
+  createDayViewModel,
   type TwoDayViewModel,
 } from '../two-day-view-model';
 
@@ -56,6 +50,7 @@ export type UseCalendarViewInput = Readonly<{
   holidayProvider: HolidayProvider;
   refreshRevision?: number;
   now?: () => Date;
+  initialDay?: string;
 }>;
 
 export type CalendarViewState = Readonly<{
@@ -71,6 +66,7 @@ export type CalendarViewState = Readonly<{
    * ジャンプなく連続スライドできるよう、予備列分もあらかじめ取得済み。
    */
   twoDayStrip: readonly TwoDayViewModel[];
+  dayStrip: readonly TwoDayViewModel[];
   monthDays: readonly MonthDayViewModel[];
   monthWeeks: readonly MonthWeekViewModel[];
   datePickerMonth: string;
@@ -79,6 +75,7 @@ export type CalendarViewState = Readonly<{
   selectedHolidayName: string | null;
   holidaySupport: HolidaySupport;
   isPeriodLoading: boolean;
+  isViewModeUpdating: boolean;
   periodError: string | null;
   viewModePersistenceError: string | null;
   isDatePickerLoading: boolean;
@@ -89,6 +86,7 @@ export type CalendarViewState = Readonly<{
   isCalendarVisibilityUpdating: boolean;
   calendarVisibilityError: string | null;
   selectMode(mode: CalendarViewMode): Promise<boolean>;
+  showDay(date: string): Promise<boolean>;
   showPreviousPeriod(): Promise<boolean>;
   showNextPeriod(): Promise<boolean>;
   showToday(): Promise<boolean>;
@@ -97,26 +95,6 @@ export type CalendarViewState = Readonly<{
   selectDate(date: string): Promise<boolean>;
   setCalendarVisible(visible: boolean): Promise<boolean>;
   retry(): Promise<boolean>;
-}>;
-
-type CalendarSnapshot = Readonly<{
-  weekStartsOn: WeekStartsOn;
-  calendarId: string;
-  calendarName: string;
-  calendarColorId: EventColorId;
-  isCalendarVisible: boolean;
-  occurrences: readonly EventOccurrence[];
-  holidayCoverage: readonly HolidayRangeCoverage[];
-  definitions: ReadonlyMap<string, TemporalDefinition>;
-  undeterminedFadeMinutes: number;
-}>;
-
-type ViewTarget = Readonly<{
-  mode: CalendarViewMode;
-  today: string;
-  anchorDate: string;
-  visibleMonth: string;
-  selectedDate: string;
 }>;
 
 type InternalState = ViewTarget &
@@ -153,31 +131,6 @@ function getSystemTime(): Date {
   return new Date();
 }
 
-function getTargetRange(
-  target: ViewTarget,
-  weekStartsOn: WeekStartsOn,
-): Readonly<{ from: string; through: string }> {
-  if (target.mode === 'twoDay') {
-    const range = getTwoDayRange(target.anchorDate);
-    // スワイプ用予備列(前後TWO_DAY_SWIPE_BUFFER_DAYS日)の分だけ広く取得する。
-    // 前日側はさらに1日分広げ、日跨ぎ予定が予備列の左端でも継続描画できるようにする。
-    return {
-      from: offsetCalendarDate(range.from, -(TWO_DAY_SWIPE_BUFFER_DAYS + 1)),
-      through: offsetCalendarDate(range.through, TWO_DAY_SWIPE_BUFFER_DAYS),
-    };
-  }
-  const grid = getMonthGrid(target.visibleMonth, weekStartsOn);
-  return { from: grid[0].date, through: grid[grid.length - 1].date };
-}
-
-function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): readonly string[] {
-  const dates =
-    target.mode === 'twoDay'
-      ? createTwoDayStripDates(getTwoDayRange(target.anchorDate), TWO_DAY_SWIPE_BUFFER_DAYS)
-      : getMonthGrid(target.visibleMonth, weekStartsOn).map((day) => day.date);
-  return [...new Set(dates.map(getMonthStart))];
-}
-
 function withViewMode(target: ViewTarget, mode: CalendarViewMode): ViewTarget {
   return mode === 'month'
     ? { ...target, mode, visibleMonth: getMonthStart(target.today), selectedDate: target.today }
@@ -190,58 +143,9 @@ function withViewMode(target: ViewTarget, mode: CalendarViewMode): ViewTarget {
       };
 }
 
-async function loadSnapshot(input: UseCalendarViewInput, target: ViewTarget): Promise<CalendarSnapshot> {
-  const weekStartsOn = await input.settings.getCalendarWeekStartsOn();
-  const preferences = await input.settings.getHolidayPreferences();
-  const holidayProvider = selectHolidayProvider(input.holidayProvider, preferences.calendarId);
-  const calendar = await input.calendars.getDefault();
-  const range = getTargetRange(target, weekStartsOn);
-  const [schedule, isCalendarVisible, undeterminedFadeMinutes] = await Promise.all([
-    input.events.listSchedule(calendar.id, range.from, range.through),
-    input.settings.getCalendarVisible(calendar.id),
-    input.settings.getUndeterminedFadeMinutes(),
-  ]);
-  const holidayCoverage = getHolidayMonths(target, weekStartsOn).map((month) => {
-    const monthRange = getMonthRange(month);
-    return {
-      ...monthRange,
-      result: holidayProvider.list(monthRange.from, monthRange.through),
-    };
-  });
-  const expanded = expandEventOccurrences({ snapshot: schedule, from: range.from, through: range.through });
-  if (!expanded.ok) throw new Error('event occurrence expansion failed');
-  const occurrences = expanded.value;
-  const fuzzyDefinitionIds = [
-    ...new Set(
-      occurrences
-        .map((occurrence) => occurrence.event)
-        .filter((event) => event.temporalType === 'fuzzy')
-        .map((event) => event.temporalDefinitionId),
-    ),
-  ];
-  const definitions = await Promise.all(
-    fuzzyDefinitionIds.map((id) => input.temporalDefinitions.getById(id)),
-  );
-
-  return {
-    weekStartsOn,
-    calendarId: calendar.id,
-    calendarName: calendar.name,
-    calendarColorId: calendar.colorId,
-    isCalendarVisible,
-    occurrences,
-    holidayCoverage,
-    definitions: new Map(
-      definitions.flatMap((definition) =>
-        definition === null ? [] : [[definition.id, definition] as const],
-      ),
-    ),
-    undeterminedFadeMinutes,
-  };
-}
-
 export function useCalendarView(input: UseCalendarViewInput): CalendarViewState {
   const inputRef = useRef(input);
+  const [isViewModeUpdating, setViewModeUpdating] = useState(false);
   const [state, setState] = useState<InternalState>(() => {
     const today = toCalendarDate((input.now ?? getSystemTime)());
     return {
@@ -263,6 +167,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   const requestIdRef = useRef(0);
   const initialModePromiseRef = useRef<Promise<CalendarViewMode> | null>(null);
   const initialModeAppliedRef = useRef(false);
+  const [initialDay] = useState(() => isCalendarDate(input.initialDay) ? input.initialDay : null);
   const modeSelectionBusyRef = useRef(false);
   const modeSelectionVersionRef = useRef(0);
   const datePickerRequestIdRef = useRef(0);
@@ -281,6 +186,15 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   useEffect(() => {
     inputRef.current = input;
   }, [input]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      const today = toCalendarDate((inputRef.current.now ?? getSystemTime)());
+      setState((current) => current.today === today ? current : { ...current, today });
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     stateRef.current = state;
@@ -324,9 +238,10 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     void (async () => {
       let target: ViewTarget = stateRef.current;
       if (!initialModeAppliedRef.current) {
-        const mode = await getInitialMode();
+        const mode = initialDay === null ? await getInitialMode() : 'day';
         if (!mountedRef.current || requestId !== requestIdRef.current) return;
         target = withViewMode(stateRef.current, mode);
+        if (initialDay !== null) target = { ...target, anchorDate: initialDay, selectedDate: initialDay, visibleMonth: getMonthStart(initialDay) };
         initialModeAppliedRef.current = true;
         setState((current) => ({ ...current, ...target }));
       }
@@ -336,6 +251,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         setState((current) => ({
           ...current,
           ...target,
+          today: toCalendarDate((inputRef.current.now ?? getSystemTime)()),
           status: 'ready',
           snapshot: resolveCalendarVisibility(snapshot, calendarVisibilityVersion),
           isPeriodLoading: false,
@@ -376,6 +292,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     input.temporalDefinitions,
     getInitialMode,
     resolveCalendarVisibility,
+    initialDay,
   ]);
 
   const transitionTo = useCallback(async (target: ViewTarget): Promise<boolean> => {
@@ -388,6 +305,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
       setState((current) => ({
         ...current,
         ...target,
+        today: toCalendarDate((inputRef.current.now ?? getSystemTime)()),
         status: 'ready',
         snapshot: resolveCalendarVisibility(snapshot, calendarVisibilityVersion),
         isPeriodLoading: false,
@@ -406,11 +324,13 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   }, [resolveCalendarVisibility]);
 
   const selectMode = useCallback(
-    async (mode: CalendarViewMode): Promise<boolean> => {
+    async (mode: CalendarViewMode, date?: string): Promise<boolean> => {
+      if (date !== undefined && !isCalendarDate(date)) return false;
       if (modeSelectionBusyRef.current) return false;
       const current = stateRef.current;
-      if (current.mode === mode) return true;
+      if (current.mode === mode && date === undefined) return true;
       modeSelectionBusyRef.current = true;
+      setViewModeUpdating(true);
       const operationVersion = ++modeSelectionVersionRef.current;
       try {
         const target =
@@ -423,10 +343,14 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
             : {
                 ...current,
                 mode,
-                anchorDate: current.selectedDate,
-                visibleMonth: getMonthStart(current.selectedDate),
+                anchorDate: date ?? current.selectedDate,
+                selectedDate: date ?? current.selectedDate,
+                visibleMonth: getMonthStart(date ?? current.selectedDate),
               };
-        if (!(await transitionTo(target))) return false;
+        // 初回URLはすでに対象日のsnapshotを取得済み。再取得に依存せずmode保存へ進む。
+        const alreadyDisplayed = current.status === 'ready' && current.mode === mode
+          && date !== undefined && current.anchorDate === date && current.selectedDate === date;
+        if (!alreadyDisplayed && !(await transitionTo(target))) return false;
         setState((value) => ({ ...value, viewModePersistenceError: null }));
         try {
           const now = (inputRef.current.now ?? getSystemTime)().toISOString();
@@ -445,15 +369,18 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
         return true;
       } finally {
         modeSelectionBusyRef.current = false;
+        if (mountedRef.current) setViewModeUpdating(false);
       }
     },
     [transitionTo],
   );
 
+  const showDay = useCallback((date: string) => selectMode('day', date), [selectMode]);
+
   const movePeriod = useCallback(
     async (offset: -1 | 1): Promise<boolean> => {
       const current = stateRef.current;
-      if (current.mode === 'twoDay') {
+      if (current.mode !== 'month') {
         const anchorDate = moveTwoDayWindow(current.anchorDate, offset);
         return transitionTo({
           ...current,
@@ -625,6 +552,11 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     [state.anchorDate, state.snapshot.calendarColorId, state.snapshot.definitions, state.snapshot.holidayCoverage,
       state.snapshot.undeterminedFadeMinutes, state.today, visibleOccurrences],
   );
+  const dayStrip = useMemo(() => [-1, 0, 1].map((offset) => createDayViewModel(offsetCalendarDate(state.anchorDate, offset), {
+    today: state.today, occurrences: visibleOccurrences, definitions: state.snapshot.definitions,
+    undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes, calendarColorId: state.snapshot.calendarColorId,
+    holidayCoverage: state.snapshot.holidayCoverage,
+  })), [state.anchorDate, state.today, state.snapshot, visibleOccurrences]);
   const monthDays = useMemo(
     () =>
       createMonthDayViewModels({
@@ -691,6 +623,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     selectedDate: state.selectedDate,
     twoDayDays,
     twoDayStrip,
+    dayStrip,
     monthDays,
     monthWeeks,
     datePickerMonth: datePickerState.month,
@@ -699,6 +632,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     selectedHolidayName: selectedDay?.holidayName ?? null,
     holidaySupport: selectedDay?.holidaySupport ?? 'unsupported',
     isPeriodLoading: state.isPeriodLoading,
+    isViewModeUpdating,
     periodError: state.periodError,
     viewModePersistenceError: state.viewModePersistenceError,
     isDatePickerLoading: datePickerState.isLoading,
@@ -709,6 +643,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     isCalendarVisibilityUpdating: state.isCalendarVisibilityUpdating,
     calendarVisibilityError: state.calendarVisibilityError,
     selectMode,
+    showDay,
     showPreviousPeriod,
     showNextPeriod,
     showToday,

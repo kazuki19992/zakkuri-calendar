@@ -14,7 +14,7 @@ const ALL_DAY_VISIBLE_ITEM_LIMIT = 2;
 /** 罫線の太さ。位置を下端内へ収める計算とstyleの両方で参照する。 */
 const HOUR_LINE_THICKNESS = StyleSheet.hairlineWidth;
 
-export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = null, sharedAllDayLayout = false, sharedAllDayHeight, hiddenAllDayItemCount = 0, onEditEvent, onCreateExactAt }: Readonly<{
+export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = null, sharedAllDayLayout = false, sharedAllDayHeight, hiddenAllDayItemCount = 0, hidden = false, onEditEvent, onCreateExactAt }: Readonly<{
   day: TwoDayViewModel;
   variant?: 'summary' | 'timeline';
   scale?: number;
@@ -22,6 +22,7 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
   sharedAllDayLayout?: boolean;
   sharedAllDayHeight?: number;
   hiddenAllDayItemCount?: number;
+  hidden?: boolean;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
 }>) {
@@ -32,6 +33,8 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, nowTop = nul
     return (
       <View
         testID="two-day-calendar.timeline-column"
+        accessibilityElementsHidden={hidden}
+        importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
         style={[styles.timelineColumn, { height: TIMELINE_HEIGHT * scale, borderColor: theme.calendarBorder }]}
         onTouchEnd={(event) => {
           const timestamp = Date.now();

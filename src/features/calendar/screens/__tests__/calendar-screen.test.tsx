@@ -63,6 +63,7 @@ jest.mock('../../hooks/use-two-day-carousel', () => {
 });
 
 const callbacks = {
+  showDay: jest.fn().mockResolvedValue(true),
   selectMode: jest.fn().mockResolvedValue(true),
   showPreviousPeriod: jest.fn().mockResolvedValue(true),
   showNextPeriod: jest.fn().mockResolvedValue(true),
@@ -96,10 +97,10 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
   return {
     status: 'ready', mode: 'twoDay', today: '2026-09-08', anchorDate: '2026-09-08',
     visibleMonth: '2026-09-01', selectedDate: '2026-09-08',
-    twoDayDays, twoDayStrip,
+    twoDayDays, twoDayStrip, dayStrip: twoDayStrip.slice(0, 3),
     monthDays: [], monthWeeks: [], datePickerMonth: '2026-09-01', datePickerDays: [],
     selectedAgendaItems: [], selectedHolidayName: null,
-    holidaySupport: 'available', isPeriodLoading: false, periodError: null,
+    holidaySupport: 'available', isPeriodLoading: false, isViewModeUpdating: false, periodError: null,
     viewModePersistenceError: null,
     isDatePickerLoading: false, datePickerError: null,
     calendarName: 'マイカレンダー', calendarColorId: 'blue', isCalendarVisible: true,
@@ -110,6 +111,15 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
 
 describe('カレンダー画面', () => {
   beforeEach(() => jest.clearAllMocks());
+
+  it('1日モードは一列時間軸と前後日操作を表示する', async () => {
+    const user = userEvent.setup();
+    await renderWithSafeArea(<CalendarScreen state={createState({ mode: 'day' })} onAddEvent={jest.fn()} />);
+    expect(screen.getByTestId('single-day-calendar')).toBeOnTheScreen();
+    expect(useTwoDayCarousel).toHaveBeenLastCalledWith(expect.objectContaining({ visibleDayCount: 1 }));
+    await user.press(screen.getByRole('button', { name: '翌日へ移動' }));
+    expect(jest.mocked(useTwoDayCarousel).mock.results.at(-1)?.value.moveNext).toHaveBeenCalledTimes(1);
+  });
 
   it('表示を維持した期間エラーでも再読み込みできる', async () => {
     const user = userEvent.setup();

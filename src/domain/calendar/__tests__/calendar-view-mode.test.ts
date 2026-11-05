@@ -4,7 +4,7 @@ import {
 } from '../calendar-view-mode';
 
 describe('カレンダー表示モード', () => {
-  it.each(['twoDay', 'month'] as const)('既知の表示モード%sを受け入れる', (value) => {
+  it.each(['day', 'twoDay', 'month'] as const)('既知の表示モード%sを受け入れる', (value) => {
     expect(parseCalendarViewMode(value)).toBe(value);
   });
 

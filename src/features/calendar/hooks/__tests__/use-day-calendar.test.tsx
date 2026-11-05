@@ -27,7 +27,9 @@ function createDependencies() {
   };
   const temporalDefinitions: jest.Mocked<TemporalDefinitionRepository> = { listEnabled: jest.fn(), getById: jest.fn(), disable: jest.fn() };
   const holidayProvider: jest.Mocked<HolidayProvider> = { list: jest.fn().mockReturnValue({ status: 'available', holidays: [{ date: '2026-09-21', name: '敬老の日' }] }) };
-  const settings = { getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }) };
+  const settings = { getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }),
+    getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), getCalendarVisible: jest.fn().mockResolvedValue(true),
+    getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(120) };
   return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }
 
@@ -50,11 +52,27 @@ describe('1日表示の状態調整', () => {
 
     await waitFor(() => expect(result.current.status).toBe('ready'));
 
-    expect(dependencies.events.listSchedule).toHaveBeenCalledWith(calendar.id, '2026-09-21', '2026-09-21');
+    expect(dependencies.events.listSchedule).toHaveBeenCalledWith(calendar.id, '2026-09-19', '2026-09-22');
     expect(result.current).toMatchObject({
       holidayName: '敬老の日',
       items: [{ eventId: 'event-1', title: '通院', temporalLabel: '10:00' }],
     });
+  });
+
+  it('非表示カレンダーの予定はpreviewにも出さず祝日を維持する', async () => {
+    const dependencies = createDependencies();
+    dependencies.settings.getCalendarVisible.mockResolvedValue(false);
+    const { result } = await renderHook(() => useDayCalendar({ ...dependencies, date: '2026-09-21' }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.items).toEqual([]);
+    expect(result.current.holidayName).toBe('敬老の日');
+  });
+
+  it('取得予備日の予定は除外する', async () => {
+    const dependencies = createDependencies();
+    const { result } = await renderHook(() => useDayCalendar({ ...dependencies, date: '2026-09-22' }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.items).toEqual([]);
   });
 
   it('読み込み失敗時は予定を表示せずerror状態にする', async () => {

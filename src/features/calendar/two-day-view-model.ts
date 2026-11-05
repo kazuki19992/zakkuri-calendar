@@ -78,7 +78,7 @@ function getDateParts(date: string): readonly [number, number, number] {
   return [year, month, day];
 }
 
-function createDayViewModel(
+export function createDayViewModel(
   date: string,
   input: Readonly<{
     today: string;

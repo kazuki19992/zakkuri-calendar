@@ -2,7 +2,7 @@ import type { EventColorId } from '@/constants/event-colors';
 import type { CalendarViewMode } from '@/domain/calendar/calendar-view-mode';
 import { expandEventOccurrences, type EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { HolidayProvider } from '@/domain/calendar/holiday';
-import { getMonthGrid, getMonthRange, getMonthStart, getTwoDayRange, offsetCalendarDate, type WeekStartsOn } from '@/domain/calendar/month';
+import { getMonthGrid, getMonthRange, getMonthStart, getTwoDayRange, getWeekRange, offsetCalendarDate, type WeekStartsOn } from '@/domain/calendar/month';
 import type { CalendarRepository, EventRepository, SettingsRepository, TemporalDefinitionRepository } from '@/domain/calendar/repositories';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import { selectHolidayProvider } from '@/data/holidays/selected-holiday-provider';
@@ -41,6 +41,10 @@ function getTargetRange(
   target: ViewTarget,
   weekStartsOn: WeekStartsOn,
 ): Readonly<{ from: string; through: string }> {
+  if (target.mode === 'week') {
+    const range = getWeekRange(target.anchorDate, weekStartsOn);
+    return { from: offsetCalendarDate(range.from, -8), through: offsetCalendarDate(range.through, 7) };
+  }
   if (target.mode !== 'month') {
     const range = target.mode === 'day' ? { from: target.anchorDate, through: target.anchorDate } : getTwoDayRange(target.anchorDate);
     // スワイプ用予備列(前後TWO_DAY_SWIPE_BUFFER_DAYS日)の分だけ広く取得する。
@@ -56,7 +60,9 @@ function getTargetRange(
 
 function getHolidayMonths(target: ViewTarget, weekStartsOn: WeekStartsOn): readonly string[] {
   const dates =
-    target.mode === 'day'
+    target.mode === 'week'
+      ? Array.from({ length: 21 }, (_, index) => offsetCalendarDate(getWeekRange(target.anchorDate, weekStartsOn).from, index - 7))
+      : target.mode === 'day'
       ? [-1, 0, 1].map((offset) => offsetCalendarDate(target.anchorDate, offset))
       : target.mode === 'twoDay'
       ? createTwoDayStripDates(getTwoDayRange(target.anchorDate), TWO_DAY_SWIPE_BUFFER_DAYS)

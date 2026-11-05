@@ -330,7 +330,7 @@ describe('SQLite repositories', () => {
     [null, 'twoDay'],
     [{ value_json: '"twoDay"' }, 'twoDay'],
     [{ value_json: '"month"' }, 'month'],
-    [{ value_json: '"week"' }, 'twoDay'],
+    [{ value_json: '"week"' }, 'week'],
     [{ value_json: '2' }, 'twoDay'],
     [{ value_json: 'broken' }, 'twoDay'],
   ] as const)('最後の表示モードを安全に読み込む', async (row, expected) => {
@@ -350,7 +350,7 @@ describe('SQLite repositories', () => {
     expect(db.run).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(key) DO UPDATE'), {
       $key: 'last_calendar_view_mode', $valueJson: '"month"', $updatedAt: now,
     });
-    await expect(settings.setLastCalendarViewMode('week' as never, now))
+    await expect(settings.setLastCalendarViewMode('agenda' as never, now))
       .rejects.toThrow('Invalid calendar view mode');
   });
 

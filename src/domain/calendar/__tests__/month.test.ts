@@ -3,6 +3,7 @@ import {
   getMonthRange,
   getMonthStart,
   getTwoDayRange,
+  getWeekRange,
   moveMonth,
   moveTwoDayWindow,
   offsetCalendarDate,
@@ -10,6 +11,14 @@ import {
 } from '../month';
 
 describe('月カレンダーの日付計算', () => {
+  it.each([
+    ['2027-01-01', 1, '2026-12-28', '2027-01-03'],
+    ['2027-01-03', 0, '2027-01-03', '2027-01-09'],
+    ['2028-02-29', 1, '2028-02-28', '2028-03-05'],
+    ['2026-03-08', 0, '2026-03-08', '2026-03-14'],
+  ] as const)('週範囲は%sを含む7暦日を返す', (date, weekStartsOn, from, through) => {
+    expect(getWeekRange(date, weekStartsOn)).toEqual({ from, through });
+  });
   it('閏年2月の月初と月末を返す', () => {
     expect(getMonthRange('2028-02-14')).toEqual({
       from: '2028-02-01',

@@ -97,7 +97,7 @@ function createState(overrides: Partial<CalendarViewState> = {}): CalendarViewSt
   return {
     status: 'ready', mode: 'twoDay', today: '2026-09-08', anchorDate: '2026-09-08',
     visibleMonth: '2026-09-01', selectedDate: '2026-09-08',
-    twoDayDays, twoDayStrip, dayStrip: twoDayStrip.slice(0, 3),
+    twoDayDays, twoDayStrip, dayStrip: twoDayStrip.slice(0, 3), weekStrip: [],
     monthDays: [], monthWeeks: [], datePickerMonth: '2026-09-01', datePickerDays: [],
     selectedAgendaItems: [], selectedHolidayName: null,
     holidaySupport: 'available', isPeriodLoading: false, isViewModeUpdating: false, periodError: null,

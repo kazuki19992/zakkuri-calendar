@@ -60,6 +60,11 @@ export function getTwoDayRange(anchorDate: string): TwoDayRange {
   };
 }
 
+export function getWeekRange(date: string, weekStartsOn: WeekStartsOn): MonthRange {
+  const from = toCalendarDate(startOfWeek(parseCalendarDate(date), { weekStartsOn }));
+  return { from, through: offsetCalendarDate(from, 6) };
+}
+
 export function moveTwoDayWindow(anchorDate: string, offset: -1 | 1): string {
   return toCalendarDate(addDays(parseCalendarDate(anchorDate), offset));
 }

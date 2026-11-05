@@ -12,6 +12,7 @@ import {
   getMonthGrid,
   getMonthStart,
   getTwoDayRange,
+  getWeekRange,
   isCalendarDate,
   moveMonth,
   moveTwoDayWindow,
@@ -67,6 +68,7 @@ export type CalendarViewState = Readonly<{
    */
   twoDayStrip: readonly TwoDayViewModel[];
   dayStrip: readonly TwoDayViewModel[];
+  weekStrip: readonly TwoDayViewModel[];
   monthDays: readonly MonthDayViewModel[];
   monthWeeks: readonly MonthWeekViewModel[];
   datePickerMonth: string;
@@ -381,7 +383,9 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     async (offset: -1 | 1): Promise<boolean> => {
       const current = stateRef.current;
       if (current.mode !== 'month') {
-        const anchorDate = moveTwoDayWindow(current.anchorDate, offset);
+        const anchorDate = current.mode === 'week'
+          ? offsetCalendarDate(current.anchorDate, offset * 7)
+          : moveTwoDayWindow(current.anchorDate, offset);
         return transitionTo({
           ...current,
           anchorDate,
@@ -557,6 +561,13 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     undeterminedFadeMinutes: state.snapshot.undeterminedFadeMinutes, calendarColorId: state.snapshot.calendarColorId,
     holidayCoverage: state.snapshot.holidayCoverage,
   })), [state.anchorDate, state.today, state.snapshot, visibleOccurrences]);
+  const weekStrip = useMemo(() => {
+    if (state.mode !== 'week') return [];
+    const range = getWeekRange(state.anchorDate, state.snapshot.weekStartsOn);
+    return Array.from({ length: 21 }, (_, index) => createDayViewModel(offsetCalendarDate(range.from, index - 7), {
+      ...state.snapshot, today: state.today, occurrences: visibleOccurrences,
+    }));
+  }, [state.mode, state.anchorDate, state.today, state.snapshot, visibleOccurrences]);
   const monthDays = useMemo(
     () =>
       createMonthDayViewModels({
@@ -612,7 +623,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
   const selectedDay =
     state.mode === 'month'
       ? monthDays.find((day) => day.date === state.selectedDate)
-      : twoDayDays.find((day) => day.date === state.selectedDate);
+      : (state.mode === 'week' ? weekStrip : twoDayDays).find((day) => day.date === state.selectedDate);
 
   return {
     status: state.status,
@@ -624,6 +635,7 @@ export function useCalendarView(input: UseCalendarViewInput): CalendarViewState 
     twoDayDays,
     twoDayStrip,
     dayStrip,
+    weekStrip,
     monthDays,
     monthWeeks,
     datePickerMonth: datePickerState.month,

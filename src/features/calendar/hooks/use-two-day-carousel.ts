@@ -19,7 +19,8 @@ export type UseTwoDayCarouselInput = Readonly<{
    * ジャンプではなく瞬時の同期として基準位置へ戻す。
    */
   leadingDate: string;
-  visibleDayCount?: 1 | 2;
+  visibleDayCount?: 1 | 2 | 7;
+  stepDays?: 1 | 7;
 }>;
 
 export type TwoDayCarousel = Readonly<{
@@ -89,7 +90,8 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
       if (!transitionGate.tryEnter()) return false;
       setIsAnimating(true);
       const callback = direction === 'previous' ? input.onPrevious : input.onNext;
-      const target = direction === 'previous' ? baseOffset + columnWidth : baseOffset - columnWidth;
+      const stepWidth = columnWidth * (input.stepDays ?? 1);
+      const target = direction === 'previous' ? baseOffset + stepWidth : baseOffset - stepWidth;
       try {
         if (!input.reduceMotion) await runAnimation(translateX, target);
         else translateX.setValue(target);
@@ -108,7 +110,7 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
         setIsAnimating(false);
       }
     },
-    [baseOffset, columnWidth, input.onNext, input.onPrevious, input.reduceMotion, transitionGate, translateX],
+    [baseOffset, columnWidth, input.onNext, input.onPrevious, input.reduceMotion, input.stepDays, transitionGate, translateX],
   );
 
   const movePrevious = useCallback(() => move('previous'), [move]);

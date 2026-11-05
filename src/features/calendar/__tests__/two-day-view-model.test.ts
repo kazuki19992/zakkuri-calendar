@@ -384,5 +384,8 @@ describe('2日表示の終日レーン', () => {
 
     expect(layout.segments.map((segment) => segment.id)).toEqual(['z-multi', 'holiday:2026-09-08']);
     expect(layout.hiddenCounts).toEqual([1]);
+    expect(createTwoDayAllDayLayout([day], 1).segments.map((segment) => segment.id)).toEqual(['z-multi']);
+    expect(createTwoDayAllDayLayout([day], 1).hiddenCounts).toEqual([2]);
+    expect(createTwoDayAllDayLayout([day], 0)).toEqual({ segments: [], hiddenCounts: [3] });
   });
 });

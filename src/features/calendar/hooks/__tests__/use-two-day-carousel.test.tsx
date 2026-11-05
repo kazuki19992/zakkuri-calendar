@@ -9,6 +9,15 @@ function collectValues(value: Animated.Value): number[] {
 }
 
 describe('2日ビューの予備列付きスワイプカルーセル', () => {
+  it.each([272, 342, 382])('週表示は幅%sを7等分し1回で7列移動する', async (width) => {
+    const timing = jest.spyOn(Animated, 'timing');
+    const { result } = await renderHook(() => useTwoDayCarousel({ onPrevious: jest.fn().mockResolvedValue(true),
+      onNext: jest.fn().mockResolvedValue(true), reduceMotion: false, bufferDays: 7, visibleDayCount: 7, stepDays: 7, leadingDate: '2026-10-26' }));
+    await act(() => result.current.onLayout(width));
+    expect(result.current.columnWidth * 7).toBeCloseTo(width);
+    await act(async () => { await result.current.moveNext(); });
+    expect(timing).toHaveBeenCalledWith(result.current.translateX, expect.objectContaining({ toValue: -2 * width }));
+  });
   it('スワイプ捕捉後に2本指へ変わった操作は日移動に確定しない', async () => {
     const create = jest.spyOn(PanResponder, 'create');
     const onNext = jest.fn().mockResolvedValue(true);

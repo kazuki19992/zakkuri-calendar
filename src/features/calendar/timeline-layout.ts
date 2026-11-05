@@ -133,6 +133,12 @@ export type TimelineItemViewModel = Readonly<{
   continuesToNextDay: boolean;
 }>;
 
+/** 最小高と下端補正を、密集判定と実際の描画で一致させる。 */
+export function getTimelineItemFrame(item: TimelineItemViewModel, scale: number): Readonly<{ top: number; height: number }> {
+  const height = Math.max(item.height * scale, MIN_EVENT_HEIGHT);
+  return { height, top: Math.min(item.top * scale, Math.max(0, TIMELINE_HEIGHT * scale - height)) };
+}
+
 type MutableTimelineItem = Omit<TimelineItemViewModel, 'overlapIndex' | 'overlapCount'> & {
   overlapIndex: number;
   overlapCount: number;

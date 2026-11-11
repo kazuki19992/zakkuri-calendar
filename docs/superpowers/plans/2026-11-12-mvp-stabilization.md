@@ -35,7 +35,7 @@
 - [x] #54の全受け入れ条件の自動検証範囲と端末確認手順、未確認理由を記録する。
 - [x] typecheck、lint、全Jest、diff checkを実行する。今回native/UI変更がなければbuild/exportの再実行は必須とせず、過去結果と区別する。
 - [x] fresh-context reviewerで差分を確認し、重要な問題を修正して再検証する。
-- [ ] commit/push、develop向けPR作成。最新Issue本文を再取得して変更を保全し、確認できた#1の項目だけチェックする。#54へ結果と残件を追記する。
+- [x] commit/push、develop向けPR作成。最新Issue本文を再取得して変更を保全し、確認できた#1の項目だけチェックする。#54へ結果と残件を追記する。
 
 ## 実行記録
 
@@ -45,7 +45,7 @@
 
 - Task 1完了: helper未実装でテスト失敗を確認後、adapterを追加。初回4件→旧移行等を含む12件成功。全体77 suites / 725 tests成功。
 - adapter初期版の未使用引数エラーはNodeとExpoの差。Expo 57のiOS/Androidソースでindex=0を無視することを確認し、テストadapterを合わせた。アプリの不具合として扱わない。
-- Task 2進行: 全体検証・証拠表作成済み。fresh review、PR、Issue更新を行う。
+- Task 2完了: fresh reviewの指摘を修正し、PR #56を作成。#1は確認済みの項目をチェックし、#54は証拠表と残件を追記してopen継続。#55は修正済み・PR未マージを明示。
 - 既定長についてMVPと後続設計の差を発見。独断で変更せずユーザーへ質問し、今回の検証で既定長設定UIを実装済みとは扱わない。
 
 - 最終review指摘: 同一接続のテストがExpoの新規接続におけるFK OFFを隠す問題を採用。別接続＋FK OFF＋本番adapter経由で2件の失敗を再現後、専用接続へBEGIN前のFK設定を実装。unitもRED→GREEN、全77 suites / 727 tests成功。#55へ再現・完了条件を記録。

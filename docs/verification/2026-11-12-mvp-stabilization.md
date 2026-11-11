@@ -4,7 +4,7 @@
 
 ## 確認対象と証拠の区分
 
-- 統合済みの基準commit: `7a58910e3bc4fe5acba2b2b6c7ff7d858ab60f7f`（PR #53）。今回のコードcommitは本PRの検証結果欄に記録する。
+- 統合済みの基準commit: `7a58910e3bc4fe5acba2b2b6c7ff7d858ab60f7f`（PR #53）。検証対象コードcommit: `81eeb183d32e3d3d7bc61139e4955b0872db1410`（[PR #56](https://github.com/kazuki19992/zakkuri-calendar/pull/56)）。以降は文書のみ更新。
 - 自動検証環境: macOS、Node.js v22.18.0、lockfileによる依存install。テストDBは一時ディレクトリの合成データだけで、端末の個人DBは使用していない。
 - 今回の追加: 実SQLiteによる12件の統合テスト。本番DBアダプターの専用接続で外部キー設定を引き継ぐ修正（#55）を含む。UI・schema・native依存は変更していない。
 - 今回の実行結果: typecheck成功、lint成功（警告なし）、Jest **77 suites / 727 tests成功**、`git diff --check`成功。

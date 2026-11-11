@@ -45,7 +45,7 @@
 - [x] 承認済み仕様とREADME・元MVP・後続editor・#54記録を実装へ合わせる。
 - [x] typecheck／lint／全Jest／diff-check、iOS／Android exportを実行する。
 - [x] fresh-context reviewerで差分全体を確認し、重要な指摘をRED→GREENで修正する。
-- [ ] commit／push、develop宛て通常PR（Closes #57）作成・添付。#1／#54の実装状況を更新し、端末未確認を完了扱いにしない。
+- [x] commit／push、develop宛て通常PR（Closes #57）作成・添付。#1／#54の実装状況を更新し、端末未確認を完了扱いにしない。
 
 ## 共有境界と実行記録
 
@@ -62,3 +62,5 @@
 - 旧non-fixedテストは、承認済み設計の明示的な終了種別選択に合わせて更新。終日の入力を遅延初期化で上書きしないため終了日を独立保持。
 
 - 最終検証: typecheck/lint警告なし、全83 suites/765 tests、diff-check成功。iOS/Android export成功。初回は旧worktreeのDOM変換cacheで失敗し、Expo公開オプション--clearで再生成後に成功。コード修正は不要。実機/native buildは未実施。
+
+- Task 3完了: code commit 6a17e9d。PR #58（develop宛て通常Open）を作成・添付。#57は実装/自動検証のチェックを更新、#1へ実装済み項目を追加、#54は実機未確認を維持。設計・保存・設定・editorのcommitを分離した。

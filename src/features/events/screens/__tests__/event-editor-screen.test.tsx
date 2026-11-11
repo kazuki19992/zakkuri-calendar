@@ -10,6 +10,7 @@ jest.mock('@expo/ui/community/datetime-picker', () => {
 });
 
 const state: EventEditorState = {
+  exactDurationType: 'fixed', exactDurationStatus: 'ready', setExactDurationType: jest.fn(), retryExactDuration: jest.fn(),
   status: 'ready', mode: 'create', title: '', editorTab: 'exact', isAllDay: false, isDateEditable: true,
   isRecurrenceEditable: true, relativeDatePreview: null,
   startDate: '2026-09-25', startTime: '09:30', endDate: '2026-09-26', endTime: '11:45',

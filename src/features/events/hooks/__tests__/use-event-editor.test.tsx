@@ -354,12 +354,13 @@ describe('予定編集の主要状態', () => {
     expect(repositories.events.create).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ temporalType: 'allDay', endDate: '2026-09-11' }) }));
   });
 
-  it.each(['instant', 'undetermined'] as const)('%sは同一終了日時なら保持し範囲変更時はfixedへ変換する', async (type) => {
+  it.each(['instant', 'undetermined'] as const)('%sを保持し終了種別を明示するとfixedへ変換する', async (type) => {
     const repositories = createRepositories(); const event = { ...exactEvent, duration: { type } }; repositories.events.getById.mockResolvedValue({ event, reminders: [] });
     const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: event.id }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
     await act(async () => { await result.current.save(); });
     expect(repositories.events.update).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ duration: { type } }) }));
+    await act(async () => { result.current.setExactDurationType('fixed'); });
     await act(async () => { result.current.setEndDate('2026-09-10'); result.current.setEndTime('00:30'); });
     await act(async () => { await result.current.save(); });
     expect(repositories.events.update).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ duration: { type: 'fixed', minutes: 60 } }) }));
@@ -448,5 +449,114 @@ describe('予定編集の追加情報', () => {
     await act(async () => { result.current.setTitle('予定'); result.current.setRecurrencePreset('custom'); result.current.setRecurrenceIntervalText('0'); });
     await act(async () => { await result.current.save(); });
     expect(result.current.recurrenceError).toBe('繰り返し間隔は1以上の整数で入力してください'); expect(repositories.events.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('初期長設定と終了の指定', () => {
+  const withoutEnd = { date: '2026-12-31', startTime: '23:30', temporalType: 'fuzzy' as const };
+  it.each([
+    [{ type: 'fixed', minutes: 30 }, '2027-01-01', '00:00'],
+    [{ type: 'instant' }, '2026-12-31', '23:30'],
+    [{ type: 'undetermined' }, '2026-12-31', '23:30'],
+  ] as const)('設定%sを一度だけ適用し終了種別に沿って保存する', async (duration, endDate, endTime) => {
+    const repositories = createRepositories();
+    repositories.settings.getDefaultExactDuration.mockResolvedValue(duration);
+    const { result } = await renderHook(() => useEventEditor({ createId: () => 'event-new', ...repositories, initial: withoutEnd }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() => expect(result.current.exactDurationStatus).toBe('ready'));
+    expect(result.current.endDate).toBe(endDate);
+    expect(result.current.endTime).toBe(endTime);
+    await act(async () => { result.current.setTitle('合成予定'); result.current.setEditorTab('exact'); });
+    await act(async () => { await result.current.save(); });
+    expect(repositories.events.create).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({ duration }) }));
+    await act(async () => { result.current.setEditorTab('fuzzy'); });
+    await act(async () => { result.current.setEditorTab('exact'); });
+    expect(repositories.settings.getDefaultExactDuration).toHaveBeenCalledTimes(1);
+  });
+
+  it('明示終了と既存予定は設定を取得せず保存値を優先する', async () => {
+    const repositories = createRepositories();
+    const { result } = await renderHook(() => useEventEditor({ createId: () => 'event-new', ...repositories, initial }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.endTime).toBe('11:45');
+    expect(repositories.settings.getDefaultExactDuration).not.toHaveBeenCalled();
+  });
+
+  it('初期長読込失敗でも入力を保持し、ざっくりと終日の保存を妨げない', async () => {
+    const repositories = createRepositories();
+    repositories.settings.getDefaultExactDuration.mockRejectedValueOnce(new Error('synthetic'));
+    const { result } = await renderHook(() => useEventEditor({ createId: () => 'event-new', ...repositories, initial: withoutEnd }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() => expect(result.current.exactDurationStatus).toBe('error'));
+    await act(async () => { result.current.setTitle('入力保持'); result.current.setEditorTab('exact'); });
+    expect(result.current.isSaveDisabled).toBe(true);
+    await act(async () => { expect(await result.current.save()).toBe(false); });
+    await act(async () => { result.current.setAllDay(true); });
+    expect(result.current.isSaveDisabled).toBe(false);
+    await act(async () => { expect(await result.current.save()).toBe(true); });
+    await act(async () => { result.current.setAllDay(false); result.current.setEditorTab('fuzzy'); });
+    await act(async () => { expect(await result.current.save()).toBe(true); });
+    repositories.settings.getDefaultExactDuration.mockResolvedValue({ type: 'fixed', minutes: 15 });
+    await act(async () => { await result.current.retryExactDuration(); });
+    expect(result.current.title).toBe('入力保持');
+    expect(result.current.exactDurationStatus).toBe('ready');
+  });
+
+  it('遅延初期化は終日の入力を壊さず、完了後は変更した開始日から終了を作る', async () => {
+    const repositories = createRepositories();
+    let resolve!: (duration: { type: 'fixed'; minutes: number }) => void;
+    repositories.settings.getDefaultExactDuration.mockReturnValue(new Promise((done) => { resolve = done; }));
+    const { result } = await renderHook(() => useEventEditor({ createId: () => 'event-new', ...repositories, initial: withoutEnd }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => {
+      result.current.setEditorTab('exact'); result.current.setAllDay(true);
+    });
+    await act(async () => { result.current.setStartDate('2027-01-05'); });
+    await act(async () => { result.current.setEndDate('2027-01-08'); });
+    await act(async () => { resolve({ type: 'fixed', minutes: 60 }); });
+    expect(result.current.endDate).toBe('2027-01-08');
+    await act(async () => { result.current.setAllDay(false); });
+    expect(result.current.endDate).toBe('2027-01-06');
+    expect(result.current.endTime).toBe('00:30');
+  });
+
+  it('終了種別を変えたら無効な終了を保存に使わず最後の有効な長さへ戻せる', async () => {
+    const repositories = createRepositories();
+    const { result } = await renderHook(() => useEventEditor({ createId: () => 'event-new', ...repositories, initial: { ...initial, temporalType: 'exact' } }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.setTitle('合成予定'); result.current.setEditorTab('exact'); result.current.setExactDurationType('instant'); });
+    await act(async () => { result.current.setStartTime('23:30'); result.current.setExactDurationType('undetermined'); });
+    await act(async () => { await result.current.save(); });
+    expect(repositories.events.create).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ duration: { type: 'undetermined' } }) }));
+    await act(async () => { result.current.setExactDurationType('fixed'); });
+    expect(result.current.endTime).toBe('01:45');
+    expect(result.current.endDate).toBe('2026-09-10');
+  });
+
+  it.each(['instant', 'undetermined'] as const)('既存の%sを再編集しても初期長で上書きしない', async (type) => {
+    const repositories = createRepositories();
+    repositories.events.getById.mockResolvedValue({ event: { ...exactEvent, duration: { type } }, reminders: [] });
+    const { result } = await renderHook(() => useEventEditor({ createId: () => 'event-new', ...repositories, initial, eventId: exactEvent.id }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.exactDurationType).toBe(type);
+    expect(repositories.settings.getDefaultExactDuration).not.toHaveBeenCalled();
+    await act(async () => { await result.current.save(); });
+    expect(repositories.events.update).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({ duration: { type } }) }));
+  });
+});
+
+describe('終了種別の境界', () => {
+  it('無効になる直前の有効なfixed長を復帰時に使い、同時刻は自動で長さなしにしない', async () => {
+    const repositories = createRepositories();
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, initialTab: 'exact' }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.setEndTime('10:00'); });
+    await act(async () => { result.current.setEndTime('09:30'); result.current.setTitle('境界'); });
+    await act(async () => { expect(await result.current.save()).toBe(false); });
+    expect(result.current.exactDurationType).toBe('fixed');
+    await act(async () => { result.current.setExactDurationType('instant'); });
+    expect(result.current.endTimeError).toBeNull();
+    await act(async () => { result.current.setExactDurationType('fixed'); });
+    expect(result.current.endTime).toBe('10:00');
   });
 });

@@ -335,3 +335,7 @@ export成功は実機のlayout、keyboard、picker、gesture、VoiceOver／TalkB
 - 繰り返し規則は保存できるが、発生回表示が次PRであることを文書上明確にする。
 - schema migrationと新規native dependencyを追加しない。
 - 自動検証と両platform exportが成功し、実機未確認項目をPRへ記載する。
+
+## 初期長と終了指定の更新（#57）
+
+新規フォームのexact draftへ既定長を一度だけ反映する。未選択では1時間、明示終了routeと既存編集はそれぞれの値を優先する。きっちり・終日OFFでは終了指定を「時刻を指定／長さなし／未定」から単一選択し、後二者は終了日時を隠す。読込み失敗時もタイトル・メモを保持し、既定長を必要としないざっくり／終日の保存は妨げない。詳細は`2026-11-12-default-exact-duration-design.md`を参照する。

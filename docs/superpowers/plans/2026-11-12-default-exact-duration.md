@@ -39,12 +39,12 @@
 
 対象: `features/events/exact-duration-draft.ts`、`hooks/use-new-event-duration.ts`、`hooks/use-event-editor.ts`、日時fields／screen、新規route、各テスト、READMEと仕様・検証記録。
 
-- [ ] 設定→初期draft、明示終了優先、深夜／月年跨ぎ、全duration種別、失敗範囲、再試行、タブ／終日、既存編集、終了切替の失敗テストを追加する。
-- [ ] routeの固定+60を外し、終了の有無をhookへ渡す。小さな純粋関数と非同期hookで初期化し、編集可能になる前にsnapshotを確定する。
-- [ ] editorに終了種別とretryを配線する。保存時は種別に従い、fixed復帰では最後の有効分数を現在の開始から解決する。
-- [ ] 承認済み仕様とREADME・元MVP・後続editor・#54記録を実装へ合わせる。
-- [ ] typecheck／lint／全Jest／diff-check、iOS／Android exportを実行する。
-- [ ] fresh-context reviewerで差分全体を確認し、重要な指摘をRED→GREENで修正する。
+- [x] 設定→初期draft、明示終了優先、深夜／月年跨ぎ、全duration種別、失敗範囲、再試行、タブ／終日、既存編集、終了切替の失敗テストを追加する。
+- [x] routeの固定+60を外し、終了の有無をhookへ渡す。小さな純粋関数と非同期hookで初期化し、編集可能になる前にsnapshotを確定する。
+- [x] editorに終了種別とretryを配線する。保存時は種別に従い、fixed復帰では最後の有効分数を現在の開始から解決する。
+- [x] 承認済み仕様とREADME・元MVP・後続editor・#54記録を実装へ合わせる。
+- [x] typecheck／lint／全Jest／diff-check、iOS／Android exportを実行する。
+- [x] fresh-context reviewerで差分全体を確認し、重要な指摘をRED→GREENで修正する。
 - [ ] commit／push、develop宛て通常PR（Closes #57）作成・添付。#1／#54の実装状況を更新し、端末未確認を完了扱いにしない。
 
 ## 共有境界と実行記録
@@ -57,3 +57,8 @@
 - Task 1完了: 互換性テスト13件のうち10件が期待どおり失敗→修正後SQLite 9 suites/129 tests成功。typecheck/lint成功、全78 suites/740 tests成功。
 
 - Task 2完了: hook/UIの未実装失敗→設定7 suites/17 tests成功。選択済みaccessibilityLabelを既存共通UIの仕様に合わせて検証。typecheck/lint成功、全80 suites/746 tests成功。
+
+- Task 3: 初期化・終了種別の未実装テストと最後の有効fixedのテストの失敗を確認して最小実装。全83 suites/765 tests、typecheck、lint成功。fresh-context reviewerは重要指摘なし、独立focused 5 suites/58 tests成功。
+- 旧non-fixedテストは、承認済み設計の明示的な終了種別選択に合わせて更新。終日の入力を遅延初期化で上書きしないため終了日を独立保持。
+
+- 最終検証: typecheck/lint警告なし、全83 suites/765 tests、diff-check成功。iOS/Android export成功。初回は旧worktreeのDOM変換cacheで失敗し、Expo公開オプション--clearで再生成後に成功。コード修正は不要。実機/native buildは未実施。

@@ -78,6 +78,10 @@ SQLiteのschema version 6では、version 5までの予定モデルに加え、�
 
 ## データ境界
 
+- 設定の「予定の初期の長さ」で長さなし／10分／15分／30分／1時間／未定を選べます。初期値は1時間で新規フォームに一度だけ適用し、編集中・保存済み予定は変更しません。きっちり・終日OFFでは終了を「時刻を指定／長さなし／未定」から選べます。
+- 初期長の読込みに失敗した場合は該当する時刻付き入力と保存を止めて再試行を案内し、ざっくり・終日予定の保存は妨げません。
+- 初期長設定は既存の`default_exact_duration`へversion付きJSONで保存します。旧instant seedを1時間として読み、今後明示選択する長さなしと区別します。schema versionは6のまま、旧fixed／undeterminedと保存済み予定を保持します。
+
 - 個人のカレンダーデータは端末内のSQLiteデータベース`zakkuri-calendar.db`へ保存します。
 - 週開始曜日は既存の`app_settings`へ`calendar_week_starts_on`（0=日曜、1=月曜）として保存します。欠損・不正値は1へfallbackし、schema version 6のまま利用できます。
 - 祝日設定は`holiday_preferences`のversion付きJSONへ保存します。欠損・不正値は日本／締切調整OFFへ戻します。調整理由は既存の予定解決contextへoptional情報として保存し、旧データを一括変換しません。設定変更は保存済み予定を書き換えません。

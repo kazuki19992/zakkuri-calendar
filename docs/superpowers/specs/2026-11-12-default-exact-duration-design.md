@@ -1,6 +1,6 @@
-# 正確な予定の初期の長さ設定 設計案
+# 正確な予定の初期の長さ設定 設計
 
-状態: **設計承認済み・実装中**。2026-11-12。基準commit: `5337af30bd1490e405b530a57d8f75a615582ba6`。
+状態: **実装済み・実機未確認**。2026-11-12。基準commit: `5337af30bd1490e405b530a57d8f75a615582ba6`。
 
 関連: [既定長設定 #57](https://github.com/kazuki19992/zakkuri-calendar/issues/57)、親MVP #1、安定化 #54。元設計は`2026-09-07-zakkuri-calendar-mvp-design.md` 5.4、後続の現在のeditor仕様は`2026-09-10-event-editor-and-add-flows-design.md`と`2026-09-30-event-editor-ui-design.md`を参照する。
 
@@ -88,7 +88,7 @@ fixedでの開始・終了日時の個別編集は現行の操作を維持し、
 
 既存の`app_settings`とキー`default_exact_duration`、Repositoryの`getDefaultExactDuration`／`setDefaultExactDuration`を再利用する。新しいテーブルや別の保存基盤は追加しない。domainの`ExactDuration`も変更しない。
 
-新しい保存形式は、同じキーのJSONを次のenvelopeで保存する案とする。
+新しい保存形式は、同じキーのJSONを次のenvelopeで保存する。
 
 ```json
 { "version": 1, "duration": { "type": "fixed", "minutes": 60 } }
@@ -101,7 +101,7 @@ fixedでの開始・終了日時の個別編集は現行の操作を維持し、
 | 旧形式`{ type: 'instant' }` | 設定UIが未提供だった時点のseedとして1時間に解釈 |
 | 旧形式の有効fixed／undetermined | 既存値を維持。任意の正のfixed分数も丸めない |
 
-旧instantが初期seedか手動書込みかは、現データだけでは完全に識別できない。今回まで通常のUIから設定値を選ぶ導線はなく、現行の新規フォームは設定によらず1時間なので、**旧instantだけは未選択seedとして扱う**判断を提案する。これは保存済み予定のinstantを変える処理ではない。手動で旧設定へinstantを書いた利用者も、新UIで「長さなし」を選べば新形式として保持できる。
+旧instantが初期seedか手動書込みかは、現データだけでは完全に識別できない。今回まで通常のUIから設定値を選ぶ導線はなく、現行の新規フォームは設定によらず1時間なので、**旧instantだけは未選択seedとして扱う**判断を採用した。これは保存済み予定のinstantを変える処理ではない。手動で旧設定へinstantを書いた利用者も、新UIで「長さなし」を選べば新形式として保持できる。
 
 過去migrationのDDL・既存行を一括変更しない。schema versionは6のままとし、旧seedはreaderの互換解釈で扱う。新形式への書込みは利用者が設定を保存した時だけ、1行のparameter付きUPSERTで行う。読込みのfallbackではDBを書き換えない。新しいDBも旧seedから論理初期値1時間として使えるため、再実行により明示選択が消えることはない。
 
@@ -137,13 +137,13 @@ envelopeの読込み・validation・互換解釈はSQLite Repository境界内に
 
 既定長設定を実装しても#54の未確認項目は自動で完了にしない。#1の設定に関する仕様差は実装・検証後に解消済みへ更新する。
 
-## 8. 実装者による提案の要点
+## 8. 採用した設計判断
 
 1. 「瞬間」の表示名を「長さなし」とし、元MVPの6候補を引き継ぐ。
 2. exactに終了種別の選択を加え、長さなし／未定を設定・編集・再保存できるようにする。
 3. 同じ設定キーへversion付きenvelopeを保存し、旧seedのinstantと今後の明示選択を区別する。
 4. 固定長設定を毎編集時に強制せず、新規フォーム初期化時のsnapshotとする。
 
-この文書は設計案であり、実装済み・実機確認済みを示さない。
+本設計に対応するコードと自動テストを実装済み。実機操作・読み上げの検証は未確認として#54に残す。
 
 設計レビュー: fresh-context reviewerによるbuilder checkを実施し、実装計画を妨げる重要な未回答事項なし。2026-11-12にユーザーが設計を承認し、実装を指示した。

@@ -135,16 +135,16 @@ Expo RouterのStackを使用する。
 
 ### 5.4 設定
 
-正確な予定を作る際のデフォルト長を選択できる。初期値は「瞬間」とする。
+設定の「予定の初期の長さ」で正確な予定の初期長を選択できる。初期値は「1時間」とする。新規フォームに一度だけ適用し、明示終了と既存予定を優先する。編集中・保存済みの予定へ設定変更を遡及しない。
 
-- 瞬間
+- 長さなし（domain上のinstant）
 - 10分
 - 15分
 - 30分
 - 1時間
 - 未定
 
-予定ごとにデフォルトとは異なる長さを選べる。「未定」の減衰時間はDBに保持するが、MVPでは編集UIを提供しない。
+予定ごとに終了の指定を「時刻を指定／長さなし／未定」から選べる。fixedでは開始・終了日時を個別に編集できる。「未定」の減衰時間はDBに保持するが、MVPでは編集UIを提供しない。
 
 「今週中」の締切曜日は金曜日（既定値）・土曜日・日曜日から選べる。変更後の値は新しく解決する予定だけに使い、保存済み予定の期間は更新しない。
 
@@ -344,7 +344,7 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 
 初期設定は次のとおり。
 
-- `default_exact_duration`: `{ "type": "instant" }`
+- `default_exact_duration`: 明示選択は`{ "version": 1, "duration": { "type": "fixed", "minutes": 60 } }`形式。論理初期値は1時間。旧instant seedは変更せず未選択として1時間に解釈し、明示instant・旧fixed／undeterminedは保持する。詳細は`2026-11-12-default-exact-duration-design.md`を参照。
 - `undetermined_fade_minutes`: `120`
 - `last_event_editor_tab`: `fuzzy`または`exact`（schema version 2）
 - `this_week_deadline_weekday`: `5`、`6`、`7`のいずれか（schema version 3、既定値は金曜日の`5`）

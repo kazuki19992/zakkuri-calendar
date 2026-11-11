@@ -4,7 +4,6 @@ import { BackHandler } from 'react-native';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { JapaneseHolidayProvider } from '@/data/holidays/japanese-holiday-provider';
 import { toCalendarDate } from '@/domain/calendar/month';
-import { toWallClockTime } from '@/domain/calendar/time';
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
 import { useEventEditor } from '@/features/events/hooks/use-event-editor';
 import { EventEditorScreen } from '@/features/events/screens/event-editor-screen';
@@ -17,7 +16,6 @@ export default function NewEventRoute() {
   const repositories = useRepositories();
   const { notifyChanged } = useCalendarRefresh();
   const startTime = params.startTime ?? new Date().toTimeString().slice(0, 5);
-  const startMinutes = Number(startTime.slice(0, 2)) * 60 + Number(startTime.slice(3));
   const state = useEventEditor({
     calendars: repositories.calendars,
     events: repositories.events,
@@ -26,7 +24,7 @@ export default function NewEventRoute() {
     initial: {
       date: params.date ?? toCalendarDate(new Date()),
       startTime,
-      endTime: params.endTime ?? toWallClockTime((startMinutes + 60) % (24 * 60)) ?? '10:00',
+      endTime: params.endTime,
       temporalType: params.temporalType ?? 'fuzzy',
     },
     initialTab: params.temporalType === 'exact' || params.temporalType === 'allDay'

@@ -31,9 +31,9 @@
 
 対象: `features/settings/hooks/use-default-exact-duration-settings.ts`、設定固有の表示model・section、settings route／screenとテスト。
 
-- [ ] 非同期読込、保存成功後確定、失敗保持、再試行、二重操作、unmount、候補外固定長と6候補UIをテストし、失敗を確認する。
-- [ ] hookと設定節を追加し、SingleSelectSheetを使う。他の設定の操作を巻き込まない。
-- [ ] focused testsと全suiteを確認してcommitする。
+- [x] 非同期読込、保存成功後確定、失敗保持、再試行、二重操作、unmount、候補外固定長と6候補UIをテストし、失敗を確認する。
+- [x] hookと設定節を追加し、SingleSelectSheetを使う。他の設定の操作を巻き込まない。
+- [x] focused testsと全suiteを確認してcommitする。
 
 ## Task 3: editor初期化・終了指定と最終検証
 
@@ -55,3 +55,5 @@
 - Base develop: `5337af30bd1490e405b530a57d8f75a615582ba6`、設計commit: `ac952a1`。worktreeはclean、origin/developに追加commitなし。
 
 - Task 1完了: 互換性テスト13件のうち10件が期待どおり失敗→修正後SQLite 9 suites/129 tests成功。typecheck/lint成功、全78 suites/740 tests成功。
+
+- Task 2完了: hook/UIの未実装失敗→設定7 suites/17 tests成功。選択済みaccessibilityLabelを既存共通UIの仕様に合わせて検証。typecheck/lint成功、全80 suites/746 tests成功。

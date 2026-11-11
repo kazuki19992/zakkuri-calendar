@@ -13,10 +13,12 @@ const holidays = {
   error: null, isSaving: false, setValue: jest.fn(), reload: jest.fn(),
 };
 
+const duration = { status: 'ready' as const, value: { type: 'fixed' as const, minutes: 60 }, error: null, isSaving: false, reload: jest.fn(), setValue: jest.fn() };
+
 describe('設定画面', () => {
   it('今週中の締切曜日を金土日から選べる', async () => {
     const setWeekday = jest.fn();
-    await render(<SettingsScreen holidays={holidays} weekStart={weekStart} state={{
+    await render(<SettingsScreen duration={duration} holidays={holidays} weekStart={weekStart} state={{
       status: 'ready', weekday: 5, error: null, isSaving: false, setWeekday,
     }} />);
 
@@ -31,7 +33,7 @@ describe('設定画面', () => {
 
   it('週の開始曜日を共通シートで単一選択する', async () => {
     const setValue = jest.fn();
-    await render(<SettingsScreen holidays={holidays} weekStart={{ ...weekStart, setValue }} state={{
+    await render(<SettingsScreen duration={duration} holidays={holidays} weekStart={{ ...weekStart, setValue }} state={{
       status: 'ready', weekday: 5, error: null, isSaving: false, setWeekday: jest.fn(),
     }} />);
     await fireEvent.press(screen.getByRole('button', { name: '週の開始曜日、月曜日' }));
@@ -41,7 +43,7 @@ describe('設定画面', () => {
 
   it('週開始設定の読込失敗を再試行できる', async () => {
     const reload = jest.fn();
-    await render(<SettingsScreen holidays={holidays} weekStart={{ ...weekStart, status: 'error', error: '設定を読み込めませんでした。', reload }} state={{
+    await render(<SettingsScreen duration={duration} holidays={holidays} weekStart={{ ...weekStart, status: 'error', error: '設定を読み込めませんでした。', reload }} state={{
       status: 'ready', weekday: 5, error: null, isSaving: false, setWeekday: jest.fn(),
     }} />);
     expect(screen.getByRole('button', { name: '週の開始曜日、月曜日' })).toBeDisabled();

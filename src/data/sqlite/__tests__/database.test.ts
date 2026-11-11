@@ -1,8 +1,11 @@
-import type { SQLiteDatabase } from 'expo-sqlite';
+import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
+
 import { createExpoDatabaseAdapter } from '../database';
 
-describe('createExpoDatabaseAdapter', () => {
-  it('delegates queries and maps write metadata', async () => {
+jest.mock('expo-sqlite', () => ({ openDatabaseAsync: jest.fn() }));
+
+describe('Expoデータベースadapter', () => {
+  it('クエリを委譲し書込み結果を返す', async () => {
     const db = {
       execAsync: jest.fn().mockResolvedValue(undefined),
       runAsync: jest.fn().mockResolvedValue({ changes: 2, lastInsertRowId: 7 }),
@@ -19,15 +22,41 @@ describe('createExpoDatabaseAdapter', () => {
     await expect(adapter.all('SELECT * FROM items WHERE id = $id', params)).resolves.toEqual([{ id: 'one' }]);
   });
 
-  it('uses the transaction handle supplied by Expo', async () => {
-    const transaction = { execAsync: jest.fn().mockResolvedValue(undefined) } as unknown as SQLiteDatabase;
-    const db = {
-      withExclusiveTransactionAsync: jest.fn(async (task: (value: SQLiteDatabase) => Promise<void>) => task(transaction)),
+  it.each([0, 1])('専用接続へ外部キー設定%iをBEGIN前に引き継ぎcallbackへ渡す', async (foreignKeys) => {
+    const transaction = {
+      execAsync: jest.fn().mockResolvedValue(undefined),
+      withTransactionAsync: jest.fn(async (task: () => Promise<void>) => task()),
+      closeAsync: jest.fn().mockResolvedValue(undefined),
     } as unknown as SQLiteDatabase;
-    const adapter = createExpoDatabaseAdapter(db);
+    jest.mocked(openDatabaseAsync).mockResolvedValue(transaction);
+    const db = {
+      databasePath: '/synthetic/custom/calendar.db', options: { enableChangeListener: true },
+      getFirstAsync: jest.fn().mockResolvedValue({ foreign_keys: foreignKeys }),
+    } as unknown as SQLiteDatabase;
+    await createExpoDatabaseAdapter(db).exclusiveTransaction((tx) => tx.exec('SELECT 1'));
+    expect(openDatabaseAsync).toHaveBeenCalledWith('calendar.db', {
+      enableChangeListener: true, useNewConnection: true,
+    }, '/synthetic/custom');
+    expect(transaction.execAsync).toHaveBeenNthCalledWith(1, `PRAGMA foreign_keys = ${foreignKeys ? 'ON' : 'OFF'};`);
+    expect(jest.mocked(transaction.execAsync).mock.invocationCallOrder[0])
+      .toBeLessThan(jest.mocked(transaction.withTransactionAsync).mock.invocationCallOrder[0]);
+    expect(transaction.execAsync).toHaveBeenLastCalledWith('SELECT 1');
+    expect(transaction.closeAsync).toHaveBeenCalledTimes(1);
+  });
 
-    await adapter.exclusiveTransaction((tx) => tx.exec('CREATE TABLE example (id TEXT)'));
-
-    expect(transaction.execAsync).toHaveBeenCalledWith('CREATE TABLE example (id TEXT)');
+  it('callback失敗時も専用接続を閉じ元のエラーを返す', async () => {
+    const transaction = {
+      execAsync: jest.fn().mockResolvedValue(undefined),
+      withTransactionAsync: jest.fn(async (task: () => Promise<void>) => task()),
+      closeAsync: jest.fn().mockResolvedValue(undefined),
+    } as unknown as SQLiteDatabase;
+    jest.mocked(openDatabaseAsync).mockResolvedValue(transaction);
+    const db = { databasePath: '/synthetic/calendar.db', options: {},
+      getFirstAsync: jest.fn().mockResolvedValue({ foreign_keys: 1 }),
+    } as unknown as SQLiteDatabase;
+    const error = new Error('synthetic failure');
+    await expect(createExpoDatabaseAdapter(db).exclusiveTransaction(async () => { throw error; }))
+      .rejects.toBe(error);
+    expect(transaction.closeAsync).toHaveBeenCalledTimes(1);
   });
 });

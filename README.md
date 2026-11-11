@@ -4,7 +4,7 @@
 
 ## 開発
 
-依存関係をlockfileどおりにインストールします。
+開発・テストにはNode.js 22.18以降を使用します。依存関係をlockfileどおりにインストールします。
 
 ```bash
 npm ci
@@ -23,6 +23,10 @@ npm test -- --runInBand
 npm run typecheck
 npm run lint
 ```
+
+実SQLiteの移行・保存・再接続・失敗時rollbackテストも通常のJestに含みます。本番DBアダプターは専用transaction接続のBEGIN前に元接続の外部キー設定を適用します。Node組込みの`node:sqlite`と開発用型定義を使用し、アプリのnative依存は増やしていません。Node 22ではSQLiteのexperimental警告が出る場合があります。
+
+MVPの実装／自動検証／端末未確認の対応表と実機確認手順は[安定化の検証記録](docs/verification/2026-11-12-mvp-stabilization.md)を参照してください。実機確認が残るため、MVP全体の受け入れは未完了です。
 
 ## ローカルEAS Build
 

@@ -77,6 +77,9 @@ describe('実SQLiteによるMVP保存回帰', () => {
     expect(await repositories.settings.getLastCalendarViewMode()).toBe('week');
     expect(await repositories.settings.getCalendarWeekStartsOn()).toBe(0);
     expect(await repositories.settings.getCalendarVisible('personal-default')).toBe(false);
+    expect(await repositories.settings.getDefaultExactDuration()).toEqual({ type: 'fixed', minutes: 60 });
+    await repositories.settings.setDefaultExactDuration({ type: 'undetermined' }, now);
+    expect(await repositories.events.getById(event.id)).toEqual(aggregate);
     await repositories.events.update({ ...aggregate, event: { ...event, title: '変更後' } });
     expect(await repositories.events.getById(event.id)).toMatchObject({ event: { title: '変更後' } });
     await repositories.events.delete(event.id);
@@ -148,9 +151,13 @@ describe('実SQLiteによるMVP保存回帰', () => {
         $document: JSON.stringify(event.noteDocument), $id: 'exact',
       });
     }
+    await createRepositoryContainer(database).settings.setDefaultExactDuration({ type: 'instant' }, now);
     await migrateDatabase(database, environment);
     await migrateDatabase(database, environment);
     const repositories = createRepositoryContainer(database);
+    expect(await repositories.settings.getDefaultExactDuration()).toEqual({ type: 'instant' });
+    expect(await database.first('SELECT value_json FROM app_settings WHERE key = $key', { $key: 'default_exact_duration' }))
+      .toEqual({ value_json: '{"version":1,"duration":{"type":"instant"}}' });
     const exact = await repositories.events.getById('exact');
     expect(exact).toMatchObject({ event: { title: '旧予定', duration: { type: 'fixed', minutes: 180 } } });
     expect(exact?.reminders).toHaveLength(version >= 2 ? 1 : 0);

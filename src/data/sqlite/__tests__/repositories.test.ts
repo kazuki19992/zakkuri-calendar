@@ -278,7 +278,7 @@ describe('SQLite repositories', () => {
     expect(db.transactionRun).toHaveBeenCalledWith('DELETE FROM events WHERE id = $id', { $id: 'replacement-1' });
   });
 
-  it.each([[null, { type: 'instant' }], [{ value_json: 'private broken value' }, { type: 'instant' }]])(
+  it.each([[null, { type: 'fixed', minutes: 60 }], [{ value_json: 'private broken value' }, { type: 'fixed', minutes: 60 }]])(
     'returns a safe exact-duration fallback for missing or malformed data', async (row, expected) => {
       const db = createDatabaseDouble();
       db.first.mockResolvedValue(row);
@@ -293,7 +293,7 @@ describe('SQLite repositories', () => {
     await expect(settings.getUndeterminedFadeMinutes()).resolves.toBe(120);
     await settings.setDefaultExactDuration({ type: 'fixed', minutes: 15 }, now);
     expect(db.run).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(key) DO UPDATE'), {
-      $key: 'default_exact_duration', $valueJson: '{"type":"fixed","minutes":15}', $updatedAt: now,
+      $key: 'default_exact_duration', $valueJson: '{"version":1,"duration":{"type":"fixed","minutes":15}}', $updatedAt: now,
     });
   });
 

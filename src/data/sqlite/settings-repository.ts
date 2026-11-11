@@ -9,10 +9,11 @@ import type { AppDatabase } from './database';
 import { DEFAULT_HOLIDAY_PREFERENCES, parseHolidayPreferences, type HolidayPreferencesV1 } from '@/domain/calendar/holiday-preferences';
 import type { WeekStartsOn } from '@/domain/calendar/month';
 import { DEFAULT_CALENDAR_WEEK_STARTS_ON, parseCalendarWeekStartsOn } from '@/domain/calendar/week-start';
+import { DEFAULT_EXACT_DURATION } from '@/domain/calendar/default-exact-duration';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
 
 type SettingRow = Readonly<{ value_json: string }>;
-const DEFAULT_DURATION: ExactDuration = { type: 'instant' };
+
 const DEFAULT_FADE_MINUTES = 120;
 const DEFAULT_EVENT_EDITOR_TAB: EventEditorTab = 'fuzzy';
 const DEFAULT_THIS_WEEK_DEADLINE: ThisWeekDeadlineWeekday = 5;
@@ -76,9 +77,16 @@ export class SqliteSettingsRepository implements SettingsRepository {
       'SELECT value_json FROM app_settings WHERE key = $key',
       { $key: 'default_exact_duration' },
     );
-    if (!row) return DEFAULT_DURATION;
-    const parsed = parseExactDuration(parseJson(row.value_json));
-    return parsed.ok ? parsed.value : DEFAULT_DURATION;
+    if (!row) return DEFAULT_EXACT_DURATION;
+    const value = parseJson(row.value_json);
+    if (typeof value === 'object' && value !== null && 'version' in value) {
+      if (value.version !== 1 || !('duration' in value)) return DEFAULT_EXACT_DURATION;
+      const parsed = parseExactDuration(value.duration);
+      return parsed.ok ? parsed.value : DEFAULT_EXACT_DURATION;
+    }
+    const legacy = parseExactDuration(value);
+    // 設定UI導入前のinstantは未選択seed。明示選択はversion付きで区別する。
+    return legacy.ok && legacy.value.type !== 'instant' ? legacy.value : DEFAULT_EXACT_DURATION;
   }
 
   async setDefaultExactDuration(value: ExactDuration, updatedAt: string): Promise<void> {
@@ -90,7 +98,7 @@ export class SqliteSettingsRepository implements SettingsRepository {
        ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
       {
         $key: 'default_exact_duration',
-        $valueJson: JSON.stringify(parsed.value),
+        $valueJson: JSON.stringify({ version: 1, duration: parsed.value }),
         $updatedAt: updatedAt,
       },
     );

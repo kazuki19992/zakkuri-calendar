@@ -1,3 +1,4 @@
+import type { TemporalDefinitionPatch, DefinitionExpectation } from '@/domain/temporal/temporal-preferences';
 import type { NotificationCategory, ReminderTiming } from '@/domain/notifications/reminder-timing';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import type { Calendar } from './calendar';
@@ -24,6 +25,7 @@ export type OccurrenceEditData = Readonly<{
 }>;
 
 export type SaveOccurrenceExceptionCommand = Readonly<{
+  expectedDefinition?: DefinitionExpectation;
   identity: OccurrenceIdentity;
   replacement: EventAggregate;
   overrideFields: readonly EventOverrideField[];
@@ -38,6 +40,7 @@ export type DeleteOccurrenceExceptionCommand = Readonly<{
 }>;
 
 export type ApplyRecurrenceMutationCommand = Readonly<{
+  expectedDefinition?: DefinitionExpectation;
   seriesId: string;
   expectedSeriesUpdatedAt: string;
   plan: RecurrenceMutationPlan;
@@ -48,14 +51,23 @@ export interface CalendarRepository {
   setColor(id: string, colorId: EventColorId, updatedAt: string): Promise<void>;
 }
 
+export type TemporalUpdatePreview = Readonly<{ token: string; count: number; definition: TemporalDefinition; next: TemporalDefinition }>;
+export type TemporalUpdateCommand = Readonly<{ id: string; patch: TemporalDefinitionPatch; token: string; now: string }>;
+
 export interface TemporalDefinitionRepository {
+  listEditable(calendarId: string): Promise<TemporalDefinition[]>;
+  previewUpdate(id: string, patch: TemporalDefinitionPatch): Promise<TemporalUpdatePreview>;
+  updateDefinition(command: TemporalUpdateCommand): Promise<void>;
   listEnabled(calendarId: string): Promise<TemporalDefinition[]>;
   getById(id: string): Promise<TemporalDefinition | null>;
   disable(id: string, updatedAt: string): Promise<void>;
 }
 
+export type CalendarTemporalSchedule = Readonly<{ schedule: CalendarScheduleSnapshot; definitions: readonly TemporalDefinition[]; undeterminedFadeMinutes: number }>;
+
 export interface EventRepository {
-  create(event: EventAggregate): Promise<void>;
+  readTemporalSchedule(calendarId: string, from: string, through: string): Promise<CalendarTemporalSchedule>;
+  create(event: EventAggregate, expectedDefinition?: DefinitionExpectation): Promise<void>;
   getById(id: string): Promise<EventAggregate | null>;
   listByAnchorRange(calendarId: string, from: string, through: string): Promise<CalendarEvent[]>;
   listSchedule(calendarId: string, from: string, through: string): Promise<CalendarScheduleSnapshot>;
@@ -63,7 +75,7 @@ export interface EventRepository {
   saveOccurrenceException(command: SaveOccurrenceExceptionCommand): Promise<void>;
   deleteOccurrenceException(command: DeleteOccurrenceExceptionCommand): Promise<void>;
   applyRecurrenceMutation(command: ApplyRecurrenceMutationCommand): Promise<void>;
-  update(event: EventAggregate): Promise<void>;
+  update(event: EventAggregate, expectedDefinition?: DefinitionExpectation): Promise<void>;
   delete(id: string): Promise<void>;
 }
 
@@ -77,6 +89,7 @@ export interface SettingsRepository {
   getDefaultExactDuration(): Promise<ExactDuration>;
   setDefaultExactDuration(value: ExactDuration, updatedAt: string): Promise<void>;
   getUndeterminedFadeMinutes(): Promise<number>;
+  setUndeterminedFadeMinutes(value: number, updatedAt: string): Promise<void>;
   getCalendarVisible(calendarId: string): Promise<boolean>;
   setCalendarVisible(calendarId: string, visible: boolean, updatedAt: string): Promise<void>;
   getLastEventEditorTab(): Promise<EventEditorTab>;

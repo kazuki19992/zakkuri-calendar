@@ -73,7 +73,7 @@ function createRepositories(): RepositoryDoubles {
       create: jest.fn().mockResolvedValue(undefined),
       getById: jest.fn(),
       listByAnchorRange: jest.fn(),
-      listSchedule: jest.fn(),
+      readTemporalSchedule: jest.fn(), listSchedule: jest.fn(),
       getOccurrenceEditData: jest.fn(),
       saveOccurrenceException: jest.fn(),
       deleteOccurrenceException: jest.fn(),
@@ -82,7 +82,7 @@ function createRepositories(): RepositoryDoubles {
       delete: jest.fn(),
     },
     temporalDefinitions: {
-      listEnabled: jest.fn().mockResolvedValue([morning, nextWeek, afternoon]),
+      listEditable: jest.fn(), previewUpdate: jest.fn(), updateDefinition: jest.fn(), listEnabled: jest.fn().mockResolvedValue([morning, nextWeek, afternoon]),
       getById: jest.fn(),
       disable: jest.fn(),
     },

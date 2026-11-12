@@ -59,7 +59,7 @@ function createDependencies() {
     create: jest.fn(),
     getById: jest.fn(),
     listByAnchorRange: jest.fn(),
-    listSchedule: jest.fn().mockResolvedValue({ events: [event], exceptions: [], replacementEvents: [] }),
+    readTemporalSchedule: jest.fn(), listSchedule: jest.fn().mockResolvedValue({ events: [event], exceptions: [], replacementEvents: [] }),
     getOccurrenceEditData: jest.fn(),
     saveOccurrenceException: jest.fn(),
     deleteOccurrenceException: jest.fn(),
@@ -68,7 +68,7 @@ function createDependencies() {
     delete: jest.fn(),
   };
   const temporalDefinitions: jest.Mocked<TemporalDefinitionRepository> = {
-    listEnabled: jest.fn(),
+    listEditable: jest.fn(), previewUpdate: jest.fn(), updateDefinition: jest.fn(), listEnabled: jest.fn(),
     getById: jest.fn().mockResolvedValue({
       id: 'personal-default:afternoon',
       calendarId: calendar.id,
@@ -95,7 +95,7 @@ function createDependencies() {
   const settings: jest.Mocked<SettingsRepository> = {
     getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getDefaultExactDuration: jest.fn(),
     setDefaultExactDuration: jest.fn(),
-    getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(90),
+    setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(90),
     getCalendarVisible: jest.fn().mockResolvedValue(true),
     setCalendarVisible: jest.fn().mockResolvedValue(undefined),
     getLastEventEditorTab: jest.fn(),
@@ -107,6 +107,12 @@ function createDependencies() {
     getThisWeekDeadlineWeekday: jest.fn(),
     setThisWeekDeadlineWeekday: jest.fn(),
   };
+  events.readTemporalSchedule.mockImplementation(async (calendarId, from, through) => {
+    const schedule = await events.listSchedule(calendarId, from, through);
+    const ids = [...new Set([...schedule.events, ...schedule.replacementEvents].flatMap(e => e.temporalType === 'fuzzy' ? [e.temporalDefinitionId] : []))];
+    const definitions = (await Promise.all(ids.map(id => temporalDefinitions.getById(id)))).filter((d): d is NonNullable<typeof d> => d !== null);
+    return {schedule, definitions, undeterminedFadeMinutes: await settings.getUndeterminedFadeMinutes()};
+  });
   return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }
 

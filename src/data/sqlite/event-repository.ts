@@ -1,3 +1,18 @@
+import { TemporalConflictError, temporalDefinitionToken, reResolveTemporalEvent, type DefinitionExpectation } from '@/domain/temporal/temporal-preferences';
+import { SqliteTemporalDefinitionRepository } from './temporal-definition-repository';
+import { SqliteSettingsRepository } from './settings-repository';
+import { mapTemporalDefinitionRow, type TemporalDefinitionRow } from './row-mappers';
+import type { CalendarTemporalSchedule } from '@/domain/calendar/repositories';
+
+async function assertExpectedDefinition(tx: AppDatabase, expected?: DefinitionExpectation, event?: CalendarEvent): Promise<void> {
+  if (!expected) return;
+  const current = await new SqliteTemporalDefinitionRepository(tx).getById(expected.id);
+  if (!current || temporalDefinitionToken(current) !== expected.token) throw new TemporalConflictError();
+  if (event?.temporalType === 'fuzzy' && event.resolutionContext !== null) {
+    const resolved = reResolveTemporalEvent(event, current);
+    if (resolved.anchorDate !== event.anchorDate || (resolved.temporalType === 'fuzzy' && resolved.endDate !== event.endDate)) throw new TemporalConflictError();
+  }
+}
 import type {
   ApplyRecurrenceMutationCommand,
   DeleteOccurrenceExceptionCommand,
@@ -236,9 +251,10 @@ export class SqliteEventRepository implements EventRepository {
   }
 
 
-  async create(aggregate: EventAggregate): Promise<void> {
+  async create(aggregate: EventAggregate, expectedDefinition?: DefinitionExpectation): Promise<void> {
     const normalized = normalizeAggregate(aggregate);
     await this.mutate(async (transaction) => {
+      await assertExpectedDefinition(transaction, expectedDefinition, normalized.event);
       await assertFuzzyDefinitionConsistency(transaction, normalized.event);
       await transaction.run(INSERT_EVENT_SQL, eventParameters(normalized.event));
       for (const reminder of normalized.reminders) {
@@ -262,6 +278,16 @@ export class SqliteEventRepository implements EventRepository {
       { $calendarId: calendarId, $from: from, $through: through },
     );
     return rows.map(mapEventRow);
+  }
+
+  async readTemporalSchedule(calendarId: string, from: string, through: string): Promise<CalendarTemporalSchedule> {
+    let result!: CalendarTemporalSchedule;
+    await this.database.exclusiveTransaction(async tx => {
+      const schedule = await new SqliteEventRepository(tx).listSchedule(calendarId, from, through);
+      const rows = await tx.all<TemporalDefinitionRow>('SELECT * FROM temporal_definitions WHERE calendar_id=$calendarId', {$calendarId:calendarId});
+      result = { schedule, definitions: rows.map(mapTemporalDefinitionRow), undeterminedFadeMinutes: await new SqliteSettingsRepository(tx).getUndeterminedFadeMinutes() };
+    });
+    return result;
   }
 
   async listSchedule(calendarId: string, from: string, through: string) {
@@ -330,6 +356,7 @@ export class SqliteEventRepository implements EventRepository {
 
   async saveOccurrenceException(command: SaveOccurrenceExceptionCommand): Promise<void> {
     await this.mutate(async (transaction) => {
+      await assertExpectedDefinition(transaction, command.expectedDefinition);
       await assertSeriesRevision(
         transaction,
         command.identity.seriesEventId,
@@ -431,6 +458,7 @@ export class SqliteEventRepository implements EventRepository {
 
   async applyRecurrenceMutation(command: ApplyRecurrenceMutationCommand): Promise<void> {
     await this.mutate(async (transaction) => {
+      await assertExpectedDefinition(transaction, command.expectedDefinition);
       await assertSeriesRevision(transaction, command.seriesId, command.expectedSeriesUpdatedAt);
       if (command.plan.removePreviousSeries) {
         await transaction.run('DELETE FROM events WHERE id = $id', { $id: command.seriesId });
@@ -460,9 +488,10 @@ export class SqliteEventRepository implements EventRepository {
     });
   }
 
-  async update(aggregate: EventAggregate): Promise<void> {
+  async update(aggregate: EventAggregate, expectedDefinition?: DefinitionExpectation): Promise<void> {
     const normalized = normalizeAggregate(aggregate);
     await this.mutate(async (transaction) => {
+      await assertExpectedDefinition(transaction, expectedDefinition, normalized.event);
       await assertFuzzyDefinitionConsistency(transaction, normalized.event);
       const result = await transaction.run(
         `UPDATE events SET

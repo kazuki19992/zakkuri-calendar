@@ -52,7 +52,7 @@ describe('予定作成ルート', () => {
       calendars: { getDefault: jest.fn() },
       events: { create: jest.fn() },
       settings: { getLastEventEditorTab: jest.fn() },
-      temporalDefinitions: { listEnabled: jest.fn() },
+      temporalDefinitions: { listEditable: jest.fn(), previewUpdate: jest.fn(), updateDefinition: jest.fn(), listEnabled: jest.fn() },
     };
     const back = jest.fn();
     const notifyChanged = jest.fn();

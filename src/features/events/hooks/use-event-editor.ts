@@ -1,3 +1,4 @@
+import { TemporalConflictError, temporalDefinitionToken, type DefinitionExpectation } from '@/domain/temporal/temporal-preferences';
 import { useNewReminderDefaults } from './use-new-reminder-defaults';
 import { getReminderTiming } from '@/domain/calendar/event-reminder';
 import { parseReminderTiming, sameReminderCondition, timingIsCompatible, type ReminderTiming, type NotificationCategory } from '@/domain/notifications/reminder-timing';
@@ -580,6 +581,31 @@ export function useEventEditor({
 
   const durationBlocked = editorTab === 'exact' && !isAllDay && initialDuration.status !== 'ready';
 
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
+  const expectedDefinitionFor = useCallback((event: EventAggregate['event']): DefinitionExpectation | undefined => {
+    if (event.temporalType !== 'fuzzy') return undefined;
+    const definition = definitions.find(item => item.id === event.temporalDefinitionId);
+    return definition ? { id: definition.id, token: temporalDefinitionToken(definition) } : undefined;
+  }, [definitions]);
+  const recoverTemporalConflict = useCallback(async () => {
+    try {
+      let latest = await temporalDefinitions.listEnabled(calendarId ?? '');
+      if (selectedDefinitionId && !latest.some(item => item.id === selectedDefinitionId)) {
+        const selected = await temporalDefinitions.getById(selectedDefinitionId);
+        if (selected) latest = [...latest, selected];
+      }
+      const aggregate = eventId && occurrenceDate === undefined ? await events.getById(eventId) : null;
+      if (!mountedRef.current) return;
+      setDefinitions(latest);
+      if (aggregate) setExistingAggregate(aggregate);
+      setPendingAggregate(null); setScopeRequest(null);
+      setSaveError('時間表現が更新されました。入力内容は保持しています。期間を再確認して保存してください。');
+    } catch {
+      if (mountedRef.current) setSaveError('時間表現を再読み込みできませんでした。入力内容を保持しています。再度保存してお試しください。');
+    }
+  }, [calendarId, eventId, events, occurrenceDate, selectedDefinitionId, temporalDefinitions]);
+
   const save = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || status !== 'ready' || durationBlocked) return false;
     clearErrors();
@@ -662,23 +688,30 @@ export function useEventEditor({
     setIsSaving(true);
     try {
       const aggregate = { event: parsedEvent.value, reminders: builtReminders.value };
-      if (existingEvent === undefined) await events.create(aggregate);
+      if (existingEvent === undefined) {
+        const expected = expectedDefinitionFor(aggregate.event);
+        if (expected) await events.create(aggregate, expected); else await events.create(aggregate);
+      }
       else if (occurrenceEditData !== null && existingAggregate !== null) {
         const recurrenceChanged = getChangedEventFields(existingAggregate, aggregate)
           .includes('recurrence');
         setPendingAggregate(aggregate);
         setScopeRequest(createScopeRequest('save', recurrenceChanged));
         return false;
-      } else await events.update(aggregate);
+      } else {
+        const expected = expectedDefinitionFor(aggregate.event);
+        if (expected) await events.update(aggregate, expected); else await events.update(aggregate);
+      }
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof TemporalConflictError) { await recoverTemporalConflict(); return false; }
       setSaveError('保存できませんでした。もう一度お試しください。');
       return false;
     } finally {
       operationRef.current = false;
       setIsSaving(false);
     }
-  }, [allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
+  }, [expectedDefinitionFor, recoverTemporalConflict, allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
     getTimeZoneId, isAllDay, location, newEventId, noteDocument, now, recurrenceDraft, reminders, reminderDefaults.status,
     definitions, occurrenceEditData, relativeResolution, relativeDateError, selectedDefinitionId,
     startDate, startTime, status, title]);
@@ -741,6 +774,7 @@ export function useEventEditor({
         const replacementId = occurrenceEditData.replacement?.event.id ?? newEventId;
         await events.saveOccurrenceException({
           identity,
+          expectedDefinition: expectedDefinitionFor(pendingAggregate.event),
           replacement: {
             event: { ...pendingAggregate.event, id: replacementId, recurrenceRule: null },
             reminders: pendingAggregate.reminders.map((reminder) => ({
@@ -798,12 +832,14 @@ export function useEventEditor({
           seriesId: occurrenceEditData.series.event.id,
           expectedSeriesUpdatedAt: occurrenceEditData.series.event.updatedAt,
           plan,
+          ...(!deleting && pendingAggregate ? { expectedDefinition: expectedDefinitionFor(pendingAggregate.event) } : {}),
         });
       }
       setScopeRequest(null);
       setPendingAggregate(null);
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof TemporalConflictError) { await recoverTemporalConflict(); return false; }
       setSaveError(deleting
         ? '削除できませんでした。もう一度お試しください。'
         : '保存できませんでした。もう一度お試しください。');
@@ -813,7 +849,7 @@ export function useEventEditor({
       setIsSaving(false);
       setIsDeleting(false);
     }
-  }, [createId, events, existingAggregate, newEventId, now, occurrenceDate,
+  }, [expectedDefinitionFor, recoverTemporalConflict, createId, events, existingAggregate, newEventId, now, occurrenceDate,
     occurrenceEditData, pendingAggregate, scopeRequest]);
 
   return {

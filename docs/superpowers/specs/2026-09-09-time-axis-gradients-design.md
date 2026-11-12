@@ -95,7 +95,7 @@ resolveEventTime(event, definition, undeterminedFadeMinutes)
 
 ## 8. 対象外
 
-- 時間表現、フェード比率、未定時間を変更する設定UI。
+- このリリースの対象外だった設定UIは、後続のIssue #60（`2026-11-13-temporal-preferences-design.md`）で追加する。時間表現・フェード比率・未定時間の保存値を引き続き描画の正とする。
 - 週・月ビュー上のグラデーション。
 - ドラッグによる予定時刻変更。
 - 表示時間帯や1時間あたりの高さを変更する設定。

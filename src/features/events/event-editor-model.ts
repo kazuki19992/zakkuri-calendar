@@ -1,3 +1,4 @@
+import type { ReminderTiming } from '@/domain/notifications/reminder-timing';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type {
   CalendarEvent,
@@ -47,7 +48,7 @@ export type RecurrenceDraft = Readonly<{
   countText: string;
 }>;
 
-export type ReminderDraft = Readonly<{ id: string; minutesBefore: number }>;
+export type ReminderDraft = Readonly<{ id: string; minutesBefore?: number; timing?: ReminderTiming }>;
 
 const fail = (field: string, message: string): Result<never, EventValidationError> => ({
   ok: false,
@@ -243,7 +244,7 @@ export function buildRecurrenceRule(
 export function getReminderDrafts(reminders: readonly EventReminder[]): ReminderDraft[] {
   return [...reminders]
     .sort((first, second) => first.sortOrder - second.sortOrder || first.id.localeCompare(second.id))
-    .map(({ id, minutesBefore }) => ({ id, minutesBefore }));
+    .map(({ id, minutesBefore, timing }) => timing ? { id, timing } : { id, minutesBefore });
 }
 
 export function moveReminderDraft(

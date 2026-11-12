@@ -3,6 +3,11 @@ import { StyleSheet } from 'react-native';
 
 import RootLayout from '../_layout';
 
+jest.mock('@/features/notifications/notification-context', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return { NotificationProvider: ({children}: {children: React.ReactNode}) => React.createElement(View, {testID:'notification-provider'}, children) };
+});
 jest.mock('@/global.css', () => ({}));
 
 jest.mock('react-native-gesture-handler', () => {
@@ -73,10 +78,12 @@ describe('ルートレイアウト', () => {
     const databaseProvider = screen.getByTestId('database-provider');
     const calendarRefreshProvider = screen.getByTestId('calendar-refresh-provider');
     const stack = screen.getByTestId('router-stack');
+    const notificationProvider = screen.getByTestId('notification-provider');
 
     expect(splashOverlay.parent).toBe(databaseProvider.parent);
     expect(calendarRefreshProvider.parent).toBe(databaseProvider);
-    expect(stack.parent).toBe(calendarRefreshProvider);
+    expect(notificationProvider.parent).toBe(calendarRefreshProvider);
+    expect(stack.parent).toBe(notificationProvider);
     expect(screen.getByTestId('stack-screen.events/new')).toHaveTextContent('modal');
     expect(screen.getByTestId('stack-screen.events/[id]')).toHaveTextContent('modal');
     expect(screen.getByTestId('stack-screen.settings').props).toMatchObject({

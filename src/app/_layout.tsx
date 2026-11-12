@@ -1,3 +1,4 @@
+import { NotificationProvider } from '@/features/notifications/notification-context';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
@@ -17,6 +18,7 @@ export default function RootLayout() {
         <AnimatedSplashOverlay />
         <AppDatabaseProvider>
           <CalendarRefreshProvider>
+            <NotificationProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="calendar/day/[date]" options={{ headerShown: false, gestureEnabled: false, animation: 'none' }} />
               <Stack.Screen name="events/new" options={{ presentation: 'modal' }} />
@@ -28,6 +30,7 @@ export default function RootLayout() {
                 animation: 'slide_from_right',
               }} />
             </Stack>
+          </NotificationProvider>
           </CalendarRefreshProvider>
         </AppDatabaseProvider>
       </ThemeProvider>

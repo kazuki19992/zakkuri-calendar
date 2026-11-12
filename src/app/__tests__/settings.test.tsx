@@ -3,6 +3,8 @@ import SettingsRoute from '../settings';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { useRelativeDateSettings } from '@/features/settings/hooks/use-relative-date-settings';
 
+jest.mock('@/features/notifications/notification-context', () => ({ useNotifications: () => ({ state: {permission:'unsupported'} }) }));
+jest.mock('@/features/settings/hooks/use-notification-defaults', () => ({ useNotificationDefaults: () => ({entries:{}}) }));
 jest.mock('@/global.css', () => ({}));
 jest.mock('@/data/sqlite/app-database-provider', () => ({ useRepositories: jest.fn() }));
 jest.mock('@/features/settings/hooks/use-relative-date-settings', () => ({ useRelativeDateSettings: jest.fn() }));

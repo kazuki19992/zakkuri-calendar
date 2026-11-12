@@ -103,58 +103,32 @@ describe('予定編集の追加項目', () => {
     expect(view.getByText('買い物リスト')).toBeOnTheScreen();
   });
 
-  it('通知未発火の説明と並べ替え操作を表示する', async () => {
-    const view = await render(<EventReminderEditor reminders={[{ id: 'r1', minutesBefore: 30 }]} disabled={false} error={null} onAdd={jest.fn()} onRemove={jest.fn()} onMove={jest.fn()} />);
-    expect(view.getByText('設定は保存されますが、端末への通知はまだ行われません')).toBeOnTheScreen();
-    expect(view.getByLabelText('30分前を上へ')).toBeDisabled();
-    expect(view.getByLabelText('30分前を削除')).toBeOnTheScreen();
-    expect(view.getByTestId('event-editor.reminder-preset-30-check')).toBeOnTheScreen();
-    expect(view.queryByTestId('event-editor.reminder-preset-10-check')).toBeNull();
+  it('旧通知の開始基準を表示し複数通知を並べ替え・削除できる', async () => {
+    const onMove=jest.fn(),onRemove=jest.fn();
+    const view=await render(<EventReminderEditor reminders={[{id:'r1',minutesBefore:30},{id:'r2',minutesBefore:60}]} disabled={false} error={null} onAdd={jest.fn()} onRemove={onRemove} onMove={onMove}/>);
+    expect(view.getByText('開始30分前（以前の設定）')).toBeOnTheScreen();
+    await fireEvent.press(view.getByLabelText('通知2を上へ'));expect(onMove).toHaveBeenCalledWith('r2',-1);
+    await fireEvent.press(view.getByLabelText('通知1を削除'));expect(onRemove).toHaveBeenCalledWith('r1');
   });
-
-  it('60分以上の通知時間を時間と分で表示する', async () => {
-    const view = await render(<EventReminderEditor reminders={[
-      { id: 'r60', minutesBefore: 60 },
-      { id: 'r90', minutesBefore: 90 },
-      { id: 'r135', minutesBefore: 135 },
-      { id: 'r1440', minutesBefore: 1_440 },
-    ]} disabled={false} error={null} onAdd={jest.fn()} onRemove={jest.fn()}
-      onMove={jest.fn()} />);
-
-    expect(view.getByLabelText('1時間前を削除')).toBeOnTheScreen();
-    expect(view.getByLabelText('1時間30分前を削除')).toBeOnTheScreen();
-    expect(view.getByLabelText('2時間15分前を削除')).toBeOnTheScreen();
-    expect(view.getByLabelText('1日前を削除')).toBeOnTheScreen();
+  it('60分以上の通知は基準と時分を表示する',async()=>{
+    const view=await render(<EventReminderEditor reminders={[{id:'r',timing:{version:1,kind:'relativeMinutes',anchor:'end',minutesBefore:90}}]} disabled={false} error={null} onAdd={jest.fn()} onRemove={jest.fn()} onMove={jest.fn()}/>);
+    expect(view.getByText('終了1時間30分前')).toBeOnTheScreen();
   });
-
-  it('任意の通知時間を時・分ドラムから追加する', async () => {
-    const user = userEvent.setup();
-    const onAdd = jest.fn();
-    const view = await render(<EventReminderEditor reminders={[]} disabled={false} error={null}
-      onAdd={onAdd} onRemove={jest.fn()} onMove={jest.fn()} />);
-
-    await user.press(view.getByLabelText('任意の通知時間を追加'));
-    expect(view.getByLabelText('通知時間、予定時刻')).toBeOnTheScreen();
-    await fireEvent(view.getByTestId('duration-wheel.hours'), 'momentumScrollEnd', {
-      nativeEvent: { contentOffset: { y: 2 * 44 } },
-    });
-    await fireEvent(view.getByTestId('duration-wheel.minutes'), 'momentumScrollEnd', {
-      nativeEvent: { contentOffset: { y: 15 * 44 } },
-    });
-    await user.press(view.getByLabelText('通知時間を確定'));
-
-    expect(onAdd).toHaveBeenCalledWith(135);
+  it('日・時・分のドラムから通知を追加する',async()=>{
+    const onAdd=jest.fn();
+    const view=await render(<EventReminderEditor reminders={[]} disabled={false} error={null} onAdd={onAdd} onRemove={jest.fn()} onMove={jest.fn()}/>);
+    await fireEvent.press(view.getByLabelText('通知を追加'));
+    await fireEvent(view.getByTestId('notification-wheel.hours'),'momentumScrollEnd',{nativeEvent:{contentOffset:{y:88}}});
+    await fireEvent(view.getByTestId('notification-wheel.minutes'),'momentumScrollEnd',{nativeEvent:{contentOffset:{y:15*44}}});
+    await fireEvent.press(view.getByLabelText('通知タイミングを確定'));
+    expect(onAdd).toHaveBeenCalledWith({version:1,kind:'relativeMinutes',anchor:'start',minutesBefore:135});
   });
-
-  it('既存通知と同じ0分を確定しても既存追加callbackへ同値を渡す', async () => {
-    const user = userEvent.setup();
-    const onAdd = jest.fn();
-    const view = await render(<EventReminderEditor reminders={[{ id: 'r0', minutesBefore: 0 }]}
-      disabled={false} error={null} onAdd={onAdd} onRemove={jest.fn()} onMove={jest.fn()} />);
-
-    await user.press(view.getByLabelText('任意の通知時間を追加'));
-    await user.press(view.getByLabelText('通知時間を確定'));
-
-    expect(onAdd).toHaveBeenCalledWith(0);
+  it('通知行の編集は追加ではなく指定IDの変更として返す',async()=>{
+    const onUpdate=jest.fn(),onAdd=jest.fn();
+    const view=await render(<EventReminderEditor reminders={[{id:'r',timing:{version:1,kind:'relativeMinutes',anchor:'start',minutesBefore:10}}]} disabled={false} error={null} onAdd={onAdd} onUpdate={onUpdate} onRemove={jest.fn()} onMove={jest.fn()}/>);
+    await fireEvent.press(view.getByLabelText('通知を変更、開始10分前'));
+    await fireEvent(view.getByTestId('notification-wheel.minutes'),'momentumScrollEnd',{nativeEvent:{contentOffset:{y:0}}});
+    await fireEvent.press(view.getByLabelText('通知タイミングを確定'));
+    expect(onUpdate).toHaveBeenCalledWith('r',{version:1,kind:'relativeMinutes',anchor:'start',minutesBefore:0});expect(onAdd).not.toHaveBeenCalled();
   });
 });

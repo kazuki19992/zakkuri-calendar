@@ -1,3 +1,4 @@
+import { getReminderTiming } from './event-reminder';
 import { addDays, addYears, differenceInCalendarDays, format, parse } from 'date-fns';
 import type { CalendarEvent } from './event';
 import { areEventNotesEqual } from './event-note';
@@ -71,8 +72,8 @@ export function getChangedEventFields(
   if (before.event.location !== after.event.location) changed.push('location');
   if (!areEventNotesEqual(before.event.noteDocument, after.event.noteDocument)) changed.push('notes');
   if (before.event.colorId !== after.event.colorId) changed.push('color');
-  if (!jsonEqual(before.reminders.map(({ minutesBefore }) => minutesBefore),
-    after.reminders.map(({ minutesBefore }) => minutesBefore))) changed.push('reminders');
+  if (!jsonEqual(before.reminders.map(getReminderTiming),
+    after.reminders.map(getReminderTiming))) changed.push('reminders');
   if (!jsonEqual(before.event.recurrenceRule, after.event.recurrenceRule)) changed.push('recurrence');
   return changed;
 }

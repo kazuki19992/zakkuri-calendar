@@ -99,7 +99,7 @@ describe('ホームルート', () => {
     const user = userEvent.setup();
     const push = jest.fn();
     jest.mocked(useRouter).mockReturnValue({ push } as unknown as ReturnType<typeof useRouter>);
-    const repositories = {
+    const repositories = { notifications: { readSnapshot: jest.fn(), getRevision: jest.fn(), markApplied: jest.fn(), recordFailure: jest.fn() },
       calendars: { getDefault: jest.fn(), setColor: jest.fn() },
       events: {
         create: jest.fn(),
@@ -119,7 +119,7 @@ describe('ホームルート', () => {
         disable: jest.fn(),
       },
       settings: {
-        getDefaultExactDuration: jest.fn(),
+        getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getDefaultExactDuration: jest.fn(),
         setDefaultExactDuration: jest.fn(),
         getUndeterminedFadeMinutes: jest.fn(),
         getCalendarVisible: jest.fn(),

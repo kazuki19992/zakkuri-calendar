@@ -93,7 +93,7 @@ function createDependencies() {
     }),
   };
   const settings: jest.Mocked<SettingsRepository> = {
-    getDefaultExactDuration: jest.fn(),
+    getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getDefaultExactDuration: jest.fn(),
     setDefaultExactDuration: jest.fn(),
     getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(90),
     getCalendarVisible: jest.fn().mockResolvedValue(true),

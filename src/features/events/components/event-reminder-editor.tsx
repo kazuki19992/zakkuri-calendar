@@ -1,104 +1,145 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
+import { getReminderTiming } from '@/domain/calendar/event-reminder';
+import {
+  defaultReminderTiming,
+  editableReminderTiming,
+  timingLabel,
+  type NotificationCategory,
+  type ReminderTiming,
+} from '@/domain/notifications/reminder-timing';
+import { ReminderTimingPicker } from '@/shared/components/reminder-timing-picker';
 import type { ReminderDraft } from '../event-editor-model';
-import { DurationWheelPicker } from './duration-wheel-picker';
-
-const PRESETS = [0, 5, 10, 30, 60, 1_440] as const;
-
-function reminderLabel(minutes: number): string {
-  if (minutes === 0) return '予定時刻';
-  if (minutes === 1_440) return '1日前';
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return remainingMinutes === 0
-      ? `${hours}時間前`
-      : `${hours}時間${remainingMinutes}分前`;
-  }
-  return `${minutes}分前`;
-}
-
-export function EventReminderEditor({ reminders, disabled, error, onAdd, onRemove, onMove }: Readonly<{
+export function EventReminderEditor({
+  reminders,
+  disabled,
+  error,
+  onAdd,
+  onRemove,
+  onMove,
+  onUpdate,
+  category = 'exact',
+  allowEnd = true,
+  defaultStatus = 'ready',
+  onRetry,
+  onReset,
+}: Readonly<{
   reminders: readonly ReminderDraft[];
   disabled: boolean;
   error: string | null;
-  onAdd(minutesBefore: number): void;
+  onAdd(value: number | ReminderTiming): void;
   onRemove(id: string): void;
   onMove(id: string, offset: -1 | 1): void;
+  onUpdate?(id: string, value: ReminderTiming): void;
+  category?: NotificationCategory;
+  allowEnd?: boolean;
+  defaultStatus?: 'loading' | 'ready' | 'error';
+  onRetry?(): void;
+  onReset?(): void;
 }>) {
   const theme = useTheme();
-  const [customPickerOpen, setCustomPickerOpen] = useState(false);
+  const [editing, setEditing] = useState<string | null | undefined>(undefined);
+  const button = (label: string, action: () => void, accessibilityLabel = label) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={action}
+      style={styles.button}
+    >
+      <Text style={{ color: theme.calendarAccent }}>{label}</Text>
+    </Pressable>
+  );
   return (
-    <View style={styles.container}>
-      <View style={styles.presets}>
-        {PRESETS.map((minutes) => {
-          const label = reminderLabel(minutes);
-          const added = reminders.some((item) => item.minutesBefore === minutes);
-          return (
-            <Pressable key={minutes} accessibilityRole="button"
-              accessibilityLabel={added ? `${label}は追加済み` : `${label}を追加`}
-              accessibilityState={{ disabled: disabled || added, selected: added }}
-              disabled={disabled || added} onPress={() => onAdd(minutes)}
-              style={[styles.chip, {
-                backgroundColor: added ? theme.backgroundSelected : theme.backgroundElement,
-                borderColor: added ? theme.calendarAccent : 'transparent',
-              }]}>
-              <Text style={{ color: added ? theme.calendarAccent : theme.text,
-                fontWeight: added ? '700' : '400' }}>{label}</Text>
-              {added ? <View testID={`event-editor.reminder-preset-${minutes}-check`}
-                style={[styles.checkBadge, { backgroundColor: theme.calendarAccent }]}>
-                <Text style={[styles.checkText, { color: theme.background }]}>✓</Text>
-              </View> : null}
-            </Pressable>
-          );
-        })}
-      </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="任意の通知時間を追加"
-        accessibilityState={{ disabled }} disabled={disabled}
-        onPress={() => setCustomPickerOpen(true)}
-        style={[styles.customButton, { borderColor: theme.calendarBorder }]}>
-        <Text style={{ color: theme.text }}>任意の通知時間</Text>
-        <Text style={{ color: theme.calendarAccent }}>選択</Text>
-      </Pressable>
-      <DurationWheelPicker visible={customPickerOpen} initialMinutes={0} maxHours={23}
-        onConfirm={onAdd} onClose={() => setCustomPickerOpen(false)} />
-      {reminders.map((reminder, index) => {
-        const label = reminderLabel(reminder.minutesBefore);
-        return (
-          <View key={reminder.id} style={[styles.reminderRow, { borderTopColor: theme.calendarBorder }]}>
-            <Text style={[styles.reminderText, { color: theme.text }]}>{label}</Text>
-            <Pressable accessibilityRole="button" accessibilityLabel={`${label}を上へ`} disabled={disabled || index === 0} onPress={() => onMove(reminder.id, -1)} style={styles.smallButton}><Text style={{ color: theme.calendarAccent }}>↑</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={`${label}を下へ`} disabled={disabled || index === reminders.length - 1} onPress={() => onMove(reminder.id, 1)} style={styles.smallButton}><Text style={{ color: theme.calendarAccent }}>↓</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={`${label}を削除`} disabled={disabled} onPress={() => onRemove(reminder.id)} style={styles.smallButton}><Text style={{ color: theme.calendarHoliday }}>削除</Text></Pressable>
-          </View>
-        );
-      })}
-      <Text style={[styles.help, { color: theme.textSecondary }]}>設定は保存されますが、端末への通知はまだ行われません</Text>
-      {error ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{error}</Text> : null}
+    <View style={{ gap: 8 }}>
+      {defaultStatus === 'loading' ? (
+        <Text style={{ color: theme.textSecondary }}>
+          通知の初期値を読み込んでいます
+        </Text>
+      ) : null}
+      {defaultStatus === 'error' ? (
+        <>
+          {
+            <Text
+              accessibilityRole="alert"
+              style={{ color: theme.calendarHoliday }}
+            >
+              通知の初期値を読み込めませんでした
+            </Text>
+          }
+          {button('通知の初期値を再読み込み', () => onRetry?.())}
+        </>
+      ) : null}
+      {reminders.map((r, index) => (
+        <View
+          key={r.id}
+          style={[styles.row, { borderBottomColor: theme.calendarBorder }]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`通知を変更、${timingLabel(getReminderTiming(r), category === 'all_day' || category === 'fuzzy_period')}`}
+            disabled={disabled}
+            onPress={() => setEditing(r.id)}
+            style={[styles.button, { flex: 1 }]}
+          >
+            <Text style={{ color: theme.text }}>
+              {timingLabel(
+                getReminderTiming(r),
+                category === 'all_day' || category === 'fuzzy_period',
+              )}
+            </Text>
+          </Pressable>
+          {index > 0 ? button('上へ', () => onMove(r.id, -1), `通知${index + 1}を上へ`) : null}
+          {button(`通知${index + 1}を削除`, () => onRemove(r.id))}
+        </View>
+      ))}
+      {reminders.length === 0 ? (
+        <Text style={{ color: theme.textSecondary }}>通知なし</Text>
+      ) : null}
+      {button('通知を追加', () => setEditing(null))}
+      {error ? (
+        <>
+          <Text
+            accessibilityRole="alert"
+            style={{ color: theme.calendarHoliday }}
+          >
+            {error}
+          </Text>
+          {button('この種類の初期値に置き換える', () => onReset?.())}
+        </>
+      ) : null}
+      <ReminderTimingPicker
+        visible={editing !== undefined}
+        allowEnd={allowEnd}
+        value={editableReminderTiming(
+          editing
+            ? getReminderTiming(
+                reminders.find((r) => r.id === editing) ?? { minutesBefore: 0 },
+              )
+            : defaultReminderTiming(category),
+          category,
+        )}
+        onConfirm={(timing) => {
+          if (editing) onUpdate?.(editing, timing);
+          else onAdd(timing);
+        }}
+        onClose={() => setEditing(undefined)}
+      />
     </View>
   );
 }
-
 const styles = StyleSheet.create({
-  container: { gap: 10 },
-  presets: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderRadius: 8, borderWidth: 2, justifyContent: 'center', minHeight: 44,
-    paddingHorizontal: 10, position: 'relative' },
-  checkBadge: { alignItems: 'center', borderRadius: 8, height: 16, justifyContent: 'center',
-    position: 'absolute', right: -4, top: -4, width: 16 },
-  checkText: { fontSize: 10, fontWeight: '700', lineHeight: 12 },
-  customButton: {
-    alignItems: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
+  row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    minHeight: 44,
-    paddingHorizontal: 12,
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  reminderRow: { alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 48 },
-  reminderText: { flex: 1, fontSize: 15 },
-  smallButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 44 },
-  help: { fontSize: 13, lineHeight: 18 },
+  button: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
 });

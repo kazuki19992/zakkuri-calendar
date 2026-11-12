@@ -24,7 +24,7 @@ function createRepositories(): Readonly<{ calendars: jest.Mocked<CalendarReposit
     events: { create: jest.fn(), getById: jest.fn().mockResolvedValue(null), listByAnchorRange: jest.fn(),
       listSchedule: jest.fn(), getOccurrenceEditData: jest.fn(), saveOccurrenceException: jest.fn(),
       deleteOccurrenceException: jest.fn(), applyRecurrenceMutation: jest.fn(), update: jest.fn(), delete: jest.fn() },
-    settings: { getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
+    settings: { getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
     temporalDefinitions: { listEnabled: jest.fn().mockResolvedValue([morning]), getById: jest.fn(), disable: jest.fn() },
   };
 }
@@ -559,4 +559,63 @@ describe('終了種別の境界', () => {
     await act(async () => { result.current.setExactDurationType('fixed'); });
     expect(result.current.endTime).toBe('10:00');
   });
+});
+
+
+describe('通知初期値の新規draft適用', () => {
+  test('日内ざっくりの終了通知を初期化し、手動削除後はタブ往復でも復活させない', async () => {
+    const r = createRepositories();
+    r.settings.getNotificationDefault.mockImplementation(async category => category === 'fuzzy_day'
+      ? { version: 1, kind: 'relativeMinutes', anchor: 'end', minutesBefore: 60 }
+      : { version: 1, kind: 'relativeMinutes', anchor: 'start', minutesBefore: 10 });
+    const { result } = await renderHook(() => useEventEditor({ ...r, initial }));
+    await waitFor(() => expect(result.current.reminders).toHaveLength(1));
+    expect(result.current.reminders[0].timing).toEqual({ version: 1, kind: 'relativeMinutes', anchor: 'end', minutesBefore: 60 });
+    await act(async () => { result.current.removeReminder(result.current.reminders[0].id); result.current.setEditorTab('exact'); });
+    await act(async () => { result.current.setEditorTab('fuzzy'); });
+    expect(result.current.reminders).toEqual([]);
+  });
+  test('複数通知の追加・変更を保存し既定値の再読込みで潰さない', async () => {
+    const r = createRepositories();
+    const { result } = await renderHook(() => useEventEditor({ ...r, initial }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.addReminder({ version:1,kind:'relativeMinutes',anchor:'end',minutesBefore:60 }); });
+    await act(async () => { result.current.addReminder({ version:1,kind:'relativeMinutes',anchor:'start',minutesBefore:10 }); });
+    expect(result.current.reminders).toHaveLength(2);
+    await act(async () => { result.current.updateReminder(result.current.reminders[0].id,{version:1,kind:'relativeMinutes',anchor:'end',minutesBefore:30}); });
+    expect(result.current.reminders[0].timing?.kind).toBe('relativeMinutes');
+    expect(result.current.reminders[0].timing).toMatchObject({minutesBefore:30});
+  });
+  test('新規通知既定値の読込み失敗を通知なしとして保存しない', async () => {
+    const r=createRepositories(); r.settings.getNotificationDefault.mockRejectedValue(Error('read'));
+    const {result}=await renderHook(()=>useEventEditor({...r,initial}));
+    await waitFor(()=>expect(result.current.notificationDefaultStatus).toBe('error'));
+    expect(result.current.isSaveDisabled).toBe(true);
+    r.settings.getNotificationDefault.mockResolvedValue(null);
+    await act(async()=>{result.current.retryNotificationDefaults();});
+    await waitFor(()=>expect(result.current.notificationDefaultStatus).toBe('ready'));
+  });
+});
+
+test('既存予定の初期通知への置換が遅れても、その後の手動編集を上書きしない',async()=>{
+ const r=createRepositories();r.events.getById.mockResolvedValue(exactAggregate);
+ let finish!:(value:null)=>void;r.settings.getNotificationDefault.mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+ const {result}=await renderHook(()=>useEventEditor({...r,initial,eventId:exactEvent.id}));
+ await waitFor(()=>expect(result.current.status).toBe('ready'));
+ await act(async()=>{result.current.resetReminderDefaults();});
+ await act(async()=>{result.current.addReminder({version:1,kind:'relativeMinutes',anchor:'start',minutesBefore:5});});
+ await act(async()=>{finish(null);});
+ expect(result.current.reminders).toHaveLength(3);
+});
+
+test('時刻付きの旧開始通知と同条件の新通知を追加・更新で重複させない', async () => {
+ const r=createRepositories();r.events.getById.mockResolvedValue(exactAggregate);
+ const {result}=await renderHook(()=>useEventEditor({...r,initial,eventId:exactEvent.id}));
+ await waitFor(()=>expect(result.current.status).toBe('ready'));
+ await act(async()=>{result.current.addReminder({version:1,kind:'relativeMinutes',anchor:'start',minutesBefore:30});});
+ expect(result.current.reminders).toHaveLength(2);
+ await act(async()=>{result.current.updateReminder('reminder-2',{version:1,kind:'relativeMinutes',anchor:'start',minutesBefore:30});});
+ expect(result.current.reminders[1].minutesBefore).toBe(10);
+ await act(async()=>{result.current.addReminder({version:1,kind:'relativeMinutes',anchor:'end',minutesBefore:30});});
+ expect(result.current.reminders).toHaveLength(3);
 });

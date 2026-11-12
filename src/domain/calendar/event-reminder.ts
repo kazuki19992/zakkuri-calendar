@@ -1,12 +1,12 @@
+import { parseReminderTiming, type ReminderTiming } from '@/domain/notifications/reminder-timing';
 import type { CalendarEvent, EventValidationError } from './event';
 import type { Result } from '@/domain/shared/result';
 
 export type EventReminder = Readonly<{
   id: string;
   eventId: string;
-  minutesBefore: number;
   sortOrder: number;
-}>;
+}> & (Readonly<{ timing: ReminderTiming; minutesBefore?: never }> | Readonly<{ minutesBefore: number; timing?: never }>);
 
 export type EventAggregate = Readonly<{
   event: CalendarEvent;
@@ -28,7 +28,9 @@ export function parseEventReminder(value: unknown): Result<EventReminder, EventV
   const reminder = value as Record<string, unknown>;
   if (!isNonBlank(reminder.id)) return fail('id', 'reminder id must not be blank');
   if (!isNonBlank(reminder.eventId)) return fail('eventId', 'reminder eventId must not be blank');
-  if (!isNonNegativeSafeInteger(reminder.minutesBefore)) {
+  const timing = reminder.timing === undefined ? null : parseReminderTiming(reminder.timing);
+  if (reminder.timing !== undefined && reminder.minutesBefore !== undefined) return fail('timing', 'reminder timing must have one representation');
+  if (reminder.timing !== undefined ? timing === null : !isNonNegativeSafeInteger(reminder.minutesBefore)) {
     return fail('minutesBefore', 'reminder minutesBefore must be a non-negative integer');
   }
   if (!isNonNegativeSafeInteger(reminder.sortOrder)) {
@@ -39,7 +41,7 @@ export function parseEventReminder(value: unknown): Result<EventReminder, EventV
     value: {
       id: reminder.id,
       eventId: reminder.eventId,
-      minutesBefore: reminder.minutesBefore,
+      ...(timing ? { timing } : { minutesBefore: reminder.minutesBefore as number }),
       sortOrder: reminder.sortOrder,
     },
   };
@@ -61,7 +63,7 @@ export function normalizeEventReminders(
     parsed.push(result.value);
   }
 
-  const uniqueMinutes = new Set<number>();
+  const uniqueMinutes = new Set<string>();
   const normalized: EventReminder[] = [];
   for (const reminder of [...parsed].sort((first, second) => {
     if (first.sortOrder !== second.sortOrder) return first.sortOrder - second.sortOrder;
@@ -69,9 +71,17 @@ export function normalizeEventReminders(
     if (first.id > second.id) return 1;
     return 0;
   })) {
-    if (uniqueMinutes.has(reminder.minutesBefore)) continue;
-    uniqueMinutes.add(reminder.minutesBefore);
+    const key = JSON.stringify(getReminderTiming(reminder));
+    if (uniqueMinutes.has(key)) continue;
+    uniqueMinutes.add(key);
     normalized.push({ ...reminder, sortOrder: normalized.length });
   }
   return { ok: true, value: normalized };
+}
+
+/** 旧呼出しの分数だけの入力も、通知計算と永続化では単一のtimingへ変換する。 */
+export function getReminderTiming(reminder: Pick<EventReminder, 'timing' | 'minutesBefore'>): ReminderTiming {
+  if (reminder.timing) return reminder.timing;
+  if (!isNonNegativeSafeInteger(reminder.minutesBefore)) throw new Error('Invalid reminder timing');
+  return { version: 1, kind: 'legacyStartOffset', minutesBefore: reminder.minutesBefore };
 }

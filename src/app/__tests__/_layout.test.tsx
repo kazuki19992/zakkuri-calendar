@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 
 import RootLayout from '../_layout';
 
+jest.mock('@/features/notifications/notification-context', () => ({ NotificationProvider: ({children}: {children: React.ReactNode}) => children }));
 jest.mock('@/global.css', () => ({}));
 
 jest.mock('react-native-gesture-handler', () => {

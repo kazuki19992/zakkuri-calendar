@@ -1,3 +1,6 @@
+import { NotificationSettingsSection } from '../components/notification-settings-section';
+import type { NotificationDefaultsState } from '../hooks/use-notification-defaults';
+import type { NotificationRuntime } from '@/features/notifications/notification-context';
 import { DefaultExactDurationSettingsSection } from '../components/default-exact-duration-settings-section';
 import type { DefaultExactDurationSettingsState } from '../hooks/use-default-exact-duration-settings';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -11,7 +14,7 @@ import { HolidaySettingsSection } from '../components/holiday-settings-section';
 
 const OPTIONS = [[5, '金曜日'], [6, '土曜日'], [7, '日曜日']] as const;
 
-export function SettingsScreen({ state, weekStart, holidays, duration }: Readonly<{ duration: DefaultExactDurationSettingsState; state: RelativeDateSettingsState; weekStart: WeekStartSettingsState; holidays: HolidayPreferencesState }>) {
+export function SettingsScreen({ state, weekStart, holidays, duration, notificationDefaults, notificationRuntime }: Readonly<{ notificationDefaults?: NotificationDefaultsState; notificationRuntime?: NotificationRuntime; duration: DefaultExactDurationSettingsState; state: RelativeDateSettingsState; weekStart: WeekStartSettingsState; holidays: HolidayPreferencesState }>) {
   const theme = useTheme();
   const [selecting, setSelecting] = useState(false);
   const disabled = weekStart.status !== 'ready' || weekStart.isSaving;
@@ -35,6 +38,7 @@ export function SettingsScreen({ state, weekStart, holidays, duration }: Readonl
         onClose={() => setSelecting(false)} onSelect={(value) => { void weekStart.setValue(value); }} />
       <HolidaySettingsSection state={holidays} />
       <DefaultExactDurationSettingsSection state={duration} />
+      {notificationDefaults && notificationRuntime ? <NotificationSettingsSection defaults={notificationDefaults} runtime={notificationRuntime} /> : null}
       <View style={[styles.section, { borderBottomColor: theme.calendarBorder }]}>
         <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ざっくり予定</Text>
         <Text style={[styles.label, { color: theme.text }]}>今週中の締切</Text>

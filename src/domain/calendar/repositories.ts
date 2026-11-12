@@ -1,3 +1,4 @@
+import type { NotificationCategory, ReminderTiming } from '@/domain/notifications/reminder-timing';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import type { Calendar } from './calendar';
 import type { CalendarViewMode } from './calendar-view-mode';
@@ -67,6 +68,8 @@ export interface EventRepository {
 }
 
 export interface SettingsRepository {
+  getNotificationDefault(category: NotificationCategory): Promise<ReminderTiming | null>;
+  setNotificationDefault(category: NotificationCategory, timing: ReminderTiming | null, updatedAt: string): Promise<void>;
   getHolidayPreferences(): Promise<HolidayPreferencesV1>;
   setHolidayPreferences(value: HolidayPreferencesV1, updatedAt: string): Promise<void>;
   getCalendarWeekStartsOn(): Promise<WeekStartsOn>;

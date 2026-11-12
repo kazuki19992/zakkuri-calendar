@@ -49,7 +49,7 @@ describe('migrateDatabase', () => {
     await migrateDatabase(database.database, environment);
 
     const writes = database.run.mock.calls as [string, Record<string, unknown>][];
-    expect(writes).toHaveLength(33);
+    expect(writes).toHaveLength(34);
     expect(writes.filter(([sql]) => sql.startsWith('INSERT')).every(([sql]) => sql.includes('ON CONFLICT DO NOTHING'))).toBe(true);
     expect(writes[0][1]).toMatchObject({
       $id: 'personal-default',
@@ -108,7 +108,7 @@ describe('migrateDatabase', () => {
   it('version 2から既存fuzzyを補完して今週中定義を追加する', async () => {
     const database = createDatabaseDouble();
     database.first.mockResolvedValue({ version: 2 });
-    database.all.mockResolvedValue([{ id: 'personal-default' }]);
+    database.all.mockImplementation(async (sql: string) => sql === 'PRAGMA foreign_key_check' ? [] : [{ id: 'personal-default' }]);
 
     await migrateDatabase(database.database, environment);
 
@@ -133,7 +133,7 @@ describe('migrateDatabase', () => {
     await migrateDatabase(database.database, environment);
 
     const schemaSql = database.exec.mock.calls.map(([sql]) => sql).join('\n');
-    expect(LATEST_SCHEMA_VERSION).toBe(6);
+    expect(LATEST_SCHEMA_VERSION).toBe(7);
     expect(schemaSql).toContain('CREATE TABLE IF NOT EXISTS recurrence_exceptions');
     expect(schemaSql).toContain('PRIMARY KEY (series_event_id, original_occurrence_date)');
     expect(schemaSql).toContain('recurrence_exceptions_replacement_event_id');
@@ -149,7 +149,7 @@ describe('migrateDatabase', () => {
     await migrateDatabase(database.database, environment);
 
     const schemaSql = database.exec.mock.calls.map(([sql]) => sql).join('\n');
-    expect(LATEST_SCHEMA_VERSION).toBe(6);
+    expect(LATEST_SCHEMA_VERSION).toBe(7);
     expect(schemaSql).toContain('ALTER TABLE events ADD COLUMN notes_document_json TEXT');
     expect(schemaSql).not.toContain('DELETE FROM events');
     expect(database.run).toHaveBeenCalledWith(expect.stringContaining('schema_migrations'), {
@@ -164,7 +164,7 @@ describe('migrateDatabase', () => {
 
     await migrateDatabase(database.database, environment);
 
-    expect(LATEST_SCHEMA_VERSION).toBe(6);
+    expect(LATEST_SCHEMA_VERSION).toBe(7);
     expect(database.run).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE temporal_definitions'),
       expect.objectContaining({

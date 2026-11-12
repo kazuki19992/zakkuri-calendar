@@ -1,3 +1,4 @@
+import { parseReminderTiming } from '@/domain/notifications/reminder-timing';
 import type { Calendar } from '@/domain/calendar/calendar';
 import {
   DEFAULT_EVENT_COLOR_ID,
@@ -42,7 +43,7 @@ export type EventRow = Readonly<{
 }>;
 
 export type ReminderRow = Readonly<{
-  id: string; event_id: string; minutes_before: number; sort_order: number;
+  id: string; event_id: string; minutes_before?: number; timing_json?: string; timing_key?: string; sort_order: number;
 }>;
 
 export type RecurrenceExceptionRow = Readonly<{
@@ -186,10 +187,15 @@ function parseStoredEventNote(
 }
 
 export function mapReminderRow(row: ReminderRow): EventReminder {
+  let timing;
+  if (row.timing_json !== undefined) {
+    try { timing = parseReminderTiming(JSON.parse(row.timing_json)); } catch { timing = null; }
+    if (!timing || (row.timing_key !== undefined && row.timing_key !== JSON.stringify(timing))) throw new CorruptDatabaseRowError('event reminder', row.id);
+  }
   const parsed = parseEventReminder({
     id: row.id,
     eventId: row.event_id,
-    minutesBefore: row.minutes_before,
+    ...(timing && timing.kind !== 'legacyStartOffset' ? { timing } : { minutesBefore: timing?.kind === 'legacyStartOffset' ? timing.minutesBefore : row.minutes_before }),
     sortOrder: row.sort_order,
   });
   if (!parsed.ok) throw new CorruptDatabaseRowError('event reminder', row.id);

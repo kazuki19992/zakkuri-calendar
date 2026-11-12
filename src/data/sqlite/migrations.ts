@@ -3,7 +3,7 @@ import { createStandardTemporalDefinitions } from '@/domain/temporal/standard-de
 import type { AppDatabase } from './database';
 
 export const DATABASE_NAME = 'zakkuri-calendar.db';
-export const LATEST_SCHEMA_VERSION = 6;
+export const LATEST_SCHEMA_VERSION = 7;
 
 export type MigrationEnvironment = Readonly<{
   now: () => string;
@@ -308,6 +308,37 @@ export async function migrateDatabase(
          VALUES ($version, $appliedAt)
          ON CONFLICT DO NOTHING`,
         { $version: 6, $appliedAt: now },
+      );
+    }
+    if (currentVersion < 7) {
+      await transaction.exec(`
+CREATE TABLE event_reminders_v7 (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  timing_json TEXT NOT NULL,
+  timing_key TEXT NOT NULL,
+  sort_order INTEGER NOT NULL CHECK (sort_order >= 0),
+  UNIQUE (event_id, timing_key)
+);
+INSERT INTO event_reminders_v7(id,event_id,timing_json,timing_key,sort_order)
+SELECT id,event_id,json_object('version',1,'kind','legacyStartOffset','minutesBefore',minutes_before),
+  json_object('version',1,'kind','legacyStartOffset','minutesBefore',minutes_before),sort_order FROM event_reminders;
+CREATE TEMP TABLE notification_migration_check(valid INTEGER CHECK(valid=1));
+INSERT INTO notification_migration_check SELECT (SELECT COUNT(*) FROM event_reminders) = (SELECT COUNT(*) FROM event_reminders_v7);
+DROP TABLE notification_migration_check;
+DROP TABLE event_reminders;
+ALTER TABLE event_reminders_v7 RENAME TO event_reminders;
+CREATE INDEX event_reminders_event_order_idx ON event_reminders(event_id,sort_order,id);
+CREATE TABLE IF NOT EXISTS notification_sync_state (
+  id INTEGER PRIMARY KEY CHECK(id=1), desired_revision INTEGER NOT NULL DEFAULT 0,
+  applied_revision INTEGER NOT NULL DEFAULT -1, synced_at TEXT, error_code TEXT
+);
+INSERT INTO notification_sync_state(id) VALUES(1) ON CONFLICT DO NOTHING;
+`);
+      if ((await transaction.all('PRAGMA foreign_key_check')).length > 0) throw new Error('Invalid notification migration constraints');
+      await transaction.run(
+        'INSERT INTO schema_migrations(version,applied_at) VALUES($version,$appliedAt) ON CONFLICT DO NOTHING',
+        { $version: 7, $appliedAt: environment.now() },
       );
     }
     });

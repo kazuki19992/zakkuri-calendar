@@ -11,6 +11,7 @@ jest.mock('@expo/ui/community/datetime-picker', () => {
 
 const state: EventEditorState = {
   exactDurationType: 'fixed', exactDurationStatus: 'ready', setExactDurationType: jest.fn(), retryExactDuration: jest.fn(),
+  reminderCategory: 'exact', allowReminderEnd: true, notificationDefaultStatus: 'ready', retryNotificationDefaults: jest.fn(), resetReminderDefaults: jest.fn(), updateReminder: jest.fn(),
   status: 'ready', mode: 'create', title: '', editorTab: 'exact', isAllDay: false, isDateEditable: true,
   isRecurrenceEditable: true, relativeDatePreview: null,
   startDate: '2026-09-25', startTime: '09:30', endDate: '2026-09-26', endTime: '11:45',
@@ -43,7 +44,7 @@ describe('予定編集フォーム', () => {
     expect(view.getByTestId('event-editor.tab-content')).toBeOnTheScreen();
     expect(view.getByText('繰り返し')).toBeOnTheScreen();
     expect(view.getByText('マイカレンダー')).toBeOnTheScreen();
-    expect(view.getByText('設定は保存されますが、端末への通知はまだ行われません')).toBeOnTheScreen();
+    expect(view.getByText('通知なし')).toBeOnTheScreen();
     expect(view.getByLabelText('メモを追加')).toBeOnTheScreen();
     expect(view.queryByLabelText('予定を削除')).toBeNull();
   });

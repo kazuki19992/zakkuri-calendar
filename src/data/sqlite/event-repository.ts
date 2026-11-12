@@ -11,6 +11,7 @@ import {
   projectEventNoteToPlainText,
 } from '@/domain/calendar/event-note';
 import {
+  getReminderTiming,
   normalizeEventReminders,
   type EventAggregate,
   type EventReminder,
@@ -82,7 +83,8 @@ function reminderParameters(reminder: EventReminder): AppDatabaseParameters {
   return {
     $id: reminder.id,
     $eventId: reminder.eventId,
-    $minutesBefore: reminder.minutesBefore,
+    $timingJson: JSON.stringify(getReminderTiming(reminder)),
+    $timingKey: JSON.stringify(getReminderTiming(reminder)),
     $sortOrder: reminder.sortOrder,
   };
 }
@@ -125,9 +127,9 @@ const INSERT_EVENT_SQL = `INSERT INTO events (
 )`;
 
 const INSERT_REMINDER_SQL = `INSERT INTO event_reminders (
-  id, event_id, minutes_before, sort_order
+  id, event_id, timing_json, timing_key, sort_order
 ) VALUES (
-  $id, $eventId, $minutesBefore, $sortOrder
+  $id, $eventId, $timingJson, $timingKey, $sortOrder
 )`;
 
 const UPSERT_EXCEPTION_SQL = `INSERT INTO recurrence_exceptions (
@@ -225,9 +227,18 @@ async function loadValidOccurrence(
 export class SqliteEventRepository implements EventRepository {
   constructor(private readonly database: AppDatabase) {}
 
+  /** 予定本体・例外と同じtransactionで予約の世代を進め、保存後クラッシュから回復する。 */
+  private async mutate(task: (transaction: AppDatabase) => Promise<void>): Promise<void> {
+    await this.database.exclusiveTransaction(async transaction => {
+      await task(transaction);
+      await transaction.run('UPDATE notification_sync_state SET desired_revision = desired_revision + 1 WHERE id = 1');
+    });
+  }
+
+
   async create(aggregate: EventAggregate): Promise<void> {
     const normalized = normalizeAggregate(aggregate);
-    await this.database.exclusiveTransaction(async (transaction) => {
+    await this.mutate(async (transaction) => {
       await assertFuzzyDefinitionConsistency(transaction, normalized.event);
       await transaction.run(INSERT_EVENT_SQL, eventParameters(normalized.event));
       for (const reminder of normalized.reminders) {
@@ -318,7 +329,7 @@ export class SqliteEventRepository implements EventRepository {
   }
 
   async saveOccurrenceException(command: SaveOccurrenceExceptionCommand): Promise<void> {
-    await this.database.exclusiveTransaction(async (transaction) => {
+    await this.mutate(async (transaction) => {
       await assertSeriesRevision(
         transaction,
         command.identity.seriesEventId,
@@ -381,7 +392,7 @@ export class SqliteEventRepository implements EventRepository {
   }
 
   async deleteOccurrenceException(command: DeleteOccurrenceExceptionCommand): Promise<void> {
-    await this.database.exclusiveTransaction(async (transaction) => {
+    await this.mutate(async (transaction) => {
       await assertSeriesRevision(
         transaction,
         command.identity.seriesEventId,
@@ -419,7 +430,7 @@ export class SqliteEventRepository implements EventRepository {
   }
 
   async applyRecurrenceMutation(command: ApplyRecurrenceMutationCommand): Promise<void> {
-    await this.database.exclusiveTransaction(async (transaction) => {
+    await this.mutate(async (transaction) => {
       await assertSeriesRevision(transaction, command.seriesId, command.expectedSeriesUpdatedAt);
       if (command.plan.removePreviousSeries) {
         await transaction.run('DELETE FROM events WHERE id = $id', { $id: command.seriesId });
@@ -451,7 +462,7 @@ export class SqliteEventRepository implements EventRepository {
 
   async update(aggregate: EventAggregate): Promise<void> {
     const normalized = normalizeAggregate(aggregate);
-    await this.database.exclusiveTransaction(async (transaction) => {
+    await this.mutate(async (transaction) => {
       await assertFuzzyDefinitionConsistency(transaction, normalized.event);
       const result = await transaction.run(
         `UPDATE events SET
@@ -476,7 +487,7 @@ export class SqliteEventRepository implements EventRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.database.exclusiveTransaction(async (transaction) => {
+    await this.mutate(async (transaction) => {
       const replacements = await transaction.all<{ replacement_event_id: string }>(
         `SELECT replacement_event_id FROM recurrence_exceptions
          WHERE series_event_id = $id AND replacement_event_id IS NOT NULL`,

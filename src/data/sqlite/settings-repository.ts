@@ -1,3 +1,4 @@
+import { defaultReminderTiming, defaultTimingIsValid, parseReminderTiming, type NotificationCategory, type ReminderTiming } from '@/domain/notifications/reminder-timing';
 import { parseExactDuration, type EventEditorTab, type ExactDuration } from '@/domain/calendar/event';
 import {
   DEFAULT_CALENDAR_VIEW_MODE,
@@ -37,6 +38,25 @@ function parseEventEditorTab(value: unknown): EventEditorTab | null {
 
 export class SqliteSettingsRepository implements SettingsRepository {
   constructor(private readonly database: AppDatabase) {}
+
+  async getNotificationDefault(category: NotificationCategory): Promise<ReminderTiming | null> {
+    const row = await this.database.first<SettingRow>('SELECT value_json FROM app_settings WHERE key=$key', { $key: `notification_default_${category}` });
+    const v = row ? parseJson(row.value_json) : null;
+    if (typeof v === 'object' && v !== null && 'version' in v && v.version === 1 && 'timing' in v) {
+      if (v.timing === null) return null;
+      const timing = parseReminderTiming(v.timing);
+      if (timing && defaultTimingIsValid(category, timing)) return timing;
+    }
+    return defaultReminderTiming(category);
+  }
+
+  async setNotificationDefault(category: NotificationCategory, timing: ReminderTiming | null, updatedAt: string): Promise<void> {
+    const parsed = timing === null ? null : parseReminderTiming(timing);
+    if (timing !== null && (!parsed || !defaultTimingIsValid(category, parsed))) throw new Error('Invalid notification default');
+    await this.database.run('INSERT INTO app_settings(key,value_json,updated_at) VALUES($key,$json,$now) ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at', {
+      $key: `notification_default_${category}`, $json: JSON.stringify({ version: 1, timing: parsed }), $now: updatedAt,
+    });
+  }
 
   async getHolidayPreferences(): Promise<HolidayPreferencesV1> {
     const row = await this.database.first<SettingRow>('SELECT value_json FROM app_settings WHERE key = $key', { $key: 'holiday_preferences' });

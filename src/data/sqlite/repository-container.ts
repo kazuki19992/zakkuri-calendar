@@ -1,3 +1,5 @@
+import { SqliteNotificationRepository } from './notification-repository';
+import type { NotificationRepository } from '@/domain/notifications/ports';
 import type {
   CalendarRepository,
   EventRepository,
@@ -11,6 +13,7 @@ import { SqliteSettingsRepository } from './settings-repository';
 import { SqliteTemporalDefinitionRepository } from './temporal-definition-repository';
 
 export type RepositoryContainer = Readonly<{
+  notifications: NotificationRepository;
   calendars: CalendarRepository;
   temporalDefinitions: TemporalDefinitionRepository;
   events: EventRepository;
@@ -19,6 +22,7 @@ export type RepositoryContainer = Readonly<{
 
 export function createRepositoryContainer(database: AppDatabase): RepositoryContainer {
   return {
+    notifications: new SqliteNotificationRepository(database),
     calendars: new SqliteCalendarRepository(database),
     temporalDefinitions: new SqliteTemporalDefinitionRepository(database),
     events: new SqliteEventRepository(database),

@@ -1,3 +1,5 @@
+import { useNotifications } from '@/features/notifications/notification-context';
+import { useNotificationDefaults } from '@/features/settings/hooks/use-notification-defaults';
 import { useDefaultExactDurationSettings } from '@/features/settings/hooks/use-default-exact-duration-settings';
 import { SettingsScreen } from '@/features/settings/screens/settings-screen';
 import { useRelativeDateSettings } from '@/features/settings/hooks/use-relative-date-settings';
@@ -11,10 +13,12 @@ import { useHolidayPreferences } from '@/features/settings/hooks/use-holiday-pre
  */
 export default function SettingsRoute() {
   const { settings } = useRepositories();
+  const notificationDefaults = useNotificationDefaults(settings);
+  const notificationRuntime = useNotifications();
   const duration = useDefaultExactDurationSettings({ settings });
   const state = useRelativeDateSettings({ settings });
   const { notifyChanged } = useCalendarRefresh();
   const weekStart = useWeekStartSettings({ settings, onSaved: notifyChanged });
   const holidays = useHolidayPreferences({ settings, onSaved: notifyChanged });
-  return <SettingsScreen duration={duration} state={state} weekStart={weekStart} holidays={holidays} />;
+  return <SettingsScreen notificationDefaults={notificationDefaults} notificationRuntime={notificationRuntime} duration={duration} state={state} weekStart={weekStart} holidays={holidays} />;
 }

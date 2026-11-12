@@ -187,10 +187,10 @@ describe('SQLite repositories', () => {
       $colorId: 'teal', $recurrenceRuleJson: expect.any(String),
     }));
     expect(db.transactionRun).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO event_reminders'), {
-      $id: 'reminder-10', $eventId: exactEvent.id, $minutesBefore: 10, $sortOrder: 0,
+      $id: 'reminder-10', $eventId: exactEvent.id, $timingJson: '{"version":1,"kind":"legacyStartOffset","minutesBefore":10}', $timingKey: '{"version":1,"kind":"legacyStartOffset","minutesBefore":10}', $sortOrder: 0,
     });
     expect(db.transactionRun).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO event_reminders'), {
-      $id: 'reminder-30', $eventId: exactEvent.id, $minutesBefore: 30, $sortOrder: 1,
+      $id: 'reminder-30', $eventId: exactEvent.id, $timingJson: '{"version":1,"kind":"legacyStartOffset","minutesBefore":30}', $timingKey: '{"version":1,"kind":"legacyStartOffset","minutesBefore":30}', $sortOrder: 1,
     });
   });
 
@@ -410,6 +410,6 @@ describe('SQLite repositories', () => {
 
   it('constructs one complete repository container', () => {
     const container = createRepositoryContainer(createDatabaseDouble().database);
-    expect(Object.keys(container).sort()).toEqual(['calendars', 'events', 'settings', 'temporalDefinitions']);
+    expect(Object.keys(container).sort()).toEqual(['calendars', 'events', 'notifications', 'settings', 'temporalDefinitions']);
   });
 });

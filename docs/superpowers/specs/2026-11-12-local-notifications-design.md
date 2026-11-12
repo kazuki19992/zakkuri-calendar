@@ -1,6 +1,6 @@
 # 端末ローカル通知 設計
 
-状態: **設計レビュー中・機能未実装・依存未追加**。2026-11-12。基準commit: `f2fde5da97928b831b31afd4c9a1d71d7f2b15ed`。
+状態: **2026-11-12ユーザー承認済み・実装済み・実機未確認**。2026-11-12。基準commit: `f2fde5da97928b831b31afd4c9a1d71d7f2b15ed`。
 
 関連: [端末通知 #59](https://github.com/kazuki19992/zakkuri-calendar/issues/59)。元MVPの対象外機能を追加する後続Issueであり、#1のMVP完了条件を増やさない。#54の実機検証とも分けて扱う。
 
@@ -16,7 +16,7 @@
 - 予定ごとに通知を複数追加・変更・削除でき、すべて削除すると通知なしになる。
 - 導入前に通知を設定済みの予定は、通知を許可した後、今後の分から有効にする。通知未設定の予定へ自動追加しない。過ぎた通知をまとめて鳴らさない。
 
-これ以降の詳細は、上記を実現するための**設計者の提案**であり、文書全体の承認前は実装しない。
+これ以降の詳細を含め、2026-11-12にユーザーが文書全体を承認した。実装と自動検証を行い、実機の発火・操作性は未確認として分ける。
 
 ## 2. 対象と対象外
 
@@ -198,7 +198,7 @@ payloadには管理version、event ID、元の開催identity、reminder IDなど
 
 `expo-notifications`をSDK 57互換版で追加する。独自のiOS/Android予約実装より保守負担が小さく、権限・一覧・取消・タップを同じ境界で扱える。Androidの専用OS設定画面にはSDK 57互換の`expo-intent-launcher`を使い、独自native moduleを増やさない。設定画面を開けない端末では通常のアプリ設定への導線と説明を残す。
 
-追加時に`npx expo install`で互換versionを確認しlockfileを更新する。調査時の公式推奨はnotifications `~57.0.25`、intent-launcher `~57.0.1`だが、実装時に再確認する。SDK 58向けの`delivery`などをSDK 57で使用しない。push credentialsや外部通知プロジェクトの登録は不要。native依存追加後はdevelopment buildの更新が必要であり、旧バイナリへのJS配信だけで動くと扱わない。
+追加時に`npx expo install`で互換versionを確認しlockfileを更新する。調査時の公式推奨はnotifications `~57.0.25`、intent-launcher `~57.0.1`だが、実装時に再確認する。SDK 58向けの`delivery`などをSDK 57で使用しない。push credentialsや外部通知プロジェクトの登録は不要。Expoの通知pluginは暗黙適用でもAPNs entitlementを付けるため、`plugins/with-local-notifications.js`で公式pluginの後に`aps-environment`だけを除外する。ローカル通知のautolinkを維持し、既存のAdHoc profileへpush capabilityを追加しない。native依存追加後はdevelopment buildの更新が必要であり、旧バイナリへのJS配信だけで動くと扱わない。
 
 ## 13. 検証と完了条件
 
@@ -236,4 +236,4 @@ payloadには管理version、event ID、元の開催identity、reminder IDなど
 4. Androidの正確なアラーム許可がない場合も予約し、遅延可能性とOS設定への導線を示す。
 5. 権限拒否や予約失敗を予定保存失敗として扱わず、DBとOSの非原子的な区間を再同期で回復する。
 
-builder check: 2026-11-12にfresh-context reviewerが実施。予定種別変更時の通知基準の互換性を表で明記し、再確認で実装計画を妨げる重要な未回答事項なし。全文のユーザー承認: 未取得。
+builder check: 2026-11-12にfresh-context reviewerが実施。予定種別変更時の通知基準の互換性を表で明記し、再確認で実装計画を妨げる重要な未回答事項なし。全文のユーザー承認: 2026-11-12取得。

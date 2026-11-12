@@ -1,3 +1,6 @@
+import { useNewReminderDefaults } from './use-new-reminder-defaults';
+import { getReminderTiming } from '@/domain/calendar/event-reminder';
+import { parseReminderTiming, timingIsCompatible, type ReminderTiming, type NotificationCategory } from '@/domain/notifications/reminder-timing';
 import { DEFAULT_EXACT_DURATION } from '@/domain/calendar/default-exact-duration';
 import { rangeForExactDuration } from '../exact-duration-draft';
 import { useNewEventDuration } from './use-new-event-duration';
@@ -132,7 +135,13 @@ export type EventEditorState = Readonly<{
   setRecurrenceEndType(value: RecurrenceRuleV1['end']['type']): void;
   setRecurrenceUntilDate(value: string): void;
   setRecurrenceCountText(value: string): void;
-  addReminder(minutesBefore: number): void;
+  reminderCategory: NotificationCategory;
+  allowReminderEnd: boolean;
+  notificationDefaultStatus: 'loading' | 'ready' | 'error';
+  retryNotificationDefaults(): void;
+  resetReminderDefaults(): void;
+  updateReminder(id: string, timing: ReminderTiming): void;
+  addReminder(value: number | ReminderTiming): void;
   removeReminder(id: string): void;
   moveReminder(id: string, offset: -1 | 1): void;
   retry(): void;
@@ -248,6 +257,11 @@ export function useEventEditor({
   const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrenceDraft>(() =>
     getRecurrenceDraft(null, initialValues.date));
   const [reminders, setReminders] = useState<readonly ReminderDraft[]>([]);
+  const reminderCategory: NotificationCategory = editorTab === 'exact' ? isAllDay ? 'all_day' : 'exact'
+    : definitions.find(d => d.id === selectedDefinitionId)?.resolverConfig.kind === 'timeOfDay' ? 'fuzzy_day' : 'fuzzy_period';
+  const reminderDefaults = useNewReminderDefaults({ settings, isNew: eventId === undefined, category: reminderCategory, ready: status === 'ready', apply: setReminders, createId: createReminderId });
+  const markReminderTouched = reminderDefaults.markTouched;
+
   const [titleError, setTitleError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [endTimeError, setEndTimeError] = useState<string | null>(null);
@@ -491,23 +505,35 @@ export function useEventEditor({
   const setRecurrenceEndType = useCallback((value: RecurrenceRuleV1['end']['type']) => updateRecurrence({ endType: value }), [updateRecurrence]);
   const setRecurrenceUntilDate = useCallback((value: string) => updateRecurrence({ untilDate: value }), [updateRecurrence]);
   const setRecurrenceCountText = useCallback((value: string) => updateRecurrence({ countText: value }), [updateRecurrence]);
-  const addReminder = useCallback((minutesBefore: number) => {
-    if (!Number.isSafeInteger(minutesBefore) || minutesBefore < 0) {
-      setReminderError('通知時間は0以上の整数で入力してください');
-      return;
+  const addReminder = useCallback((value: number | ReminderTiming) => {
+    if (typeof value === 'number' && (!Number.isSafeInteger(value) || value < 0)) {
+      setReminderError('通知時間は0以上の整数で入力してください'); return;
     }
-    setReminders((current) => current.some((item) => item.minutesBefore === minutesBefore)
-      ? current
-      : [...current, { id: createReminderId(), minutesBefore }]);
+    const timing = typeof value === 'number' ? { version: 1, kind: 'legacyStartOffset', minutesBefore: value } as const : parseReminderTiming(value);
+    if (!timing) { setReminderError('通知時間を確認してください'); return; }
+    markReminderTouched();
+    setReminders(current => current.some(item => JSON.stringify(getReminderTiming(item)) === JSON.stringify(timing))
+      ? current : [...current, typeof value === 'number' ? { id: createReminderId(), minutesBefore: value } : { id: createReminderId(), timing }]);
     setReminderError(null);
-  }, [createReminderId]);
+  }, [createReminderId, markReminderTouched]);
+  const updateReminder = useCallback((id: string, value: ReminderTiming) => {
+    const timing = parseReminderTiming(value);
+    if (!timing) { setReminderError('通知時間を確認してください'); return; }
+    markReminderTouched();
+    setReminders(current => {
+      if(current.some(item => item.id !== id && JSON.stringify(getReminderTiming(item)) === JSON.stringify(timing))) return current;
+      return current.map(item => item.id === id ? { id, timing } : item);
+    });
+    setReminderError(null);
+  }, [markReminderTouched]);
   const removeReminder = useCallback((id: string) => {
-    setReminders((current) => current.filter((item) => item.id !== id));
-    setReminderError(null);
-  }, []);
+    markReminderTouched();
+    setReminders(current => current.filter(item => item.id !== id)); setReminderError(null);
+  }, [markReminderTouched]);
   const moveReminder = useCallback((id: string, offset: -1 | 1) => {
-    setReminders((current) => moveReminderDraft(current, current.findIndex((item) => item.id === id), offset));
-  }, []);
+    markReminderTouched();
+    setReminders(current => moveReminderDraft(current, current.findIndex(item => item.id === id), offset));
+  }, [markReminderTouched]);
   const retry = useCallback(() => { setStatus('loading'); setLoadRevision((value) => value + 1); }, []);
 
   const selectedDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
@@ -625,6 +651,10 @@ export function useEventEditor({
       } else setSaveError('入力内容を確認してください。');
       return false;
     }
+    if (reminderDefaults.status !== 'ready') { setReminderError('通知の初期値を読み込んでから保存してください'); return false; }
+    if (reminders.some(reminder => !timingIsCompatible(getReminderTiming(reminder), parsedEvent.value, definitions))) {
+      setReminderError('この予定では使えない通知があります。基準を変更・削除するか、初期値に置き換えてください。'); return false;
+    }
     const builtReminders = buildEventReminders(parsedEvent.value.id, reminders);
     if (!builtReminders.ok) { setReminderError(builtReminders.error.message); return false; }
 
@@ -649,7 +679,7 @@ export function useEventEditor({
       setIsSaving(false);
     }
   }, [allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
-    getTimeZoneId, isAllDay, location, newEventId, noteDocument, now, recurrenceDraft, reminders,
+    getTimeZoneId, isAllDay, location, newEventId, noteDocument, now, recurrenceDraft, reminders, reminderDefaults.status,
     definitions, occurrenceEditData, relativeResolution, relativeDateError, selectedDefinitionId,
     startDate, startTime, status, title]);
 
@@ -822,7 +852,13 @@ export function useEventEditor({
     reminderError,
     saveError,
     isSaving,
-    isSaveDisabled: relativeDateError !== null || durationBlocked,
+    isSaveDisabled: relativeDateError !== null || durationBlocked || reminderDefaults.status !== 'ready',
+    reminderCategory,
+    allowReminderEnd: reminderCategory !== 'exact' || exactDurationType === 'fixed',
+    notificationDefaultStatus: reminderDefaults.status,
+    retryNotificationDefaults: reminderDefaults.retry,
+    resetReminderDefaults: () => { void reminderDefaults.reset().then(ok => { if (ok !== null) setReminderError(ok ? null : '通知の初期値を読み込めませんでした。再試行してください。'); }); },
+    updateReminder,
     isDeleting,
     usesRecurrenceScope: occurrenceEditData !== null,
     scopeRequest,

@@ -69,7 +69,7 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
           </View>)}
           {section('場所', <EventMetadataFields location={state.location} disabled={busy}
             onLocationChange={state.setLocation} />)}
-          {section('通知', <EventReminderEditor reminders={state.reminders} disabled={busy} error={state.reminderError} onAdd={state.addReminder} onRemove={state.removeReminder} onMove={state.moveReminder} />)}
+          {section('通知', <EventReminderEditor reminders={state.reminders} disabled={busy} error={state.reminderError} onAdd={state.addReminder} onRemove={state.removeReminder} onMove={state.moveReminder} onUpdate={state.updateReminder} category={state.reminderCategory} allowEnd={state.allowReminderEnd} defaultStatus={state.notificationDefaultStatus} onRetry={state.retryNotificationDefaults} onReset={state.resetReminderDefaults} />)}
           {section('メモ', <EventNoteField summary={state.noteSummary} disabled={busy}
             error={state.noteLinkError} onPress={state.openNoteEditor} />)}
           {state.saveError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.saveError}</Text> : null}

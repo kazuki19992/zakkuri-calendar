@@ -45,7 +45,7 @@
 
 対象外の機能は、既存のドメインモデルを置き換えずに追加できる境界を用意する。ただし、未確定の機能本体や抽象化は先回りして実装しない。
 
-### 2.3 予定モデル schema version 5の実装段階
+### 2.3 予定モデルと後続機能の実装段階
 
 予定の保存基盤は、MVPの画面範囲と段階を分けて扱う。
 
@@ -56,7 +56,7 @@
 - 繰り返し例外（実装済み）: schema version 4へ個別発生回の削除・置換とoverride field maskを保存し、「この予定」「これ以降」「すべての予定」の変更範囲を扱う。
 - 書式付きメモ（実装済み）: schema version 5へアプリ所有のversion付き文書を保存する。旧プレーンテキストを保持し、全画面エディタの完了から予定保存まではインメモリdraftとして扱う。
 - 週ビュー（実装済み）: 7日分を同時表示し、前後週・1日詳細への切替、縮尺に応じた密集表示と省略件数を扱う。詳細は `2026-11-05-week-overview-design.md` を参照する。実機の可読性・操作性確認は別途必要。
-- 端末通知（未実装）: 保存した通知の権限要求、予約、解除、発火を追加する。schemaへ通知行を保存できても、現時点では端末通知は発火しない。
+- 端末通知（MVP後続・実装済み、実機未確認）: schema version 7で通知基準を保存し、権限要求、単発予約、解除、開催ごとの展開・再同期を実装する。件数・期間・OS制約を含む詳細は`2026-11-12-local-notifications-design.md`を参照する。元MVPの完了条件を増やさない。
 
 自動検証はdomain・SQLite・featureのコードと静的exportを対象とし、端末またはシミュレータ上の見た目、ピッカー操作、通知動作を確認済みとは扱わない。
 
@@ -131,7 +131,7 @@ Expo RouterのStackを使用する。
 - カレンダー既定色または予定固有色
 - 場所、複数通知、書式付きメモ
 
-日付は`9月25日（金）`形式で表示し、内部値は`yyyy-MM-dd`を維持する。保存後はメイン画面の対象期間へ即時反映する。保存が失敗した場合は成功状態へ遷移しない。相対日付を選んだ場合は解決期間をプレビューし、日付入力と繰り返しを無効にする。通知設定は保存するが端末通知は発火しない。
+日付は`9月25日（金）`形式で表示し、内部値は`yyyy-MM-dd`を維持する。保存後はメイン画面の対象期間へ即時反映する。保存が失敗した場合は成功状態へ遷移しない。相対日付を選んだ場合は解決期間をプレビューし、日付入力と繰り返しを無効にする。通知の入力・保存・予約は後続の`2026-11-12-local-notifications-design.md`に従う。
 
 ### 5.4 設定
 
@@ -465,3 +465,11 @@ Presentational Component
 - UI変更が時間計算やSQLite実装の書き換えを要求しない。
 - 予定本文を外部へ送信しない。
 - lint、typecheck、全自動テストが成功する。
+
+### 後続schema version 7: 端末通知
+
+`event_reminders`は`id`、`event_id`（FK cascade）、`timing_json`、`timing_key`、`sort_order`を保持し、`(event_id, timing_key)`を一意とする。旧schemaの`minutes_before`は`legacyStartOffset`へ全件移行する。読み取り互換では旧分数だけのdomain入力も受け入れるが、新しい永続化はversion付きtimingを正とする。
+
+`notification_sync_state`はsingleton id=1の`desired_revision`、`applied_revision`、`synced_at`、`error_code`を保存する。予定・例外のmutationと同じtransactionでdesired revisionを進め、OS読戻しと最新revisionを照合できたときだけapplied revisionを確定する。OS予約一覧を別のDB台帳へ複製しない。
+
+既定通知は`app_settings`の`notification_default_exact`、`notification_default_all_day`、`notification_default_fuzzy_day`、`notification_default_fuzzy_period`に`{version:1,timing:値またはnull}`として保存する。欠損・不正値・未知versionは項目ごとの初期値へ戻し、nullは通知なしとして保持する。設定変更で既存予定へ通知を追加しない。

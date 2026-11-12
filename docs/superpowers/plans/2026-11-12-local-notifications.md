@@ -87,6 +87,8 @@
 - [x] typecheck、lint、全Jest、git diff --check、iOS/Android exportを実行する。
 - [x] native development buildは署名・環境が利用可能ならrepository scriptで確認する。未実施と失敗は区別して記録し、実機発火は未確認のまま残す。
 - [x] 独立した最終レビューを1回行い、有効な指摘を修正・再検証する。
-- [ ] 日本語Semantic commitで意味単位に保存しpush、develop向け通常PRを作成・attachする。本文にCloses #59、検証、OS制約と実機未確認を記載する。
+- [x] 日本語Semantic commitで意味単位に保存しpush、develop向け通常PRを作成・attachする。本文にCloses #59、検証、OS制約と実機未確認を記載する。
 
 ユーザーの継続指示により、計画提示後の再承認は求めずinlineで実行し、最後に独立レビューを行う。
+
+完了: [PR #63](https://github.com/kazuki19992/zakkuri-calendar/pull/63)をdevelop向け通常Open PRとして作成。worktreeはマージ確認まで保持する。

@@ -54,3 +54,16 @@ describe('通知起動の待機キュー', () => {
     ]);
   });
 });
+
+test('空のキューを準備済みにした直後の初期responseも最初のflushで処理する', async () => {
+  const opened: unknown[] = [], acknowledge = jest.fn();
+  const queue = new NotificationResponseQueue(
+    { getById: async () => ({event: {recurrenceRule: null}}) } as never,
+    target => { opened.push(target); }, () => {},
+  );
+  queue.setReady(true);
+  queue.receive({id: 'initial', data: {version: 1, eventId: 'event'}, acknowledge});
+  await queue.flush();
+  expect(opened).toEqual([{eventId: 'event'}]);
+  expect(acknowledge).toHaveBeenCalledTimes(1);
+});

@@ -86,7 +86,7 @@
 - [x] 既存編集routeへ検証済みID/元の開催日で遷移する。任意URLは受け付けない。
 - [x] typecheck、lint、全Jest、git diff --check、iOS/Android exportを実行する。
 - [x] native development buildは署名・環境が利用可能ならrepository scriptで確認する。未実施と失敗は区別して記録し、実機発火は未確認のまま残す。
-- [ ] 独立した最終レビューを1回行い、有効な指摘を修正・再検証する。
+- [x] 独立した最終レビューを1回行い、有効な指摘を修正・再検証する。
 - [ ] 日本語Semantic commitで意味単位に保存しpush、develop向け通常PRを作成・attachする。本文にCloses #59、検証、OS制約と実機未確認を記載する。
 
 ユーザーの継続指示により、計画提示後の再承認は求めずinlineで実行し、最後に独立レビューを行う。

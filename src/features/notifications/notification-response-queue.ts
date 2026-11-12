@@ -33,6 +33,8 @@ export class NotificationResponseQueue {
     if (ready) void this.flush();
   }
   flush(): Promise<void> {
+    // 空のdrainの完了待ちに、同じtickの初期responseを合流させない。
+    if (!this.ready || this.pending.length === 0) return this.running ?? Promise.resolve();
     if (!this.running)
       this.running = this.drain().finally(() => {
         this.running = null;

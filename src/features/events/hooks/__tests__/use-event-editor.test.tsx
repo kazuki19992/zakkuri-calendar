@@ -607,3 +607,15 @@ test('既存予定の初期通知への置換が遅れても、その後の手�
  await act(async()=>{finish(null);});
  expect(result.current.reminders).toHaveLength(3);
 });
+
+test('時刻付きの旧開始通知と同条件の新通知を追加・更新で重複させない', async () => {
+ const r=createRepositories();r.events.getById.mockResolvedValue(exactAggregate);
+ const {result}=await renderHook(()=>useEventEditor({...r,initial,eventId:exactEvent.id}));
+ await waitFor(()=>expect(result.current.status).toBe('ready'));
+ await act(async()=>{result.current.addReminder({version:1,kind:'relativeMinutes',anchor:'start',minutesBefore:30});});
+ expect(result.current.reminders).toHaveLength(2);
+ await act(async()=>{result.current.updateReminder('reminder-2',{version:1,kind:'relativeMinutes',anchor:'start',minutesBefore:30});});
+ expect(result.current.reminders[1].minutesBefore).toBe(10);
+ await act(async()=>{result.current.addReminder({version:1,kind:'relativeMinutes',anchor:'end',minutesBefore:30});});
+ expect(result.current.reminders).toHaveLength(3);
+});

@@ -1,3 +1,4 @@
+import { notificationFailure } from '@/features/notifications/notification-notice-model';
 import { useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
@@ -30,20 +31,25 @@ export function NotificationSettingsSection({
     [editing, setEditing] = useState<NotificationCategory | null>(null),
     [actionError, setActionError] = useState<string | null>(null),
     pending = useRef<NotificationCategory | null>(null);
+  const actionOperation = useRef(0);
   const action = (label: string, task: () => Promise<void>) => (
     <Pressable
       accessibilityRole="button"
       style={styles.row}
-      onPress={() =>
-        void task().catch(() =>
-          setActionError('端末の設定を開けませんでした。'),
-        )
-      }
+      onPress={() => {
+        const operation = ++actionOperation.current;
+        setActionError(null);
+        void task().catch(() => {
+          if (operation === actionOperation.current)
+            setActionError('端末の設定を開けませんでした。');
+        });
+      }}
     >
       <Text style={{ color: theme.calendarAccent }}>{label}</Text>
     </Pressable>
   );
   const state = runtime.state;
+  const failure = notificationFailure(state);
   return (
     <View style={[styles.section, { borderBottomColor: theme.calendarBorder }]}>
       <Text accessibilityRole="header" style={{ color: theme.textSecondary }}>
@@ -102,9 +108,11 @@ export function NotificationSettingsSection({
       </Text>
       {state.permission !== 'unsupported' ? (
         <>
-          {state.permission === 'undetermined'
-            ? action('通知を許可する', runtime.requestPermission)
-            : action('端末の通知設定を開く', runtime.openSettings)}
+          {failure?.permission
+            ? null
+            : state.permission === 'undetermined'
+              ? action('通知を許可する', runtime.requestPermission)
+              : action('端末の通知設定を開く', runtime.openSettings)}
           {Platform.OS === 'android' ? (
             <>
               <Text style={{ color: theme.textSecondary }}>
@@ -119,8 +127,8 @@ export function NotificationSettingsSection({
           <Text style={{ color: theme.textSecondary }}>
             {state.status === 'syncing'
               ? '通知を準備しています。'
-              : state.status === 'error'
-                ? '一部の通知を準備できませんでした。'
+              : failure
+                ? failure.message
                 : '近い予定から通知を準備しています。'}
             {state.through
               ? ` 準備済みの最終日時: ${new Date(state.through).toLocaleString('ja-JP')}`
@@ -129,7 +137,10 @@ export function NotificationSettingsSection({
           <Text style={{ color: theme.textSecondary }}>
             近い60件・366日以内を予約します。アプリを開くと補充・更新します。長期間開かない場合や停止中の時差変更には追随できません。
           </Text>
-          {action('通知を再予約する', runtime.retry)}
+          {action(
+            failure?.permission ? failure.retryLabel : '通知を再予約する',
+            failure?.permission ? runtime.requestPermission : runtime.retry,
+          )}
         </>
       ) : null}
       {actionError ? (

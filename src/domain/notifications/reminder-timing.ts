@@ -173,3 +173,37 @@ export function editableReminderTiming(
   }
   return fallback;
 }
+
+/** 旧開始通知と新形式の開始通知は、時刻付き予定で同じ条件として扱う。 */
+export function sameReminderCondition(
+  first: ReminderTiming,
+  second: ReminderTiming,
+  category: NotificationCategory,
+): boolean {
+  const canonical = (timing: ReminderTiming): ReminderTiming =>
+    (category === 'exact' || category === 'fuzzy_day') &&
+    timing.kind === 'legacyStartOffset'
+      ? {
+          version: 1,
+          kind: 'relativeMinutes',
+          anchor: 'start',
+          minutesBefore: timing.minutesBefore,
+        }
+      : timing;
+  const a = canonical(first),
+    b = canonical(second);
+  if (a.kind === 'legacyStartOffset')
+    return b.kind === a.kind && a.minutesBefore === b.minutesBefore;
+  if (a.kind === 'relativeMinutes')
+    return (
+      b.kind === a.kind &&
+      a.anchor === b.anchor &&
+      a.minutesBefore === b.minutesBefore
+    );
+  return (
+    b.kind === a.kind &&
+    a.anchor === b.anchor &&
+    a.daysBefore === b.daysBefore &&
+    a.time === b.time
+  );
+}

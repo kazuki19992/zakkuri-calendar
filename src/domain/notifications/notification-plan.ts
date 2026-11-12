@@ -80,6 +80,7 @@ export function planNotifications(snapshot: NotificationSnapshot, now: Date) {
           .filter((e) => e.seriesEventId === aggregate.event.id)
           .flatMap((e) => aggregateById.get(e.replacementEventId ?? '') ?? []),
       ];
+      if (involved.every(a => a.reminders.length === 0)) continue;
       const lead = Math.max(
         0,
         ...involved.flatMap((a) =>

@@ -107,7 +107,7 @@ describe('予定編集の追加項目', () => {
     const onMove=jest.fn(),onRemove=jest.fn();
     const view=await render(<EventReminderEditor reminders={[{id:'r1',minutesBefore:30},{id:'r2',minutesBefore:60}]} disabled={false} error={null} onAdd={jest.fn()} onRemove={onRemove} onMove={onMove}/>);
     expect(view.getByText('開始30分前（以前の設定）')).toBeOnTheScreen();
-    await fireEvent.press(view.getByLabelText('上へ'));expect(onMove).toHaveBeenCalledWith('r2',-1);
+    await fireEvent.press(view.getByLabelText('通知2を上へ'));expect(onMove).toHaveBeenCalledWith('r2',-1);
     await fireEvent.press(view.getByLabelText('通知1を削除'));expect(onRemove).toHaveBeenCalledWith('r1');
   });
   it('60分以上の通知は基準と時分を表示する',async()=>{

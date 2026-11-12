@@ -8,6 +8,7 @@ import { planNotifications } from '@/domain/notifications/notification-plan';
 export type NotificationState = Readonly<{
   status: 'idle' | 'syncing' | 'ready' | 'error';
   hasReminders: boolean;
+  failureRevision: number;
   permission: NotificationPermission;
   deferred: boolean;
   through: number | null;
@@ -17,6 +18,7 @@ export type NotificationState = Readonly<{
 export class NotificationCoordinator {
   private state: NotificationState = {
     status: 'idle',
+    failureRevision: 0,
     hasReminders: false,
     permission: 'undetermined',
     deferred: false,
@@ -41,7 +43,12 @@ export class NotificationCoordinator {
     };
   };
   private setState(patch: Partial<NotificationState>) {
-    this.state = { ...this.state, ...patch };
+    this.state = {
+      ...this.state,
+      ...patch,
+      failureRevision:
+        this.state.failureRevision + (patch.status === 'error' ? 1 : 0),
+    };
     this.listeners.forEach((l) => l());
   }
   reconcile = (): Promise<void> => {

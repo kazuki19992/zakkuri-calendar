@@ -40,10 +40,10 @@ export function EventReminderEditor({
 }>) {
   const theme = useTheme();
   const [editing, setEditing] = useState<string | null | undefined>(undefined);
-  const button = (label: string, action: () => void) => (
+  const button = (label: string, action: () => void, accessibilityLabel = label) => (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={action}
@@ -91,7 +91,7 @@ export function EventReminderEditor({
               )}
             </Text>
           </Pressable>
-          {index > 0 ? button('上へ', () => onMove(r.id, -1)) : null}
+          {index > 0 ? button('上へ', () => onMove(r.id, -1), `通知${index + 1}を上へ`) : null}
           {button(`通知${index + 1}を削除`, () => onRemove(r.id))}
         </View>
       ))}

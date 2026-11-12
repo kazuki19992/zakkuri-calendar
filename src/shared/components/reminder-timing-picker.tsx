@@ -1,8 +1,11 @@
-import { useRef, useState } from 'react';
+import { useContext, useRef, useState } from 'react';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import {
   FlatList,
   Modal,
   Pressable,
+  ScrollView,
+  useWindowDimensions,
   StyleSheet,
   Text,
   View,
@@ -31,6 +34,7 @@ function NumberWheel({
 }) {
   const theme = useTheme(),
     ref = useRef<FlatList<number>>(null);
+  const [viewportHeight, setViewportHeight] = useState(220);
   const end = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
     onChange(
       Math.max(
@@ -73,7 +77,10 @@ function NumberWheel({
           index: i,
         })}
         initialScrollIndex={value}
-        contentContainerStyle={{ paddingVertical: 88 }}
+        contentContainerStyle={{
+          paddingVertical: Math.max(0, (viewportHeight - HEIGHT) / 2),
+        }}
+        onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
         snapToInterval={HEIGHT}
         decelerationRate="fast"
         showsVerticalScrollIndicator={false}
@@ -131,6 +138,8 @@ function PickerContent({
 }: ReminderTimingPickerProps) {
   const theme = useTheme(),
     reduce = useReduceMotion();
+  const { height } = useWindowDimensions();
+  const insets = useContext(SafeAreaInsetsContext);
   const initial = value;
   const calendar = value.kind === 'relativeDate';
   const [anchor, setAnchor] = useState(initial.anchor);
@@ -176,62 +185,80 @@ function PickerContent({
           onPress={onClose}
         />
         <View
+          testID="notification-timing.sheet"
           accessibilityViewIsModal
-          style={[styles.sheet, { backgroundColor: theme.background }]}
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: theme.background,
+              maxHeight: Math.max(0, height - (insets?.top ?? 0) - 16),
+              paddingBottom: Math.max(32, insets?.bottom ?? 0),
+              paddingLeft: Math.max(20, insets?.left ?? 0),
+              paddingRight: Math.max(20, insets?.right ?? 0),
+            },
+          ]}
         >
-          <Text
-            accessibilityRole="header"
-            style={{ color: theme.text, fontSize: 18 }}
+          <ScrollView
+            testID="notification-timing.header-scroll"
+            style={styles.headerScroll}
+            contentContainerStyle={{ gap: 10 }}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
           >
-            通知タイミング
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`通知の基準、${anchor === 'start' ? '開始' : '終了'}`}
-            accessibilityState={{ disabled: fixedAnchor }}
-            disabled={fixedAnchor}
-            onPress={() => setSelecting((v) => !v)}
-            style={styles.row}
-          >
-            <Text style={{ color: theme.text }}>基準</Text>
-            <Text style={{ color: theme.text }}>
-              {anchor === 'start' ? '開始' : '終了'}
-              {calendar ? '日' : ''}
-              {fixedAnchor ? '' : ' ▾'}
+            <Text
+              accessibilityRole="header"
+              style={{ color: theme.text, fontSize: 18 }}
+            >
+              通知タイミング
             </Text>
-          </Pressable>
-          {selecting ? (
-            <View>
-              {(['start', 'end'] as const)
-                .filter((v) => v === 'start' || allowEnd)
-                .map((v) => (
-                  <Pressable
-                    key={v}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: v === anchor }}
-                    onPress={() => {
-                      setAnchor(v);
-                      setSelecting(false);
-                    }}
-                    style={styles.row}
-                  >
-                    <Text style={{ color: theme.text }}>
-                      {v === 'start' ? '開始' : '終了'}
-                      {calendar ? '日' : ''}
-                    </Text>
-                    <Text style={{ color: theme.calendarAccent }}>
-                      {v === anchor ? '✓' : ' '}
-                    </Text>
-                  </Pressable>
-                ))}
-            </View>
-          ) : null}
-          <Text
-            accessibilityLabel={`通知タイミング、${timingLabel(timing)}`}
-            style={{ color: theme.text, textAlign: 'center' }}
-          >
-            {timingLabel(timing)}
-          </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`通知の基準、${anchor === 'start' ? '開始' : '終了'}`}
+              accessibilityState={{ disabled: fixedAnchor }}
+              disabled={fixedAnchor}
+              onPress={() => setSelecting((v) => !v)}
+              style={styles.row}
+            >
+              <Text style={{ color: theme.text }}>基準</Text>
+              <Text style={{ color: theme.text }}>
+                {anchor === 'start' ? '開始' : '終了'}
+                {calendar ? '日' : ''}
+                {fixedAnchor ? '' : ' ▾'}
+              </Text>
+            </Pressable>
+            {selecting ? (
+              <View>
+                {(['start', 'end'] as const)
+                  .filter((v) => v === 'start' || allowEnd)
+                  .map((v) => (
+                    <Pressable
+                      key={v}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: v === anchor }}
+                      onPress={() => {
+                        setAnchor(v);
+                        setSelecting(false);
+                      }}
+                      style={styles.row}
+                    >
+                      <Text style={{ color: theme.text }}>
+                        {v === 'start' ? '開始' : '終了'}
+                        {calendar ? '日' : ''}
+                      </Text>
+                      <Text style={{ color: theme.calendarAccent }}>
+                        {v === anchor ? '✓' : ' '}
+                      </Text>
+                    </Pressable>
+                  ))}
+              </View>
+            ) : null}
+            <Text
+              accessibilityLabel={`通知タイミング、${timingLabel(timing)}`}
+              style={{ color: theme.text, textAlign: 'center' }}
+            >
+              {timingLabel(timing)}
+            </Text>
+          </ScrollView>
           <View style={styles.wheels}>
             <NumberWheel
               name="days"
@@ -290,7 +317,14 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 18,
     gap: 10,
   },
-  wheels: { height: 250, flexDirection: 'row', justifyContent: 'center' },
+  headerScroll: { flexShrink: 1, minHeight: 44 },
+  wheels: {
+    height: 250,
+    minHeight: 64,
+    flexShrink: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
   column: { flex: 1, maxWidth: 120 },
   item: { height: HEIGHT, alignItems: 'center', justifyContent: 'center' },
   row: {
@@ -299,7 +333,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  actions: { flexDirection: 'row' },
+  actions: { flexDirection: 'row', flexShrink: 0 },
   action: {
     flex: 1,
     minHeight: 52,

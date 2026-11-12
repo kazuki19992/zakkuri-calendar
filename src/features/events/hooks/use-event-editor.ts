@@ -1,6 +1,6 @@
 import { useNewReminderDefaults } from './use-new-reminder-defaults';
 import { getReminderTiming } from '@/domain/calendar/event-reminder';
-import { parseReminderTiming, timingIsCompatible, type ReminderTiming, type NotificationCategory } from '@/domain/notifications/reminder-timing';
+import { parseReminderTiming, sameReminderCondition, timingIsCompatible, type ReminderTiming, type NotificationCategory } from '@/domain/notifications/reminder-timing';
 import { DEFAULT_EXACT_DURATION } from '@/domain/calendar/default-exact-duration';
 import { rangeForExactDuration } from '../exact-duration-draft';
 import { useNewEventDuration } from './use-new-event-duration';
@@ -512,20 +512,20 @@ export function useEventEditor({
     const timing = typeof value === 'number' ? { version: 1, kind: 'legacyStartOffset', minutesBefore: value } as const : parseReminderTiming(value);
     if (!timing) { setReminderError('通知時間を確認してください'); return; }
     markReminderTouched();
-    setReminders(current => current.some(item => JSON.stringify(getReminderTiming(item)) === JSON.stringify(timing))
+    setReminders(current => current.some(item => sameReminderCondition(getReminderTiming(item), timing, reminderCategory))
       ? current : [...current, typeof value === 'number' ? { id: createReminderId(), minutesBefore: value } : { id: createReminderId(), timing }]);
     setReminderError(null);
-  }, [createReminderId, markReminderTouched]);
+  }, [createReminderId, markReminderTouched, reminderCategory]);
   const updateReminder = useCallback((id: string, value: ReminderTiming) => {
     const timing = parseReminderTiming(value);
     if (!timing) { setReminderError('通知時間を確認してください'); return; }
     markReminderTouched();
     setReminders(current => {
-      if(current.some(item => item.id !== id && JSON.stringify(getReminderTiming(item)) === JSON.stringify(timing))) return current;
+      if(current.some(item => item.id !== id && sameReminderCondition(getReminderTiming(item), timing, reminderCategory))) return current;
       return current.map(item => item.id === id ? { id, timing } : item);
     });
     setReminderError(null);
-  }, [markReminderTouched]);
+  }, [markReminderTouched, reminderCategory]);
   const removeReminder = useCallback((id: string) => {
     markReminderTouched();
     setReminders(current => current.filter(item => item.id !== id)); setReminderError(null);

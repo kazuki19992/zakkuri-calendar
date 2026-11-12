@@ -8,7 +8,6 @@ describe('通知の日数時分入力', () => {
     const view = await render(
       <ReminderTimingPicker
         visible
-
         value={{
           version: 1,
           kind: 'relativeMinutes',
@@ -37,7 +36,6 @@ describe('通知の日数時分入力', () => {
     const view = await render(
       <ReminderTimingPicker
         visible
-
         value={{
           version: 1,
           kind: 'relativeDate',
@@ -58,4 +56,36 @@ describe('通知の日数時分入力', () => {
       time: '09:00',
     });
   });
+});
+
+test('小さい画面ではシートを画面内に制限し基準領域を縦スクロールできる', async () => {
+  const native =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  const dimensions = jest
+    .spyOn(native, 'useWindowDimensions')
+    .mockReturnValue({ width: 568, height: 320, scale: 1, fontScale: 2 });
+  const v = await render(
+    <ReminderTimingPicker
+      visible
+      value={{
+        version: 1,
+        kind: 'relativeMinutes',
+        anchor: 'start',
+        minutesBefore: 10,
+      }}
+      onConfirm={() => {}}
+      onClose={() => {}}
+    />,
+  );
+  const sheet = native.StyleSheet.flatten(
+    v.getByTestId('notification-timing.sheet').props.style,
+  );
+  expect(sheet.maxHeight).toBeLessThanOrEqual(304);
+  expect(
+    v.getByTestId('notification-timing.header-scroll').props.scrollEnabled,
+  ).not.toBe(false);
+  await fireEvent.press(v.getByLabelText('通知の基準、開始'));
+  await fireEvent.press(v.getByRole('button', { name: '終了' }));
+  expect(v.getByLabelText('通知の基準、終了')).toBeOnTheScreen();
+  dimensions.mockRestore();
 });

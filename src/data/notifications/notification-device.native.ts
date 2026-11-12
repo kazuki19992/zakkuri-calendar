@@ -164,14 +164,19 @@ export function observeNotificationEvents(
       shouldSetBadge: false,
     }),
   });
+  const responseId = (r: Notifications.NotificationResponse) =>
+    `${r.notification.request.identifier}:${r.notification.date}:${r.actionIdentifier}`;
   const forward = (r: Notifications.NotificationResponse) => {
     if (!r.notification.request.identifier.startsWith(NOTIFICATION_PREFIX))
       return;
+    const id = responseId(r);
     response({
-      id: `${r.notification.request.identifier}:${r.notification.date}:${r.actionIdentifier}`,
+      id,
       data: r.notification.request.content.data,
       acknowledge: async () => {
-        await Notifications.clearLastNotificationResponseAsync();
+        const latest = Notifications.getLastNotificationResponse();
+        if (latest && responseId(latest) === id)
+          await Notifications.clearLastNotificationResponseAsync();
       },
     });
   };

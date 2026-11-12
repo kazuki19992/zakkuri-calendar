@@ -1,3 +1,4 @@
+import { notificationFailure } from './notification-notice-model';
 import {
   createContext,
   useContext,
@@ -57,7 +58,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     coordinator.getState,
   );
   const [active, setActive] = useState(AppState.currentState === 'active'),
-    [dismissed, setDismissed] = useState(false);
+    [dismissedNotice, setDismissedNotice] = useState<string | null>(null);
   const queue = useMemo(
     () =>
       new NotificationResponseQueue(
@@ -136,7 +137,13 @@ export function NotificationProvider({ children }: PropsWithChildren) {
   const permissionNotice =
     state.hasReminders &&
     (state.permission === 'denied' || state.permission === 'undetermined');
-  const notice = !dismissed && (permissionNotice || state.status === 'error');
+  const failure = notificationFailure(state);
+  const noticeKey = failure
+    ? `error:${state.failureRevision}:${state.error}`
+    : permissionNotice
+      ? `permission:${state.permission}`
+      : null;
+  const notice = noticeKey !== null && dismissedNotice !== noticeKey;
   return (
     <Context.Provider value={runtime}>
       <View style={{ flex: 1 }}>
@@ -152,8 +159,8 @@ export function NotificationProvider({ children }: PropsWithChildren) {
             }}
           >
             <Text style={{ color: theme.text }}>
-              {state.status === 'error'
-                ? '予定は保存されています。一部の通知を準備できませんでした。'
+              {failure
+                ? `予定は保存されています。${failure.message}`
                 : '予定は保存されています。通知を受け取るには許可が必要です。'}
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
@@ -162,8 +169,10 @@ export function NotificationProvider({ children }: PropsWithChildren) {
                 style={{ minHeight: 44, justifyContent: 'center' }}
                 onPress={() => {
                   void (
-                    state.status === 'error'
-                      ? runtime.retry()
+                    failure
+                      ? failure.permission
+                        ? runtime.requestPermission()
+                        : runtime.retry()
                       : state.permission === 'undetermined'
                         ? runtime.requestPermission()
                         : runtime.openSettings()
@@ -176,8 +185,8 @@ export function NotificationProvider({ children }: PropsWithChildren) {
                 }}
               >
                 <Text style={{ color: theme.calendarAccent }}>
-                  {state.status === 'error'
-                    ? '通知を再試行'
+                  {failure
+                    ? failure.retryLabel
                     : state.permission === 'undetermined'
                       ? '通知を許可する'
                       : '端末の設定を開く'}
@@ -186,7 +195,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
               <Pressable
                 accessibilityRole="button"
                 style={{ minHeight: 44, justifyContent: 'center' }}
-                onPress={() => setDismissed(true)}
+                onPress={() => setDismissedNotice(noticeKey)}
               >
                 <Text style={{ color: theme.textSecondary }}>後で</Text>
               </Pressable>

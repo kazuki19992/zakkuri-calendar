@@ -77,6 +77,9 @@ describe('実SQLiteによるMVP保存回帰', () => {
     expect(await repositories.settings.getLastCalendarViewMode()).toBe('week');
     expect(await repositories.settings.getCalendarWeekStartsOn()).toBe(0);
     expect(await repositories.settings.getCalendarVisible('personal-default')).toBe(false);
+    expect(await repositories.settings.getDefaultExactDuration()).toEqual({ type: 'fixed', minutes: 60 });
+    await repositories.settings.setDefaultExactDuration({ type: 'undetermined' }, now);
+    expect(await repositories.events.getById(event.id)).toEqual(aggregate);
     await repositories.events.update({ ...aggregate, event: { ...event, title: '変更後' } });
     expect(await repositories.events.getById(event.id)).toMatchObject({ event: { title: '変更後' } });
     await repositories.events.delete(event.id);
@@ -148,9 +151,13 @@ describe('実SQLiteによるMVP保存回帰', () => {
         $document: JSON.stringify(event.noteDocument), $id: 'exact',
       });
     }
+    await createRepositoryContainer(database).settings.setDefaultExactDuration({ type: 'instant' }, now);
     await migrateDatabase(database, environment);
     await migrateDatabase(database, environment);
     const repositories = createRepositoryContainer(database);
+    expect(await repositories.settings.getDefaultExactDuration()).toEqual({ type: 'instant' });
+    expect(await database.first('SELECT value_json FROM app_settings WHERE key = $key', { $key: 'default_exact_duration' }))
+      .toEqual({ value_json: '{"version":1,"duration":{"type":"instant"}}' });
     const exact = await repositories.events.getById('exact');
     expect(exact).toMatchObject({ event: { title: '旧予定', duration: { type: 'fixed', minutes: 180 } } });
     expect(exact?.reminders).toHaveLength(version >= 2 ? 1 : 0);
@@ -261,4 +268,25 @@ describe('実SQLiteによるMVP保存回帰', () => {
     const january = await reopened.events.listByAnchorRange(event.calendarId, '2027-01-01', '2027-01-01');
     expect(january.map((value) => value.id).sort()).toEqual(['all-day', 'weekly-fuzzy']);
   });
+  it('初期長の書込み失敗は元の設定と予定を保持し再接続後に明示選択を復元する', async () => {
+    await migrateDatabase(database, environment);
+    let repositories = createRepositoryContainer(database);
+    await repositories.events.create(aggregate);
+    await repositories.settings.setDefaultExactDuration({ type: 'instant' }, now);
+    await database.exec(`CREATE TRIGGER fail_duration BEFORE UPDATE ON app_settings
+      WHEN NEW.key = 'default_exact_duration' BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END;`);
+    await expect(repositories.settings.setDefaultExactDuration({ type: 'undetermined' }, now)).rejects.toThrow('synthetic failure');
+    expect(await repositories.settings.getDefaultExactDuration()).toEqual({ type: 'instant' });
+    expect(await repositories.events.getById(event.id)).toEqual(aggregate);
+    await database.exec('DROP TRIGGER fail_duration');
+    await repositories.settings.setDefaultExactDuration({ type: 'undetermined' }, now);
+    await connection.close();
+    connection = await openNodeSqliteDatabase(join(directory, 'synthetic.db'));
+    database = connection.database;
+    await migrateDatabase(database, environment);
+    repositories = createRepositoryContainer(database);
+    expect(await repositories.settings.getDefaultExactDuration()).toEqual({ type: 'undetermined' });
+    expect(await repositories.events.getById(event.id)).toEqual(aggregate);
+  });
+
 });

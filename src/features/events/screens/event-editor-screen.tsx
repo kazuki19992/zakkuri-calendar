@@ -1,3 +1,4 @@
+import { ExactDurationTypeField } from '../components/exact-duration-type-field';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
@@ -16,6 +17,10 @@ import { TemporalDefinitionPicker } from '../components/temporal-definition-pick
 import type { EventEditorState } from '../hooks/use-event-editor';
 import type { RecurrenceEditScope } from '../recurrence-edit-model';
 
+/**
+ * 保存・削除の操作抑止と各項目の局所エラーを表示し、無関係なdraft入力は保持する。
+ * メモと繰り返し範囲の確定はhookへ渡し、画面から直接永続化しない。
+ */
 export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCancel }: Readonly<{
   state: EventEditorState;
   onSave(): void;
@@ -46,7 +51,8 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
           <EventEditorTabs value={state.editorTab} disabled={busy} onChange={state.setEditorTab} />
           <EventEditorTabContent tab={state.editorTab}>
           {section('日時', <>
-            <EventDateTimeFields editorTab={state.editorTab} isAllDay={state.isAllDay} isDateEditable={state.isDateEditable} startDate={state.startDate} startTime={state.startTime} endDate={state.endDate} endTime={state.endTime} disabled={busy} onAllDayChange={state.setAllDay} onStartDateChange={state.setStartDate} onStartTimeChange={state.setStartTime} onEndDateChange={state.setEndDate} onEndTimeChange={state.setEndTime} />
+            {state.editorTab === 'exact' && !state.isAllDay ? <ExactDurationTypeField value={state.exactDurationType} status={state.exactDurationStatus} disabled={busy} onChange={state.setExactDurationType} onRetry={state.retryExactDuration} /> : null}
+            <EventDateTimeFields showEnd={state.exactDurationType === 'fixed'} timeInputDisabled={state.exactDurationStatus !== 'ready'} editorTab={state.editorTab} isAllDay={state.isAllDay} isDateEditable={state.isDateEditable} startDate={state.startDate} startTime={state.startTime} endDate={state.endDate} endTime={state.endTime} disabled={busy} onAllDayChange={state.setAllDay} onStartDateChange={state.setStartDate} onStartTimeChange={state.setStartTime} onEndDateChange={state.setEndDate} onEndTimeChange={state.setEndTime} />
             {state.editorTab === 'fuzzy' ? <TemporalDefinitionPicker definitions={state.definitions} selectedId={state.selectedDefinitionId} disabled={busy} onSelect={state.selectDefinition} /> : null}
             {state.relativeDatePreview ? <Text style={{ color: theme.text }}>{state.relativeDatePreview}</Text> : null}
             {!state.isDateEditable ? <Text style={{ color: theme.textSecondary }}>相対日付では基準日から期間を決めます</Text> : null}

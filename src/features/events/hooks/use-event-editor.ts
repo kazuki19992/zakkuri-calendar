@@ -1,3 +1,6 @@
+import { DEFAULT_EXACT_DURATION } from '@/domain/calendar/default-exact-duration';
+import { rangeForExactDuration } from '../exact-duration-draft';
+import { useNewEventDuration } from './use-new-event-duration';
 import * as Crypto from 'expo-crypto';
 import { openBrowserAsync } from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -39,7 +42,7 @@ import type {
   SettingsRepository,
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
-import { toMinutesOfDay } from '@/domain/calendar/time';
+import { createFixedDurationFromDateTimes, toMinutesOfDay } from '@/domain/calendar/time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   resolveRelativeDateRange,
@@ -81,6 +84,10 @@ export type EventEditorState = Readonly<{
   startTime: string;
   endDate: string;
   endTime: string;
+  exactDurationType: ExactDuration['type'];
+  exactDurationStatus: 'loading' | 'ready' | 'error';
+  retryExactDuration(): Promise<void>;
+  setExactDurationType(value: ExactDuration['type']): void;
   definitions: readonly TemporalDefinition[];
   selectedDefinitionId: string | null;
   calendarName: string;
@@ -144,7 +151,7 @@ type UseEventEditorInput = Readonly<{
   initial: Readonly<{
     date: string;
     startTime: string;
-    endTime: string;
+    endTime?: string;
     temporalType: EventDraft['temporalType'];
   }>;
   initialTab?: EventEditorTab;
@@ -168,6 +175,10 @@ function initialEndDate(date: string, startTime: string, endTime: string): strin
   return start !== null && end !== null && end < start ? offsetCalendarDate(date, 1) : date;
 }
 
+/**
+ * 明示終了と既存予定を優先し、新規draftにだけ既定長のsnapshotを適用する。
+ * 終日と時刻付きの終了日を独立させ、遅い初期化でも入力を上書きしないようにする。
+ */
 export function useEventEditor({
   calendars,
   events,
@@ -205,9 +216,25 @@ export function useEventEditor({
   const [endDate, setEndDateValue] = useState(() => initialEndDate(
     initialValues.date,
     initialValues.startTime,
-    initialValues.endTime,
+    initialValues.endTime ?? initialValues.startTime,
   ));
-  const [endTime, setEndTimeValue] = useState(initialValues.endTime);
+  const [endTime, setEndTimeValue] = useState(initialValues.endTime ?? initialValues.startTime);
+  const [allDayEndDate, setAllDayEndDate] = useState(initialValues.date);
+  const allDayDraftInitialized = useRef(initialValues.temporalType === 'allDay');
+  const [exactDurationType, setExactDurationTypeValue] = useState<ExactDuration['type']>('fixed');
+  const lastFixedMinutes = useRef<number>(DEFAULT_EXACT_DURATION.minutes);
+  const currentStartDate = useRef(initialValues.date);
+  const initializeDuration = useCallback((duration: ExactDuration) => {
+    const range = rangeForExactDuration(currentStartDate.current, initialValues.startTime, duration);
+    setEndDateValue(range.endDate);
+    setEndTimeValue(range.endTime);
+    setExactDurationTypeValue(duration.type);
+    if (duration.type === 'fixed') lastFixedMinutes.current = duration.minutes;
+  }, [initialValues]);
+  const initialDuration = useNewEventDuration({ settings,
+    enabled: eventId === undefined && initialValues.endTime === undefined,
+    onResolved: initializeDuration,
+  });
   const [definitions, setDefinitions] = useState<readonly TemporalDefinition[]>([]);
   const [selectedDefinitionId, setSelectedDefinitionId] = useState<string | null>(null);
   const [thisWeekDeadlineWeekday, setThisWeekDeadlineWeekday] = useState<ThisWeekDeadlineWeekday>(5);
@@ -315,7 +342,12 @@ export function useEventEditor({
           const event = loadedAggregate.event;
           setExistingAggregate(loadedAggregate);
           setTitleValue(event.title);
+          if (event.temporalType === 'exact') {
+            setExactDurationTypeValue(event.duration.type);
+            if (event.duration.type === 'fixed') lastFixedMinutes.current = event.duration.minutes;
+          }
           setStartDateValue(event.anchorDate);
+          currentStartDate.current = event.anchorDate;
           setColorIdValue(event.colorId);
           setLocationValue(event.location ?? '');
           setNoteDocument(event.noteDocument);
@@ -325,12 +357,16 @@ export function useEventEditor({
             setEditorTabValue('fuzzy');
             setAllDayValue(false);
             setStartDateValue(event.resolutionContext?.referenceDate ?? event.anchorDate);
+            currentStartDate.current = event.resolutionContext?.referenceDate ?? event.anchorDate;
             setEndDateValue(event.endDate);
+            setAllDayEndDate(event.endDate);
             setSelectedDefinitionId(event.temporalDefinitionId);
           } else if (event.temporalType === 'allDay') {
             setEditorTabValue('exact');
             setAllDayValue(true);
+            allDayDraftInitialized.current = true;
             setEndDateValue(event.endDate);
+            setAllDayEndDate(event.endDate);
           } else {
             const range = getExactEditorRange(event);
             setEditorTabValue('exact');
@@ -367,16 +403,46 @@ export function useEventEditor({
     clearErrors();
     if (status === 'ready') void settings.setLastEventEditorTab(value, now()).catch(() => {});
   }, [clearErrors, editorTab, now, settings, status]);
-  const setAllDay = useCallback((value: boolean) => { setAllDayValue(value); clearErrors(); }, [clearErrors]);
+  const setAllDay = useCallback((value: boolean) => {
+    if (value && !allDayDraftInitialized.current) {
+      setAllDayEndDate(endDate);
+      allDayDraftInitialized.current = true;
+    }
+    setAllDayValue(value); clearErrors();
+  }, [clearErrors, endDate]);
   const setStartDate = useCallback((value: string) => {
     const moved = moveEditorRangeStart({ startDate, startTime, endDate, endTime }, value);
+    const movedAllDay = moveEditorRangeStart({ startDate, startTime, endDate: allDayEndDate, endTime }, value);
+    setAllDayEndDate(movedAllDay.endDate);
+    currentStartDate.current = moved.startDate;
     setStartDateValue(moved.startDate);
     setEndDateValue(moved.endDate);
     clearErrors();
-  }, [clearErrors, endDate, endTime, startDate, startTime]);
-  const setEndDate = useCallback((value: string) => { setEndDateValue(value); clearErrors(); }, [clearErrors]);
-  const setStartTime = useCallback((value: string) => { setStartTimeValue(value); clearErrors(); }, [clearErrors]);
-  const setEndTime = useCallback((value: string) => { setEndTimeValue(value); clearErrors(); }, [clearErrors]);
+  }, [allDayEndDate, clearErrors, endDate, endTime, startDate, startTime]);
+  const setEndDate = useCallback((value: string) => { if (isAllDay) setAllDayEndDate(value); else if (initialDuration.status === 'ready') setEndDateValue(value); clearErrors(); }, [clearErrors, initialDuration.status, isAllDay]);
+  const setStartTime = useCallback((value: string) => { if (initialDuration.status !== 'ready') return; setStartTimeValue(value); clearErrors(); }, [clearErrors, initialDuration.status]);
+  const setEndTime = useCallback((value: string) => { if (initialDuration.status !== 'ready') return; setEndTimeValue(value); clearErrors(); }, [clearErrors, initialDuration.status]);
+
+  useEffect(() => {
+    if (exactDurationType !== 'fixed') return;
+    const current = createFixedDurationFromDateTimes(startDate, startTime, endDate, endTime);
+    if (current.ok && current.value.type === 'fixed') lastFixedMinutes.current = current.value.minutes;
+  }, [endDate, endTime, exactDurationType, startDate, startTime]);
+
+  const setExactDurationType = useCallback((value: ExactDuration['type']) => {
+    if (initialDuration.status !== 'ready' || value === exactDurationType) return;
+    if (exactDurationType === 'fixed') {
+      const current = createFixedDurationFromDateTimes(startDate, startTime, endDate, endTime);
+      if (current.ok && current.value.type === 'fixed') lastFixedMinutes.current = current.value.minutes;
+    }
+    if (value === 'fixed') {
+      const range = rangeForExactDuration(startDate, startTime, { type: 'fixed', minutes: lastFixedMinutes.current });
+      setEndDateValue(range.endDate);
+      setEndTimeValue(range.endTime);
+    }
+    setExactDurationTypeValue(value);
+    clearErrors();
+  }, [clearErrors, endDate, endTime, exactDurationType, initialDuration.status, startDate, startTime]);
   const selectDefinition = useCallback((value: string) => {
     if (value !== selectedDefinitionId) setTemporalReselected(true);
     setSelectedDefinitionId(value); clearErrors();
@@ -486,8 +552,10 @@ export function useEventEditor({
     ? null
     : `${formatEditorDate(relativeResolution.startDate)}〜${formatEditorDate(relativeResolution.endDate)}${relativeResolution.parameterSnapshot.deadlineAdjustment === undefined ? '' : relativeResolution.parameterSnapshot.deadlineAdjustment.calendarId === 'none' ? '（土日を考慮した締切）' : '（土日祝を考慮した締切）'}`;
 
+  const durationBlocked = editorTab === 'exact' && !isAllDay && initialDuration.status !== 'ready';
+
   const save = useCallback(async (): Promise<boolean> => {
-    if (operationRef.current || status !== 'ready') return false;
+    if (operationRef.current || status !== 'ready' || durationBlocked) return false;
     clearErrors();
     if (relativeDateError !== null) { setDateError(relativeDateError); return false; }
     const existingEvent = existingAggregate?.event;
@@ -528,12 +596,11 @@ export function useEventEditor({
         },
       };
     } else if (isAllDay) {
-      draft = { ...base, temporalType: 'allDay', endDate };
+      draft = { ...base, temporalType: 'allDay', endDate: allDayEndDate };
     } else {
-      const existingDuration: ExactDuration | null = existingEvent?.temporalType === 'exact'
-        ? existingEvent.duration
-        : null;
-      const duration = getEditorExactDuration({ startDate, startTime, endDate, endTime }, existingDuration);
+      const duration = exactDurationType === 'fixed'
+        ? getEditorExactDuration({ startDate, startTime, endDate, endTime }, null)
+        : { ok: true as const, value: { type: exactDurationType } };
       if (!duration.ok) { setEndTimeError(duration.error.message); return false; }
       draft = { ...base, temporalType: 'exact', startTime, duration: duration.value };
     }
@@ -581,7 +648,7 @@ export function useEventEditor({
       operationRef.current = false;
       setIsSaving(false);
     }
-  }, [calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
+  }, [allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
     getTimeZoneId, isAllDay, location, newEventId, noteDocument, now, recurrenceDraft, reminders,
     definitions, occurrenceEditData, relativeResolution, relativeDateError, selectedDefinitionId,
     startDate, startTime, status, title]);
@@ -730,8 +797,12 @@ export function useEventEditor({
     relativeDatePreview,
     startDate,
     startTime,
-    endDate,
+    endDate: isAllDay ? allDayEndDate : endDate,
     endTime,
+    exactDurationType,
+    exactDurationStatus: initialDuration.status,
+    retryExactDuration: initialDuration.retry,
+    setExactDurationType,
     definitions,
     selectedDefinitionId,
     calendarName,
@@ -751,7 +822,7 @@ export function useEventEditor({
     reminderError,
     saveError,
     isSaving,
-    isSaveDisabled: relativeDateError !== null,
+    isSaveDisabled: relativeDateError !== null || durationBlocked,
     isDeleting,
     usesRecurrenceScope: occurrenceEditData !== null,
     scopeRequest,

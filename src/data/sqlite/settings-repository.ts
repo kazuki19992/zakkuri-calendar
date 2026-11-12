@@ -9,10 +9,11 @@ import type { AppDatabase } from './database';
 import { DEFAULT_HOLIDAY_PREFERENCES, parseHolidayPreferences, type HolidayPreferencesV1 } from '@/domain/calendar/holiday-preferences';
 import type { WeekStartsOn } from '@/domain/calendar/month';
 import { DEFAULT_CALENDAR_WEEK_STARTS_ON, parseCalendarWeekStartsOn } from '@/domain/calendar/week-start';
+import { DEFAULT_EXACT_DURATION } from '@/domain/calendar/default-exact-duration';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
 
 type SettingRow = Readonly<{ value_json: string }>;
-const DEFAULT_DURATION: ExactDuration = { type: 'instant' };
+
 const DEFAULT_FADE_MINUTES = 120;
 const DEFAULT_EVENT_EDITOR_TAB: EventEditorTab = 'fuzzy';
 const DEFAULT_THIS_WEEK_DEADLINE: ThisWeekDeadlineWeekday = 5;
@@ -71,16 +72,31 @@ export class SqliteSettingsRepository implements SettingsRepository {
     );
   }
 
+  /**
+   * 旧instant seedは未選択として1時間へ解釈し、新形式の明示instantとは区別する。
+   * 不正値・未知versionは読み取り時にfallbackし、保存内容は書き換えない。
+   */
   async getDefaultExactDuration(): Promise<ExactDuration> {
     const row = await this.database.first<SettingRow>(
       'SELECT value_json FROM app_settings WHERE key = $key',
       { $key: 'default_exact_duration' },
     );
-    if (!row) return DEFAULT_DURATION;
-    const parsed = parseExactDuration(parseJson(row.value_json));
-    return parsed.ok ? parsed.value : DEFAULT_DURATION;
+    if (!row) return DEFAULT_EXACT_DURATION;
+    const value = parseJson(row.value_json);
+    if (typeof value === 'object' && value !== null && 'version' in value) {
+      if (value.version !== 1 || !('duration' in value)) return DEFAULT_EXACT_DURATION;
+      const parsed = parseExactDuration(value.duration);
+      return parsed.ok ? parsed.value : DEFAULT_EXACT_DURATION;
+    }
+    const legacy = parseExactDuration(value);
+    // 設定UI導入前のinstantは未選択seed。明示選択はversion付きで区別する。
+    return legacy.ok && legacy.value.type !== 'instant' ? legacy.value : DEFAULT_EXACT_DURATION;
   }
 
+  /**
+   * 利用者の明示選択をversion付きで保存し、旧seedとの区別を再起動後も維持する。
+   * 設定一行だけを更新し、編集中・保存済み予定へ長さを遡及させない。
+   */
   async setDefaultExactDuration(value: ExactDuration, updatedAt: string): Promise<void> {
     const parsed = parseExactDuration(value);
     if (!parsed.ok) throw new Error('Invalid default exact duration');
@@ -90,7 +106,7 @@ export class SqliteSettingsRepository implements SettingsRepository {
        ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
       {
         $key: 'default_exact_duration',
-        $valueJson: JSON.stringify(parsed.value),
+        $valueJson: JSON.stringify({ version: 1, duration: parsed.value }),
         $updatedAt: updatedAt,
       },
     );

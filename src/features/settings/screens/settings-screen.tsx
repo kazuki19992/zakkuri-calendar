@@ -1,3 +1,5 @@
+import { DefaultExactDurationSettingsSection } from '../components/default-exact-duration-settings-section';
+import type { DefaultExactDurationSettingsState } from '../hooks/use-default-exact-duration-settings';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
 import { SingleSelectSheet } from '@/shared/components/single-select-sheet';
@@ -9,7 +11,7 @@ import { HolidaySettingsSection } from '../components/holiday-settings-section';
 
 const OPTIONS = [[5, '金曜日'], [6, '土曜日'], [7, '日曜日']] as const;
 
-export function SettingsScreen({ state, weekStart, holidays }: Readonly<{ state: RelativeDateSettingsState; weekStart: WeekStartSettingsState; holidays: HolidayPreferencesState }>) {
+export function SettingsScreen({ state, weekStart, holidays, duration }: Readonly<{ duration: DefaultExactDurationSettingsState; state: RelativeDateSettingsState; weekStart: WeekStartSettingsState; holidays: HolidayPreferencesState }>) {
   const theme = useTheme();
   const [selecting, setSelecting] = useState(false);
   const disabled = weekStart.status !== 'ready' || weekStart.isSaving;
@@ -32,6 +34,7 @@ export function SettingsScreen({ state, weekStart, holidays }: Readonly<{ state:
         options={[{ value: 1, label: '月曜日' }, { value: 0, label: '日曜日' }]} disabled={disabled}
         onClose={() => setSelecting(false)} onSelect={(value) => { void weekStart.setValue(value); }} />
       <HolidaySettingsSection state={holidays} />
+      <DefaultExactDurationSettingsSection state={duration} />
       <View style={[styles.section, { borderBottomColor: theme.calendarBorder }]}>
         <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>ざっくり予定</Text>
         <Text style={[styles.label, { color: theme.text }]}>今週中の締切</Text>

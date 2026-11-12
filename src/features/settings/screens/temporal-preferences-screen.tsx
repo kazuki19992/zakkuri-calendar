@@ -21,7 +21,7 @@ export function TemporalPreferencesScreen({state,pendingMinutes,onChangeMinutes,
       </View>)}
       <View style={{gap:8,paddingTop:16}}><Text accessibilityRole="header" style={{color:theme.textSecondary}}>終了が未定の予定</Text>
         {button(`未定の表示時間　${formatMinutes(pendingMinutes??state.minutes)}`,()=>setSelecting(true),state.isSaving)}
-        <Text style={{color:theme.textSecondary}}>開始から薄くなるまでの表示時間です。終了時刻や通知の基準には使われません。保存済み予定の表示にも反映します。</Text>
+        <Text style={{color:theme.textSecondary}}>1分〜24時間で、開始から薄くなるまでの表示時間を設定します。終了時刻や通知の基準には使われません。保存済み予定の表示にも反映します。</Text>
         {pendingMinutes!==null&&pendingMinutes!==state.minutes?<>
           {button('表示時間を保存',()=>Alert.alert('表示時間の確認',`${formatMinutes(state.minutes)} → ${formatMinutes(pendingMinutes)}。保存済みの予定にも表示のみ反映します。`,[
             {text:'キャンセル',style:'cancel'}, {text:'保存',onPress:()=>{void state.saveMinutes(pendingMinutes).then(ok=>{if(ok)onChangeMinutes(null);});}},

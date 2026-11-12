@@ -1,4 +1,5 @@
 /** @jest-environment node */
+import {planNotifications} from '@/domain/notifications/notification-plan';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -98,6 +99,15 @@ it('深夜への範囲変更後も繰り返しと個別例外identityを維持�
   const preview=await repos.temporalDefinitions.previewUpdate(definition.id,patch);
   await repos.temporalDefinitions.updateDefinition({id:definition.id,patch,token:preview.token,now});
   const after=await repos.notifications.readSnapshot();
+  const previousPlan=planNotifications(before,new Date(2026,10,13));
+  const nextPlan=planNotifications(after,new Date(2026,10,13));
+  const previous=previousPlan.requests.find(request=>request.target.occurrenceDate==='2026-11-16')!;
+  const next=nextPlan.requests.find(request=>request.target.occurrenceDate==='2026-11-16')!;
+  expect(previous).toBeDefined();expect(next).toBeDefined();
+  expect(previous.fireAt).not.toBe(next.fireAt);
+  expect(new Date(next.fireAt).getHours()).toBe(1);
+  expect(new Date(next.fireAt).getDate()).toBe(17);
+  expect(nextPlan.requests.some(request=>request.target.occurrenceDate==='2026-11-17')).toBe(false);
   expect(after.exceptions).toEqual(before.exceptions);
   expect((await repos.events.getById('e'))?.event).toEqual(series);
   expect(after.definitions.find(d=>d.id===definition.id)?.resolverConfig).toEqual(patch.resolverConfig);

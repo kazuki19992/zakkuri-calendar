@@ -172,7 +172,7 @@ function normalizeNumber(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
 }
 
-function createOpacityStops(input: Readonly<{
+export function createOpacityStops(input: Readonly<{
   rangeStart: number;
   rangeEnd: number;
   clipStart: number;

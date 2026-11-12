@@ -14,6 +14,10 @@ export type DefaultExactDurationSettingsState = Readonly<{
 
 const systemNow = () => new Date().toISOString();
 
+/**
+ * 保存成功後にだけ現在値を確定し、失敗時は前の値を保持して再選択を許可する。
+ * 同時保存と古い読込みを抑止し、設定変更を既存のカレンダーやdraftへ通知しない。
+ */
 export function useDefaultExactDurationSettings({ settings, now = systemNow }: Readonly<{
   settings: Pick<SettingsRepository, 'getDefaultExactDuration' | 'setDefaultExactDuration'>;
   now?: () => string;

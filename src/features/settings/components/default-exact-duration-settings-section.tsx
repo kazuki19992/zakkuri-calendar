@@ -5,6 +5,10 @@ import { SingleSelectSheet } from '@/shared/components/single-select-sheet';
 import type { DefaultExactDurationSettingsState } from '../hooks/use-default-exact-duration-settings';
 import { defaultExactDurationOptions, exactDurationKey, formatExactDuration } from '../default-exact-duration-model';
 
+/**
+ * 候補外の既存固定長も現在値として示し、プリセットへの暗黙の丸めを避ける。
+ * 読込み・保存の失敗はこの設定節だけに表示し、他の設定を操作可能に保つ。
+ */
 export function DefaultExactDurationSettingsSection({ state }: Readonly<{ state: DefaultExactDurationSettingsState }>) {
   const theme = useTheme();
   const [selecting, setSelecting] = useState(false);

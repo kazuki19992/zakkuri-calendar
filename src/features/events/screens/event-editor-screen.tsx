@@ -17,6 +17,10 @@ import { TemporalDefinitionPicker } from '../components/temporal-definition-pick
 import type { EventEditorState } from '../hooks/use-event-editor';
 import type { RecurrenceEditScope } from '../recurrence-edit-model';
 
+/**
+ * 保存・削除の操作抑止と各項目の局所エラーを表示し、無関係なdraft入力は保持する。
+ * メモと繰り返し範囲の確定はhookへ渡し、画面から直接永続化しない。
+ */
 export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCancel }: Readonly<{
   state: EventEditorState;
   onSave(): void;

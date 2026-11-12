@@ -72,6 +72,10 @@ export class SqliteSettingsRepository implements SettingsRepository {
     );
   }
 
+  /**
+   * 旧instant seedは未選択として1時間へ解釈し、新形式の明示instantとは区別する。
+   * 不正値・未知versionは読み取り時にfallbackし、保存内容は書き換えない。
+   */
   async getDefaultExactDuration(): Promise<ExactDuration> {
     const row = await this.database.first<SettingRow>(
       'SELECT value_json FROM app_settings WHERE key = $key',
@@ -89,6 +93,10 @@ export class SqliteSettingsRepository implements SettingsRepository {
     return legacy.ok && legacy.value.type !== 'instant' ? legacy.value : DEFAULT_EXACT_DURATION;
   }
 
+  /**
+   * 利用者の明示選択をversion付きで保存し、旧seedとの区別を再起動後も維持する。
+   * 設定一行だけを更新し、編集中・保存済み予定へ長さを遡及させない。
+   */
   async setDefaultExactDuration(value: ExactDuration, updatedAt: string): Promise<void> {
     const parsed = parseExactDuration(value);
     if (!parsed.ok) throw new Error('Invalid default exact duration');

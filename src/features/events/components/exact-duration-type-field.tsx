@@ -9,6 +9,10 @@ const OPTIONS = [
   { value: 'instant', label: '長さなし' },
   { value: 'undetermined', label: '未定' },
 ] as const;
+/**
+ * 終了種別をラベルと選択印で区別し、初期長の取得失敗をこの入力内で再試行させる。
+ * 他の入力を保持するため、フォーム全体の読込み失敗とは分けて表示する。
+ */
 export function ExactDurationTypeField({ value, status, disabled, onChange, onRetry }: Readonly<{
   value: ExactDuration['type']; status: 'loading' | 'ready' | 'error'; disabled: boolean;
   onChange(value: ExactDuration['type']): void; onRetry(): void;

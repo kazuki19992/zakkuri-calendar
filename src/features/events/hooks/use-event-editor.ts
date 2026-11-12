@@ -175,6 +175,10 @@ function initialEndDate(date: string, startTime: string, endTime: string): strin
   return start !== null && end !== null && end < start ? offsetCalendarDate(date, 1) : date;
 }
 
+/**
+ * 明示終了と既存予定を優先し、新規draftにだけ既定長のsnapshotを適用する。
+ * 終日と時刻付きの終了日を独立させ、遅い初期化でも入力を上書きしないようにする。
+ */
 export function useEventEditor({
   calendars,
   events,

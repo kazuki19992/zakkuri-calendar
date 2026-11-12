@@ -10,6 +10,10 @@ import { EventEditorScreen } from '@/features/events/screens/event-editor-screen
 
 const holidayProvider = new JapaneseHolidayProvider();
 
+/**
+ * 終了の明示指定をそのまま渡し、既定長の解決はeditor側へ委ねる。
+ * routeで終了を補完すると利用者指定と区別できず、設定値が適用されなくなる。
+ */
 export default function NewEventRoute() {
   const router = useRouter();
   const params = useLocalSearchParams<{ date?: string; startTime?: string; endTime?: string; temporalType?: 'exact' | 'allDay' | 'fuzzy' }>();

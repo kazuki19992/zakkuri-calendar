@@ -21,6 +21,10 @@ function timeValue(value: Date): string {
   return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
 }
 
+/**
+ * 非fixedでは終了日時を隠すが、終日は終了日を保持して編集できるようにする。
+ * 初期長が未確定でも終日切替は許可し、時刻付き入力の操作だけを制限する。
+ */
 export function EventDateTimeFields({
   editorTab,
   isAllDay,

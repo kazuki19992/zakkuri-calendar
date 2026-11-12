@@ -10,6 +10,7 @@ export const EXACT_DURATION_PRESETS: readonly ExactDuration[] = [
   { type: 'undetermined' },
 ];
 
+/** 種別と分数の値で比較し、復元時に別オブジェクトになっても同値の設定を再保存しない。 */
 export function sameExactDuration(first: ExactDuration, second: ExactDuration): boolean {
   return first.type === second.type &&
     (first.type !== 'fixed' || (second.type === 'fixed' && first.minutes === second.minutes));

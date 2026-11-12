@@ -6,6 +6,9 @@ import { useWeekStartSettings } from '@/features/settings/hooks/use-week-start-s
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
 import { useHolidayPreferences } from '@/features/settings/hooks/use-holiday-preferences';
 
+/**
+ * 各設定の状態を個別のhookへ配線し、一項目の失敗が他の設定を止めないようにする。
+ */
 export default function SettingsRoute() {
   const { settings } = useRepositories();
   const duration = useDefaultExactDurationSettings({ settings });

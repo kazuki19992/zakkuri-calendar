@@ -1,12 +1,10 @@
 import { applyTemporalPatch, reResolveTemporalEvent, temporalDefinitionToken, TemporalConflictError, type TemporalDefinitionPatch } from '@/domain/temporal/temporal-preferences';
-import type { TemporalUpdateCommand, TemporalUpdatePreview } from '@/domain/calendar/repositories';
-import { mapEventRow, type EventRow } from './row-mappers';
+import type { TemporalUpdateCommand, TemporalUpdatePreview , TemporalDefinitionRepository } from '@/domain/calendar/repositories';
+import { mapEventRow, type EventRow , mapTemporalDefinitionRow, type TemporalDefinitionRow } from './row-mappers';
 import { SqliteNotificationRepository } from './notification-repository';
 
-import type { TemporalDefinitionRepository } from '@/domain/calendar/repositories';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import type { AppDatabase } from './database';
-import { mapTemporalDefinitionRow, type TemporalDefinitionRow } from './row-mappers';
 
 export class SqliteTemporalDefinitionRepository implements TemporalDefinitionRepository {
   constructor(private readonly database: AppDatabase) {}
@@ -31,7 +29,8 @@ export class SqliteTemporalDefinitionRepository implements TemporalDefinitionRep
     if (events.some(event => event.calendarId !== definition.calendarId)) throw new Error('時間表現の参照が不正です');
     const rangeChanged = JSON.stringify(definition.resolverConfig) !== JSON.stringify(next.resolverConfig);
     // 全対象を先に検証してから書き込み、一部だけが新定義になる状態を防ぐ。
-    const updates = rangeChanged ? events.map(event => reResolveTemporalEvent(event, next))
+    const resolved = events.map(event => reResolveTemporalEvent(event, next));
+    const updates = rangeChanged ? resolved
       .filter((event, index) => event.anchorDate !== events[index].anchorDate ||
         (event.temporalType !== 'exact' && events[index].temporalType !== 'exact' && event.endDate !== events[index].endDate)) : [];
     const preview: TemporalUpdatePreview = { token: JSON.stringify([temporalDefinitionToken(definition), revision]), count: events.length, definition, next };

@@ -1,25 +1,22 @@
 import { TemporalConflictError, temporalDefinitionToken, reResolveTemporalEvent, type DefinitionExpectation } from '@/domain/temporal/temporal-preferences';
 import { SqliteTemporalDefinitionRepository } from './temporal-definition-repository';
 import { SqliteSettingsRepository } from './settings-repository';
-import { mapTemporalDefinitionRow, type TemporalDefinitionRow } from './row-mappers';
-import type { CalendarTemporalSchedule } from '@/domain/calendar/repositories';
-
-async function assertExpectedDefinition(tx: AppDatabase, expected?: DefinitionExpectation, event?: CalendarEvent): Promise<void> {
-  if (!expected) return;
-  const current = await new SqliteTemporalDefinitionRepository(tx).getById(expected.id);
-  if (!current || temporalDefinitionToken(current) !== expected.token) throw new TemporalConflictError();
-  if (event?.temporalType === 'fuzzy' && event.resolutionContext !== null) {
-    const resolved = reResolveTemporalEvent(event, current);
-    if (resolved.anchorDate !== event.anchorDate || (resolved.temporalType === 'fuzzy' && resolved.endDate !== event.endDate)) throw new TemporalConflictError();
-  }
-}
-import type {
+import { mapTemporalDefinitionRow, type TemporalDefinitionRow ,
+  mapEventRow,
+  mapRecurrenceExceptionRow,
+  mapReminderRow,
+  type EventRow,
+  type RecurrenceExceptionRow,
+  type ReminderRow,
+} from './row-mappers';
+import type { CalendarTemporalSchedule ,
   ApplyRecurrenceMutationCommand,
   DeleteOccurrenceExceptionCommand,
   EventRepository,
   OccurrenceEditData,
   SaveOccurrenceExceptionCommand,
 } from '@/domain/calendar/repositories';
+
 import { parseCalendarEvent, type CalendarEvent } from '@/domain/calendar/event';
 import {
   normalizeEventNoteDocument,
@@ -32,16 +29,18 @@ import {
   type EventReminder,
 } from '@/domain/calendar/event-reminder';
 import type { AppDatabase, AppDatabaseParameters } from './database';
-import {
-  mapEventRow,
-  mapRecurrenceExceptionRow,
-  mapReminderRow,
-  type EventRow,
-  type RecurrenceExceptionRow,
-  type ReminderRow,
-} from './row-mappers';
 import type { OccurrenceIdentity, RecurrenceException } from '@/domain/calendar/recurrence-exception';
 import { expandEventOccurrences } from '@/domain/calendar/event-occurrence';
+
+async function assertExpectedDefinition(tx: AppDatabase, expected?: DefinitionExpectation, event?: CalendarEvent): Promise<void> {
+  if (!expected) return;
+  const current = await new SqliteTemporalDefinitionRepository(tx).getById(expected.id);
+  if (!current || temporalDefinitionToken(current) !== expected.token) throw new TemporalConflictError();
+  if (event?.temporalType === 'fuzzy' && event.resolutionContext !== null) {
+    const resolved = reResolveTemporalEvent(event, current);
+    if (resolved.anchorDate !== event.anchorDate || (resolved.temporalType === 'fuzzy' && resolved.endDate !== event.endDate)) throw new TemporalConflictError();
+  }
+}
 
 type NormalizedEventAggregate = Readonly<{
   event: CalendarEvent;

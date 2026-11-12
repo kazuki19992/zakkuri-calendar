@@ -33,3 +33,7 @@ it('今週中の締切調整結果と非刻みのフェードを維持する', (
 });
 it.each([0, -1, 1441, 1.5, null])('未定時間%sを拒否する', value => expect(parseUndeterminedMinutes(value)).toBeNull());
 it.each([1,120,1440])('未定時間%dを許可する', value => expect(parseUndeterminedMinutes(value)).toBe(value));
+it('対象週・月の起点が不整合な保存済み予定は再解決しない',()=>{
+  expect(()=>reResolveTemporalEvent(event('next_week','2026-11-17'),def('next_week'))).toThrow();
+  expect(()=>reResolveTemporalEvent(event('next_month','2026-12-15'),def('next_month'))).toThrow();
+});

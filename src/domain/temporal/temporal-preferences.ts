@@ -1,3 +1,4 @@
+import {getISODay,parse} from 'date-fns';
 import type { CalendarEvent } from '@/domain/calendar/event';
 import { isCalendarDate } from '@/domain/calendar/month';
 import { parseTemporalDefinition, type TemporalDefinition, type TemporalResolverConfig } from './temporal-definition';
@@ -39,6 +40,8 @@ export function reResolveTemporalEvent(event: CalendarEvent, definition: Tempora
   }
   const context = event.resolutionContext;
   if (context === null || event.recurrenceRule !== null || !isCalendarDate(context.periodAnchorDate)) throw new Error('対象期間を再解決できません');
+  const period = parse(context.periodAnchorDate, 'yyyy-MM-dd', new Date());
+  if ((definition.granularity === 'week' && getISODay(period) !== 1) || (definition.granularity === 'month' && period.getDate() !== 1)) throw new Error('対象期間の起点が不正です');
   if (definition.resolverConfig.kind === 'weekRemainder') return event;
   const config = definition.resolverConfig;
   const anchored = { ...definition, resolverConfig: 'selectionWeekOffset' in config

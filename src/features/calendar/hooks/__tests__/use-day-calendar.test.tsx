@@ -30,6 +30,7 @@ function createDependencies() {
   const settings = { getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }),
     getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), getCalendarVisible: jest.fn().mockResolvedValue(true),
     setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(120) };
+  events.readTemporalSchedule.mockImplementation(async (id,from,through)=>({schedule:await events.listSchedule(id,from,through),definitions:[],undeterminedFadeMinutes:await settings.getUndeterminedFadeMinutes()}));
   return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }
 

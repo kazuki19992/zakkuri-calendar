@@ -23,6 +23,8 @@ export default function RootLayout() {
               <Stack.Screen name="calendar/day/[date]" options={{ headerShown: false, gestureEnabled: false, animation: 'none' }} />
               <Stack.Screen name="events/new" options={{ presentation: 'modal' }} />
               <Stack.Screen name="events/[id]" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="settings/temporal/index" options={{headerShown:true,title:'時間表現',animation:'slide_from_right'}} />
+              <Stack.Screen name="settings/temporal/[id]" options={{headerShown:true,title:'時間表現',animation:'slide_from_right'}} />
               <Stack.Screen name="settings" options={{
                 headerShown: true,
                 title: '設定',

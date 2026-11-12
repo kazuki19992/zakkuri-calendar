@@ -87,3 +87,18 @@ it('同一snapshotに予定・無効化済みも含む定義・未定時間を�
   expect(snapshot.definitions.find(d => d.id === definition.id)?.isEnabled).toBe(false);
   expect(snapshot.undeterminedFadeMinutes).toBe(90);
 });
+it('深夜への範囲変更後も繰り返しと個別例外identityを維持し未来通知を再計算する',async()=>{
+  const {event,definition}=await fuzzy('morning');
+  const series={...event,recurrenceRule:{version:1,frequency:'daily',interval:1,weekdays:[],end:{type:'never'}} as const};
+  const reminders=[{id:'r',eventId:'e',timing:{version:1,kind:'relativeMinutes',anchor:'end',minutesBefore:60} as const,sortOrder:0}];
+  await repos.events.update({event:series,reminders});
+  await repos.events.deleteOccurrenceException({identity:{seriesEventId:'e',originalOccurrenceDate:'2026-11-17'},expectedSeriesUpdatedAt:now,now});
+  const before=await repos.notifications.readSnapshot();
+  const patch={resolverConfig:{kind:'timeOfDay',startMinute:1320,endMinute:1560}} as const;
+  const preview=await repos.temporalDefinitions.previewUpdate(definition.id,patch);
+  await repos.temporalDefinitions.updateDefinition({id:definition.id,patch,token:preview.token,now});
+  const after=await repos.notifications.readSnapshot();
+  expect(after.exceptions).toEqual(before.exceptions);
+  expect((await repos.events.getById('e'))?.event).toEqual(series);
+  expect(after.definitions.find(d=>d.id===definition.id)?.resolverConfig).toEqual(patch.resolverConfig);
+});

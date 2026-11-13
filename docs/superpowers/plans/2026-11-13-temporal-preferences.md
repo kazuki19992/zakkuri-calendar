@@ -79,7 +79,7 @@
 - [x] 実装済み/未実装/実機未確認を分けて記載する。設計との差分があれば同時更新する。
 - [x] typecheck / lint / 全Jest / diff check / iOSとAndroid exportを実行し結果を記録する。
 - [x] 全差分を独立レビューへ渡し、重要指摘を再現テスト→修正→全体検証で対応する。
-- [ ] 通常Open PRをdevelopへ作成。日本語本文に目的・設計・検証・実機確認項目と`Closes #60`を記載する。Botの再レビューを待たず完了報告する。
+- [x] 通常Open PRをdevelopへ作成。日本語本文に目的・設計・検証・実機確認項目と`Closes #60`を記載する。Botの再レビューを待たず完了報告する。
 
 ## 実行記録
 
@@ -89,3 +89,5 @@
 - 検証途中のJest絞り込みは、worktree名にも一致するため`--runTestsByPath`へ変更した。
 
 - 最終検証: typecheck/lint、全884 tests、専用TZのDST 2 tests、iOS/Android export成功。独立レビューのP2プレビュー指摘は3 testsのRED→GREENで対応。実機未確認は検証記録へ明記した。
+
+- 完了: PR #64（https://github.com/kazuki19992/zakkuri-calendar/pull/64）をdevelop向けのOpen PRとして作成。Issue #60へ実装・自動検証・実機未確認の状況を記録した。

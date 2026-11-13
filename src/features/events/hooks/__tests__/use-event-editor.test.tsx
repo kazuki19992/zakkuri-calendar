@@ -1,3 +1,4 @@
+import {TemporalConflictError, temporalDefinitionToken} from '@/domain/temporal/temporal-preferences';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { Calendar } from '@/domain/calendar/calendar';
 import type { CalendarEvent } from '@/domain/calendar/event';
@@ -22,10 +23,10 @@ function createRepositories(): Readonly<{ calendars: jest.Mocked<CalendarReposit
   return {
     calendars: { getDefault: jest.fn().mockResolvedValue(calendar), setColor: jest.fn() },
     events: { create: jest.fn(), getById: jest.fn().mockResolvedValue(null), listByAnchorRange: jest.fn(),
-      listSchedule: jest.fn(), getOccurrenceEditData: jest.fn(), saveOccurrenceException: jest.fn(),
+      readTemporalSchedule: jest.fn(), listSchedule: jest.fn(), getOccurrenceEditData: jest.fn(), saveOccurrenceException: jest.fn(),
       deleteOccurrenceException: jest.fn(), applyRecurrenceMutation: jest.fn(), update: jest.fn(), delete: jest.fn() },
-    settings: { getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
-    temporalDefinitions: { listEnabled: jest.fn().mockResolvedValue([morning]), getById: jest.fn(), disable: jest.fn() },
+    settings: { getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
+    temporalDefinitions: { listEditable: jest.fn(), previewUpdate: jest.fn(), updateDefinition: jest.fn(), listEnabled: jest.fn().mockResolvedValue([morning]), getById: jest.fn(), disable: jest.fn() },
   };
 }
 const initial = { date: '2026-09-09', startTime: '09:30', endTime: '11:45', temporalType: 'fuzzy' as const };
@@ -43,13 +44,13 @@ describe('予定編集の主要状態', () => {
     const { result } = await renderHook(() => useEventEditor({ ...repositories, holidayProvider, initial, eventId: exactEvent.id }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
     await act(async () => { result.current.setTitle('タイトルのみ変更'); await result.current.save(); });
-    expect(repositories.events.update).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ endDate: '2026-03-20', resolutionContext: context }) }));
+    expect(repositories.events.update.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ event: expect.objectContaining({ endDate: '2026-03-20', resolutionContext: context }) }));
     expect(holidayProvider.list).not.toHaveBeenCalled();
     await act(async () => { result.current.selectDefinition(morning.id); });
     await act(async () => { result.current.selectDefinition(thisWeek.id); });
     expect(result.current.relativeDatePreview).toContain('3月19日');
     await act(async () => { await result.current.save(); });
-    expect(repositories.events.update).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ endDate: '2026-03-19' }) }));
+    expect(repositories.events.update.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ event: expect.objectContaining({ endDate: '2026-03-19' }) }));
   });
 
   it('祝日設定の読込失敗を既定値で保存しない', async () => {
@@ -72,7 +73,7 @@ describe('予定編集の主要状態', () => {
     await act(async () => { result.current.setTitle('提出'); result.current.selectDefinition(thisWeek.id); });
     expect(result.current.relativeDatePreview).toContain('3月19日');
     await act(async () => { expect(await result.current.save()).toBe(true); });
-    expect(repositories.events.create).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({
+    expect(repositories.events.create.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ event: expect.objectContaining({
       anchorDate: '2026-03-16', endDate: '2026-03-19', resolutionContext: expect.objectContaining({
         parameterSnapshot: { thisWeekDeadlineWeekday: 5, deadlineAdjustment: { version: 1, calendarId: 'jp', unadjustedDeadlineDate: '2026-03-20' } },
       }),
@@ -249,7 +250,7 @@ describe('予定編集の主要状態', () => {
       relativeDatePreview: '10月5日（月）〜10月7日（水）',
     });
     await act(async () => { await result.current.save(); });
-    expect(repositories.events.create).toHaveBeenCalledWith(expect.objectContaining({
+    expect(repositories.events.create.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
       event: expect.objectContaining({
         anchorDate: '2026-10-05', endDate: '2026-10-07', recurrenceRule: null,
         resolutionContext: expect.objectContaining({ referenceDate: '2026-09-30', periodAnchorDate: '2026-10-05' }),
@@ -359,11 +360,11 @@ describe('予定編集の主要状態', () => {
     const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: event.id }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
     await act(async () => { await result.current.save(); });
-    expect(repositories.events.update).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ duration: { type } }) }));
+    expect(repositories.events.update.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ event: expect.objectContaining({ duration: { type } }) }));
     await act(async () => { result.current.setExactDurationType('fixed'); });
     await act(async () => { result.current.setEndDate('2026-09-10'); result.current.setEndTime('00:30'); });
     await act(async () => { await result.current.save(); });
-    expect(repositories.events.update).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ duration: { type: 'fixed', minutes: 60 } }) }));
+    expect(repositories.events.update.mock.calls.at(-1)?.[0]).toEqual(expect.objectContaining({ event: expect.objectContaining({ duration: { type: 'fixed', minutes: 60 } }) }));
   });
 
   it('終了日時が開始以前なら保存しない', async () => {
@@ -440,7 +441,7 @@ describe('予定編集の追加情報', () => {
     await act(async () => { result.current.addReminder(5); });
     await act(async () => { result.current.removeReminder('reminder-a'); result.current.setTitle('朝の予定'); });
     await act(async () => { await result.current.save(); });
-    expect(repositories.events.create).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({ id: 'event-new' }), reminders: [{ id: 'reminder-b', eventId: 'event-new', minutesBefore: 5, sortOrder: 0 }] }));
+    expect(repositories.events.create.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ event: expect.objectContaining({ id: 'event-new' }), reminders: [{ id: 'reminder-b', eventId: 'event-new', minutesBefore: 5, sortOrder: 0 }] }));
   });
 
   it('不正な繰り返しは入力を保持して保存しない', async () => {
@@ -468,7 +469,7 @@ describe('初期長設定と終了の指定', () => {
     expect(result.current.endTime).toBe(endTime);
     await act(async () => { result.current.setTitle('合成予定'); result.current.setEditorTab('exact'); });
     await act(async () => { await result.current.save(); });
-    expect(repositories.events.create).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({ duration }) }));
+    expect(repositories.events.create.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ event: expect.objectContaining({ duration }) }));
     await act(async () => { result.current.setEditorTab('fuzzy'); });
     await act(async () => { result.current.setEditorTab('exact'); });
     expect(repositories.settings.getDefaultExactDuration).toHaveBeenCalledTimes(1);
@@ -618,4 +619,22 @@ test('時刻付きの旧開始通知と同条件の新通知を追加・更新�
  expect(result.current.reminders[1].minutesBefore).toBe(10);
  await act(async()=>{result.current.addReminder({version:1,kind:'relativeMinutes',anchor:'end',minutesBefore:30});});
  expect(result.current.reminders).toHaveLength(3);
+});
+
+it('時間表現の競合時は本文を保持して最新定義を読み直し再確認を求める', async () => {
+  const repositories = createRepositories();
+  const {result} = await renderHook(() => useEventEditor({...repositories, initial, createId: () => 'conflict-event', now: () => '2026-11-13T00:00:00.000Z', getTimeZoneId: () => 'Asia/Tokyo'}));
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  await waitFor(() => expect(result.current.notificationDefaultStatus).toBe('ready'));
+  await act(async () => { result.current.setTitle('保持するタイトル'); });
+  const updated = {...morning, resolverConfig: {kind:'timeOfDay',startMinute:420,endMinute:660} as const};
+  repositories.temporalDefinitions.listEnabled.mockResolvedValue([updated]);
+  repositories.events.create.mockRejectedValueOnce(new TemporalConflictError());
+  await act(async () => { expect(await result.current.save()).toBe(false); });
+  expect(repositories.events.create).toHaveBeenCalledTimes(1);
+  expect(result.current.title).toBe('保持するタイトル');
+  expect(result.current.definitions).toContainEqual(updated);
+  expect(result.current.saveError).toContain('再確認');
+  await act(async () => { await result.current.save(); });
+  expect(repositories.events.create).toHaveBeenLastCalledWith(expect.anything(), {id:morning.id,token:temporalDefinitionToken(updated)});
 });

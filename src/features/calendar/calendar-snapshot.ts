@@ -76,11 +76,11 @@ export async function loadCalendarSnapshot(input: CalendarSnapshotInput, target:
   const holidayProvider = selectHolidayProvider(input.holidayProvider, preferences.calendarId);
   const calendar = await input.calendars.getDefault();
   const range = getTargetRange(target, weekStartsOn);
-  const [schedule, isCalendarVisible, undeterminedFadeMinutes] = await Promise.all([
-    input.events.listSchedule(calendar.id, range.from, range.through),
+  const [temporalSnapshot, isCalendarVisible] = await Promise.all([
+    input.events.readTemporalSchedule(calendar.id, range.from, range.through),
     input.settings.getCalendarVisible(calendar.id),
-    input.settings.getUndeterminedFadeMinutes(),
   ]);
+  const { schedule, definitions, undeterminedFadeMinutes } = temporalSnapshot;
   const holidayCoverage = getHolidayMonths(target, weekStartsOn).map((month) => {
     const monthRange = getMonthRange(month);
     return {
@@ -91,17 +91,6 @@ export async function loadCalendarSnapshot(input: CalendarSnapshotInput, target:
   const expanded = expandEventOccurrences({ snapshot: schedule, from: range.from, through: range.through });
   if (!expanded.ok) throw new Error('event occurrence expansion failed');
   const occurrences = expanded.value;
-  const fuzzyDefinitionIds = [
-    ...new Set(
-      occurrences
-        .map((occurrence) => occurrence.event)
-        .filter((event) => event.temporalType === 'fuzzy')
-        .map((event) => event.temporalDefinitionId),
-    ),
-  ];
-  const definitions = await Promise.all(
-    fuzzyDefinitionIds.map((id) => input.temporalDefinitions.getById(id)),
-  );
 
   return {
     weekStartsOn,

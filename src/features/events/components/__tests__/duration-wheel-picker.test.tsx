@@ -81,3 +81,11 @@ describe('予定通知時間ドラムロール', () => {
     jest.mocked(useReduceMotion).mockReturnValue(false);
   });
 });
+
+it('時間設定用の表題と表示を使い、範囲外の分数を確定させない',async()=>{
+  const onConfirm=jest.fn();
+  const screen=await render(<DurationWheelPicker visible initialMinutes={0} maxHours={24} title="未定の表示時間"
+    minimumMinutes={1} maximumMinutes={1440} formatValue={value=>`${value}分`} onConfirm={onConfirm} onClose={jest.fn()}/>);
+  expect(screen.getByText('未定の表示時間')).toBeTruthy();
+  expect(screen.getByLabelText('未定の表示時間を確定')).toBeDisabled();
+});

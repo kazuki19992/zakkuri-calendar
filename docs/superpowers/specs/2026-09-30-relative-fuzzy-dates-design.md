@@ -137,7 +137,7 @@ type WeekRemainderResolver = Readonly<{
 - 再解決と定義更新は同じtransactionで行い、1件でも不正な範囲になる場合は全体をrollbackする。
 - 既存予定のタイトル、metadata、通知、基準日、繰り返し規則は変更しない。
 
-このリリースには定義更新commandやUIを追加しない。上記は将来のRepository操作が守る不変条件として文書化する。
+このリリースには定義更新commandやUIを追加しない。後続のIssue #60では、`2026-11-13-temporal-preferences-design.md`に従って上記の不変条件を守る編集commandとUIを実装する。今週中はフェードだけを編集し、保存済みの休日調整結果も維持する。
 
 ## 5. Domain model
 

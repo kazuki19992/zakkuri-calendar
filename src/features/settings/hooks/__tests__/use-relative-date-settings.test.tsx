@@ -5,7 +5,7 @@ import { useRelativeDateSettings } from '../use-relative-date-settings';
 function repository(): jest.Mocked<SettingsRepository> {
   return {
     getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(),
-    getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(),
+    setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(),
     getLastEventEditorTab: jest.fn(), setLastEventEditorTab: jest.fn(),
     getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn(),
     getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1),

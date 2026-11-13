@@ -21,15 +21,16 @@ function createDependencies() {
   const calendars: jest.Mocked<CalendarRepository> = { getDefault: jest.fn().mockResolvedValue(calendar), setColor: jest.fn() };
   const events: jest.Mocked<EventRepository> = {
     create: jest.fn(), getById: jest.fn(), listByAnchorRange: jest.fn(),
-    listSchedule: jest.fn().mockResolvedValue({ events: [event], exceptions: [], replacementEvents: [] }),
+    readTemporalSchedule: jest.fn(), listSchedule: jest.fn().mockResolvedValue({ events: [event], exceptions: [], replacementEvents: [] }),
     getOccurrenceEditData: jest.fn(), saveOccurrenceException: jest.fn(), deleteOccurrenceException: jest.fn(),
     applyRecurrenceMutation: jest.fn(), update: jest.fn(), delete: jest.fn(),
   };
-  const temporalDefinitions: jest.Mocked<TemporalDefinitionRepository> = { listEnabled: jest.fn(), getById: jest.fn(), disable: jest.fn() };
+  const temporalDefinitions: jest.Mocked<TemporalDefinitionRepository> = { listEditable: jest.fn(), previewUpdate: jest.fn(), updateDefinition: jest.fn(), listEnabled: jest.fn(), getById: jest.fn(), disable: jest.fn() };
   const holidayProvider: jest.Mocked<HolidayProvider> = { list: jest.fn().mockReturnValue({ status: 'available', holidays: [{ date: '2026-09-21', name: '敬老の日' }] }) };
   const settings = { getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }),
     getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), getCalendarVisible: jest.fn().mockResolvedValue(true),
-    getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(120) };
+    setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(120) };
+  events.readTemporalSchedule.mockImplementation(async (id,from,through)=>({schedule:await events.listSchedule(id,from,through),definitions:[],undeterminedFadeMinutes:await settings.getUndeterminedFadeMinutes()}));
   return { calendars, events, temporalDefinitions, holidayProvider, settings };
 }
 

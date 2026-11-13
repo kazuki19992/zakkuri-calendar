@@ -1,3 +1,4 @@
+import {useRouter} from 'expo-router';
 import { useNotifications } from '@/features/notifications/notification-context';
 import { useNotificationDefaults } from '@/features/settings/hooks/use-notification-defaults';
 import { useDefaultExactDurationSettings } from '@/features/settings/hooks/use-default-exact-duration-settings';
@@ -12,6 +13,7 @@ import { useHolidayPreferences } from '@/features/settings/hooks/use-holiday-pre
  * 各設定の状態を個別のhookへ配線し、一項目の失敗が他の設定を止めないようにする。
  */
 export default function SettingsRoute() {
+  const router=useRouter();
   const { settings } = useRepositories();
   const notificationDefaults = useNotificationDefaults(settings);
   const notificationRuntime = useNotifications();
@@ -20,5 +22,5 @@ export default function SettingsRoute() {
   const { notifyChanged } = useCalendarRefresh();
   const weekStart = useWeekStartSettings({ settings, onSaved: notifyChanged });
   const holidays = useHolidayPreferences({ settings, onSaved: notifyChanged });
-  return <SettingsScreen notificationDefaults={notificationDefaults} notificationRuntime={notificationRuntime} duration={duration} state={state} weekStart={weekStart} holidays={holidays} />;
+  return <SettingsScreen onOpenTemporalSettings={()=>router.push('/settings/temporal')} notificationDefaults={notificationDefaults} notificationRuntime={notificationRuntime} duration={duration} state={state} weekStart={weekStart} holidays={holidays} />;
 }

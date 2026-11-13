@@ -14,7 +14,7 @@ import { HolidaySettingsSection } from '../components/holiday-settings-section';
 
 const OPTIONS = [[5, '金曜日'], [6, '土曜日'], [7, '日曜日']] as const;
 
-export function SettingsScreen({ state, weekStart, holidays, duration, notificationDefaults, notificationRuntime }: Readonly<{ notificationDefaults?: NotificationDefaultsState; notificationRuntime?: NotificationRuntime; duration: DefaultExactDurationSettingsState; state: RelativeDateSettingsState; weekStart: WeekStartSettingsState; holidays: HolidayPreferencesState }>) {
+export function SettingsScreen({ onOpenTemporalSettings, state, weekStart, holidays, duration, notificationDefaults, notificationRuntime }: Readonly<{ onOpenTemporalSettings?():void; notificationDefaults?: NotificationDefaultsState; notificationRuntime?: NotificationRuntime; duration: DefaultExactDurationSettingsState; state: RelativeDateSettingsState; weekStart: WeekStartSettingsState; holidays: HolidayPreferencesState }>) {
   const theme = useTheme();
   const [selecting, setSelecting] = useState(false);
   const disabled = weekStart.status !== 'ready' || weekStart.isSaving;
@@ -37,6 +37,11 @@ export function SettingsScreen({ state, weekStart, holidays, duration, notificat
         options={[{ value: 1, label: '月曜日' }, { value: 0, label: '日曜日' }]} disabled={disabled}
         onClose={() => setSelecting(false)} onSelect={(value) => { void weekStart.setValue(value); }} />
       <HolidaySettingsSection state={holidays} />
+      <View style={[styles.section, {borderBottomColor:theme.calendarBorder}]}>
+        <Pressable accessibilityRole="button" onPress={onOpenTemporalSettings} style={styles.settingRow}>
+          <Text style={[styles.label,{color:theme.text}]}>時間表現</Text><Text style={{color:theme.textSecondary}}>範囲・ぼかし・未定時間 ›</Text>
+        </Pressable>
+      </View>
       <DefaultExactDurationSettingsSection state={duration} />
       {notificationDefaults && notificationRuntime ? <NotificationSettingsSection defaults={notificationDefaults} runtime={notificationRuntime} /> : null}
       <View style={[styles.section, { borderBottomColor: theme.calendarBorder }]}>

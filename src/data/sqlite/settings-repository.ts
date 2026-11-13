@@ -1,3 +1,4 @@
+import { DEFAULT_UNDETERMINED_MINUTES, parseUndeterminedMinutes } from '@/domain/temporal/temporal-preferences';
 import { defaultReminderTiming, defaultTimingIsValid, parseReminderTiming, type NotificationCategory, type ReminderTiming } from '@/domain/notifications/reminder-timing';
 import { parseExactDuration, type EventEditorTab, type ExactDuration } from '@/domain/calendar/event';
 import {
@@ -15,7 +16,7 @@ import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-re
 
 type SettingRow = Readonly<{ value_json: string }>;
 
-const DEFAULT_FADE_MINUTES = 120;
+const DEFAULT_FADE_MINUTES = DEFAULT_UNDETERMINED_MINUTES;
 const DEFAULT_EVENT_EDITOR_TAB: EventEditorTab = 'fuzzy';
 const DEFAULT_THIS_WEEK_DEADLINE: ThisWeekDeadlineWeekday = 5;
 
@@ -139,7 +140,16 @@ export class SqliteSettingsRepository implements SettingsRepository {
     );
     if (!row) return DEFAULT_FADE_MINUTES;
     const value = parseJson(row.value_json);
-    return Number.isInteger(value) && Number(value) > 0 ? Number(value) : DEFAULT_FADE_MINUTES;
+    return parseUndeterminedMinutes(value) ?? DEFAULT_FADE_MINUTES;
+  }
+
+  async setUndeterminedFadeMinutes(value: number, updatedAt: string): Promise<void> {
+    if (parseUndeterminedMinutes(value) === null) throw new Error('未定の表示時間を確認してください');
+    await this.database.run(
+      `INSERT INTO app_settings(key,value_json,updated_at) VALUES($key,$valueJson,$updatedAt)
+       ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at`,
+      { $key: 'undetermined_fade_minutes', $valueJson: JSON.stringify(value), $updatedAt: updatedAt },
+    );
   }
 
   async getCalendarVisible(calendarId: string): Promise<boolean> {

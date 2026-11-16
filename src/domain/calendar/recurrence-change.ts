@@ -1,3 +1,5 @@
+import {planRelativeFollowingMutation,planRelativeSeriesMutation,relativeMeaningChanged} from './relative-recurrence-change';
+import {resolveRelativeOccurrence,type RelativeRecurrenceEnvironment} from './relative-recurrence';
 import { getReminderTiming } from './event-reminder';
 import { addDays, addYears, differenceInCalendarDays, format, parse } from 'date-fns';
 import type { CalendarEvent } from './event';
@@ -26,7 +28,8 @@ export type RecurrenceMutationPlan = Readonly<{
   deleteReplacementEventIds: readonly string[];
 }>;
 
-type PlanFollowingMutationInput = Readonly<{
+export type PlanFollowingMutationInput = Readonly<{
+  environment?: RelativeRecurrenceEnvironment;
   series: EventAggregate;
   boundaryDate: string;
   submitted: EventAggregate;
@@ -35,7 +38,8 @@ type PlanFollowingMutationInput = Readonly<{
   now: string;
 }>;
 
-type PlanSeriesMutationInput = Readonly<{
+export type PlanSeriesMutationInput = Readonly<{
+  environment?: RelativeRecurrenceEnvironment;
   series: EventAggregate;
   boundaryDate: string;
   submitted: EventAggregate;
@@ -74,7 +78,7 @@ export function getChangedEventFields(
   if (before.event.colorId !== after.event.colorId) changed.push('color');
   if (!jsonEqual(before.reminders.map(getReminderTiming),
     after.reminders.map(getReminderTiming))) changed.push('reminders');
-  if (!jsonEqual(before.event.recurrenceRule, after.event.recurrenceRule)) changed.push('recurrence');
+  if (!jsonEqual(before.event.recurrenceRule, after.event.recurrenceRule) || relativeMeaningChanged(before.event,after.event)) changed.push('recurrence');
   return changed;
 }
 
@@ -83,6 +87,7 @@ export function buildSeriesScopedAggregate(input: Readonly<{
   occurrenceDate: string;
   displayed: EventAggregate;
   submitted: EventAggregate;
+  environment?: RelativeRecurrenceEnvironment;
 }>): EventAggregate {
   const changed = new Set(getChangedEventFields(input.displayed, input.submitted));
   const overrideFields = [...changed]
@@ -92,6 +97,7 @@ export function buildSeriesScopedAggregate(input: Readonly<{
     replacementEvent: input.submitted.event,
     overrideFields,
     occurrenceDate: input.occurrenceDate,
+    ...(input.series.event.recurrenceRule?.version===2?{resolvedOccurrence:resolveRelativeOccurrence(input.series.event,input.occurrenceDate,input.environment??{definitions:[]})}:{}),
   });
   return {
     event: {
@@ -214,6 +220,7 @@ function replacementIds(exceptions: readonly RecurrenceException[]): readonly st
 export function planFollowingMutation(
   input: PlanFollowingMutationInput,
 ): RecurrenceMutationPlan {
+  if(input.series.event.recurrenceRule?.version===2||input.submitted.event.recurrenceRule?.version===2)return planRelativeFollowingMutation(input);
   const originalRule = input.series.event.recurrenceRule;
   if (originalRule === null) throw new Error('Following mutation requires a recurring series');
   const countBefore = occurrenceCountBefore(input.series.event, input.boundaryDate);
@@ -228,7 +235,7 @@ export function planFollowingMutation(
   const nextId = input.createSeriesId();
   const calculatedNextRule = nextRule(
     originalRule,
-    input.submitted.event.recurrenceRule,
+    input.submitted.event.recurrenceRule as RecurrenceRuleV1 | null,
     countBefore,
     dayOffset,
   );
@@ -276,6 +283,7 @@ export function planFollowingMutation(
 }
 
 export function planSeriesMutation(input: PlanSeriesMutationInput): RecurrenceMutationPlan {
+  if(input.series.event.recurrenceRule?.version===2||input.submitted.event.recurrenceRule?.version===2)return planRelativeSeriesMutation(input);
   const recurrenceChanged = !jsonEqual(
     input.series.event.recurrenceRule,
     input.submitted.event.recurrenceRule,
@@ -298,16 +306,17 @@ export function planSeriesMutation(input: PlanSeriesMutationInput): RecurrenceMu
         ),
       ),
     };
+  const submittedRule = submittedEvent.recurrenceRule as RecurrenceRuleV1 | null;
   const recurrenceRuleWithEnd = !recurrenceChanged
-      && submittedEvent.recurrenceRule?.end.type === 'until'
+      && submittedRule?.end.type === 'until'
     ? {
-      ...submittedEvent.recurrenceRule,
+      ...submittedRule,
       end: {
         type: 'until' as const,
-        date: offsetDate(submittedEvent.recurrenceRule.end.date, dayOffset),
+        date: offsetDate(submittedRule.end.date, dayOffset),
       },
     }
-    : submittedEvent.recurrenceRule;
+    : submittedRule;
   const recurrenceRule = recurrenceChanged
     ? recurrenceRuleWithEnd
     : shiftWeeklyWeekdays(recurrenceRuleWithEnd, dayOffset);

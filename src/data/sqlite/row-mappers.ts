@@ -12,7 +12,7 @@ import {
   parseEventNoteDocument,
   type EventNoteDocumentV1,
 } from '@/domain/calendar/event-note';
-import { parseRecurrenceRule, type RecurrenceRuleV1 } from '@/domain/calendar/recurrence';
+import { parseRecurrenceRule, type RecurrenceRule } from '@/domain/calendar/recurrence';
 import {
   parseRecurrenceException,
   type RecurrenceException,
@@ -230,7 +230,7 @@ export function mapRecurrenceExceptionRow(row: RecurrenceExceptionRow): Recurren
   return parsed.value;
 }
 
-function parseStoredRecurrenceRule(value: string | null): RecurrenceRuleV1 | null {
+function parseStoredRecurrenceRule(value: string | null): RecurrenceRule | null {
   if (typeof value !== 'string') return null;
   try {
     const parsed = parseRecurrenceRule(JSON.parse(value) as unknown);

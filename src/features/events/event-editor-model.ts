@@ -10,7 +10,7 @@ import {
   type EventReminder,
 } from '@/domain/calendar/event-reminder';
 import { isCalendarDate, offsetCalendarDate } from '@/domain/calendar/month';
-import { parseRecurrenceRule, type RecurrenceRuleV1 } from '@/domain/calendar/recurrence';
+import { parseRecurrenceRule, type RecurrenceRuleV1, type RecurrenceRule } from '@/domain/calendar/recurrence';
 import type { Result } from '@/domain/shared/result';
 import {
   createFixedDurationFromDateTimes,
@@ -148,7 +148,7 @@ export function getEditorExactDuration(
 }
 
 export function getRecurrenceDraft(
-  rule: RecurrenceRuleV1 | null,
+  rule: RecurrenceRule | null,
   anchorDate: string,
 ): RecurrenceDraft {
   if (rule === null) {
@@ -162,6 +162,12 @@ export function getRecurrenceDraft(
       countText: '1',
     };
   }
+
+  if(rule.version===2)return {
+    preset:rule.interval===1&&rule.end.type==='never'?rule.frequency:'custom',frequency:rule.frequency,
+    intervalText:String(rule.interval),weekdays:[],endType:rule.end.type==='untilPeriod'?'until':rule.end.type,
+    untilDate:rule.end.type==='untilPeriod'?rule.end.periodAnchorDate:anchorDate,countText:rule.end.type==='count'?String(rule.end.count):'1',
+  };
 
   let preset: RecurrencePreset = 'custom';
   if (rule.interval === 1 && rule.end.type === 'never') {

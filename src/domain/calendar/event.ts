@@ -1,7 +1,7 @@
 import type { Result } from '@/domain/shared/result';
 import { parseEventColorId, type EventColorId } from './event-color';
 import { isCalendarDate } from './month';
-import { parseRecurrenceRule, type RecurrenceRuleV1 } from './recurrence';
+import { parseRecurrenceRule, type RecurrenceRule } from './recurrence';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
 import { parseDeadlineAdjustment, type DeadlineAdjustmentV1 } from './holiday-preferences';
 import {
@@ -19,7 +19,7 @@ export type FuzzyResolutionContextV1 = Readonly<{
   version: 1;
   referenceDate: string;
   periodAnchorDate: string;
-  parameterSnapshot: Readonly<{ thisWeekDeadlineWeekday?: ThisWeekDeadlineWeekday; deadlineAdjustment?: DeadlineAdjustmentV1 }>;
+  parameterSnapshot: Readonly<{ thisWeekDeadlineWeekday?: ThisWeekDeadlineWeekday; deadlineAdjustment?: DeadlineAdjustmentV1; deadlineWarning?: 'noBusinessDay' | 'unsupportedHolidayRange' }>;
 }>;
 
 type EventDraftBase = Readonly<{
@@ -30,7 +30,7 @@ type EventDraftBase = Readonly<{
   location: string | null;
   noteDocument: EventNoteDocumentV1 | null;
   colorId: EventColorId | null;
-  recurrenceRule: RecurrenceRuleV1 | null;
+  recurrenceRule: RecurrenceRule | null;
 }>;
 
 export type EventDraft =
@@ -72,6 +72,9 @@ function parseFuzzyResolutionContext(value: unknown): FuzzyResolutionContextV1 |
   const rawAdjustment = value.parameterSnapshot.deadlineAdjustment;
   const adjustment = rawAdjustment === undefined ? undefined : parseDeadlineAdjustment(rawAdjustment);
   if (adjustment === null) return undefined;
+  const warning = value.parameterSnapshot.deadlineWarning;
+  if (warning !== undefined && warning !== 'noBusinessDay' && warning !== 'unsupportedHolidayRange') return undefined;
+  if (warning !== undefined && adjustment === undefined) return undefined;
   return {
     version: 1,
     referenceDate: value.referenceDate,
@@ -79,6 +82,7 @@ function parseFuzzyResolutionContext(value: unknown): FuzzyResolutionContextV1 |
     parameterSnapshot: {
       ...(deadline === undefined ? {} : { thisWeekDeadlineWeekday: deadline }),
       ...(adjustment === undefined ? {} : { deadlineAdjustment: adjustment }),
+      ...(warning === undefined ? {} : { deadlineWarning: warning }),
     },
   };
 }
@@ -119,6 +123,7 @@ export function parseEventDraft(input: unknown): Result<EventDraft, EventValidat
     return fail('recurrenceRule', 'recurrence until date must not be before anchor date');
   }
 
+  if (recurrenceRule.value?.version === 2 && input.temporalType !== 'fuzzy') return fail('recurrenceRule', 'relative rule requires fuzzy event');
   const base = {
     calendarId: input.calendarId,
     title: input.title,
@@ -144,7 +149,7 @@ export function parseEventDraft(input: unknown): Result<EventDraft, EventValidat
     }
     const resolutionContext = parseFuzzyResolutionContext(input.resolutionContext);
     if (resolutionContext === undefined) return fail('resolutionContext', 'invalid fuzzy resolution context');
-    if (resolutionContext !== null && base.recurrenceRule !== null) {
+    if ((resolutionContext !== null && base.recurrenceRule?.version === 1) || (resolutionContext === null && base.recurrenceRule?.version === 2)) {
       return fail('recurrenceRule', 'resolved relative events cannot recur');
     }
     return { ok: true, value: {
@@ -184,7 +189,7 @@ function parseOptionalColorId(value: unknown): Result<EventColorId | null, Event
 
 function parseOptionalRecurrenceRule(
   value: unknown,
-): Result<RecurrenceRuleV1 | null, EventValidationError> {
+): Result<RecurrenceRule | null, EventValidationError> {
   if (value === null || value === undefined) return { ok: true, value: null };
   return parseRecurrenceRule(value);
 }

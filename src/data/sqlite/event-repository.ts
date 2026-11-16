@@ -224,7 +224,7 @@ async function assertSeriesRevision(
      WHERE id = $id AND updated_at = $expectedUpdatedAt`,
     { $id: id, $expectedUpdatedAt: expectedUpdatedAt },
   );
-  if (result.changes !== 1) throw new Error('Recurring event changed while editing');
+  if (result.changes !== 1) throw new TemporalConflictError();
 }
 
 async function loadValidOccurrence(
@@ -381,6 +381,7 @@ export class SqliteEventRepository implements EventRepository {
   async saveOccurrenceException(command: SaveOccurrenceExceptionCommand): Promise<void> {
     await this.mutate(async (transaction) => {
       await assertExpectedDefinition(transaction, command.expectedDefinition);
+      for(const expected of command.expectedDefinitions??[])await assertExpectedDefinition(transaction,expected);
       await assertSeriesRevision(
         transaction,
         command.identity.seriesEventId,
@@ -483,6 +484,7 @@ export class SqliteEventRepository implements EventRepository {
   async applyRecurrenceMutation(command: ApplyRecurrenceMutationCommand): Promise<void> {
     await this.mutate(async (transaction) => {
       await assertExpectedDefinition(transaction, command.expectedDefinition);
+      for(const expected of command.expectedDefinitions??[])await assertExpectedDefinition(transaction,expected);
       await assertSeriesRevision(transaction, command.seriesId, command.expectedSeriesUpdatedAt);
       if (command.plan.removePreviousSeries) {
         await transaction.run('DELETE FROM events WHERE id = $id', { $id: command.seriesId });

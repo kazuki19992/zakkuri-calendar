@@ -27,6 +27,7 @@ export type OccurrenceEditData = Readonly<{
 
 export type SaveOccurrenceExceptionCommand = Readonly<{
   expectedDefinition?: DefinitionExpectation;
+  expectedDefinitions?: readonly DefinitionExpectation[];
   identity: OccurrenceIdentity;
   replacement: EventAggregate;
   overrideFields: readonly EventOverrideField[];
@@ -42,6 +43,7 @@ export type DeleteOccurrenceExceptionCommand = Readonly<{
 
 export type ApplyRecurrenceMutationCommand = Readonly<{
   expectedDefinition?: DefinitionExpectation;
+  expectedDefinitions?: readonly DefinitionExpectation[];
   seriesId: string;
   expectedSeriesUpdatedAt: string;
   plan: RecurrenceMutationPlan;

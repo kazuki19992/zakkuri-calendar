@@ -342,6 +342,10 @@ export function useEventEditor({
           const existingDefinition = await temporalDefinitions.getById(existingDefinitionId);
           if (existingDefinition !== null) loadedDefinitions = [...loadedDefinitions, existingDefinition];
         }
+        const sourceId=loadedOccurrenceData?.series.event.temporalType==='fuzzy'?loadedOccurrenceData.series.event.temporalDefinitionId:null;
+        if(sourceId&&!loadedDefinitions.some(item=>item.id===sourceId)){
+          const sourceDefinition=await temporalDefinitions.getById(sourceId);if(sourceDefinition)loadedDefinitions=[...loadedDefinitions,sourceDefinition];
+        }
         if (!active) return;
 
         setCalendarId(targetCalendarId);
@@ -629,15 +633,20 @@ export function useEventEditor({
   }, [definitions]);
   const recoverTemporalConflict = useCallback(async () => {
     try {
+      const occurrence=eventId&&occurrenceDate?await events.getOccurrenceEditData({seriesEventId:eventId,originalOccurrenceDate:occurrenceDate}):null;
       let latest = await temporalDefinitions.listEnabled(calendarId ?? '');
-      if (selectedDefinitionId && !latest.some(item => item.id === selectedDefinitionId)) {
-        const selected = await temporalDefinitions.getById(selectedDefinitionId);
-        if (selected) latest = [...latest, selected];
+      const ids=[selectedDefinitionId,occurrence?.series.event.temporalType==='fuzzy'?occurrence.series.event.temporalDefinitionId:null];
+      for(const id of ids){if(id&&!latest.some(item=>item.id===id)){const definition=await temporalDefinitions.getById(id);if(definition)latest=[...latest,definition];}}
+      let aggregate = eventId && occurrenceDate === undefined ? await events.getById(eventId) : null;
+      if(occurrence&&occurrenceDate){
+        const fields=occurrence.exception?.overrideFields??[];
+        const materialized=materializeOccurrenceReplacement({seriesEvent:occurrence.series.event,replacementEvent:occurrence.replacement?.event??occurrence.series.event,overrideFields:fields,occurrenceDate,resolvedOccurrence:occurrence.resolvedOccurrence});
+        aggregate={event:{...materialized,id:occurrence.series.event.id,recurrenceRule:occurrence.series.event.recurrenceRule},reminders:fields.includes('reminders')?occurrence.replacement?.reminders??[]:occurrence.series.reminders};
       }
-      const aggregate = eventId && occurrenceDate === undefined ? await events.getById(eventId) : null;
       if (!mountedRef.current) return;
       setDefinitions(latest);
       if (aggregate) setExistingAggregate(aggregate);
+      if(occurrence)setOccurrenceEditData(occurrence);
       setPendingAggregate(null); setScopeRequest(null);
       setSaveError('時間表現が更新されました。入力内容は保持しています。期間を再確認して保存してください。');
     } catch {
@@ -833,6 +842,7 @@ export function useEventEditor({
         await events.saveOccurrenceException({
           identity,
           expectedDefinition: expectedDefinitionFor(pendingAggregate.event),
+          ...(expectedDefinitionFor(occurrenceEditData.series.event)?{expectedDefinitions:[expectedDefinitionFor(occurrenceEditData.series.event)!]}:{}),
           replacement: {
             event: { ...pendingAggregate.event, id: replacementId, recurrenceRule: null },
             reminders: pendingAggregate.reminders.map((reminder) => ({
@@ -892,6 +902,7 @@ export function useEventEditor({
         await events.applyRecurrenceMutation({
           seriesId: occurrenceEditData.series.event.id,
           expectedSeriesUpdatedAt: occurrenceEditData.series.event.updatedAt,
+          ...(expectedDefinitionFor(occurrenceEditData.series.event)?{expectedDefinitions:[expectedDefinitionFor(occurrenceEditData.series.event)!]}:{}),
           plan,
           ...(!deleting && pendingAggregate ? { expectedDefinition: expectedDefinitionFor(pendingAggregate.event) } : {}),
         });

@@ -148,3 +148,19 @@ it('V2のmetadata例外を保存しても範囲を月初へ移動しない',asyn
   const after=await repos.events.getOccurrenceEditData(identity);
   expect(after?.replacement?.event.title).toBe('個別メモの予定');expect(after?.resolvedOccurrence).toMatchObject({anchorDate:'2027-02-24',endDate:'2027-02-28'});
 });
+it('初回範囲が同じでも元定義が変わったV2変更計画を保存しない',async()=>{
+  const {event,definition}=await relativeSeriesFixture();
+  const initialPatch={resolverConfig:{kind:'monthLastDays',selectionMonthOffset:0,count:30}} as const;
+  let preview=await repos.temporalDefinitions.previewUpdate(definition.id,initialPatch);
+  await repos.temporalDefinitions.updateDefinition({id:definition.id,patch:initialPatch,token:preview.token,now});
+  const source={...event,anchorDate:'2027-02-01',endDate:'2027-02-28',resolutionContext:{version:1 as const,referenceDate:'2027-02-01',periodAnchorDate:'2027-02-01',parameterSnapshot:{}}};
+  await repos.events.update({event:source,reminders:[]});
+  const before=await repos.temporalDefinitions.getById(definition.id);if(!before)throw new Error('missing definition');
+  const patch={resolverConfig:{kind:'monthLastDays',selectionMonthOffset:0,count:31}} as const;
+  preview=await repos.temporalDefinitions.previewUpdate(definition.id,patch);
+  await repos.temporalDefinitions.updateDefinition({id:definition.id,patch,token:preview.token,now:'2026-11-18T00:00:00Z'});
+  expect((await repos.events.getById(event.id))?.event.updatedAt).toBe(now);
+  const target=await repos.temporalDefinitions.getById('personal-default:next_month');if(!target)throw new Error('missing target');
+  await expect(repos.events.applyRecurrenceMutation({seriesId:event.id,expectedSeriesUpdatedAt:now,expectedDefinition:{id:target.id,token:temporalDefinitionToken(target)},expectedDefinitions:[{id:before.id,token:temporalDefinitionToken(before)}],plan:{removePreviousSeries:false,previousSeries:null,nextSeries:{event:{...source,title:'変更',temporalType:'fuzzy',temporalDefinitionId:target.id},reminders:[]},upsertExceptions:[],deleteExceptionIdentities:[],deleteReplacementEventIds:[]}})).rejects.toBeInstanceOf(TemporalConflictError);
+  expect((await repos.events.getById(event.id))?.event.title).toBe('月末');
+});

@@ -1,3 +1,4 @@
+import {deadlineWarningLabel} from '@/domain/calendar/relative-recurrence';
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { EventColorId } from '@/constants/event-colors';
 import type { MonthGridDate } from '@/domain/calendar/month';
@@ -62,7 +63,7 @@ function getOccurrenceTemporalLabel(occurrence: EventOccurrence, labels: Readonl
   const { event } = occurrence;
   if (event.temporalType === 'exact') return event.startTime;
   if (event.temporalType === 'allDay') return '終日';
-  return labels.get(event.temporalDefinitionId) ?? 'ざっくり';
+  const label=labels.get(event.temporalDefinitionId)??'ざっくり';const warning=deadlineWarningLabel(event);return warning?`${label}・${warning}`:label;
 }
 
 function getSegmentPriority(occurrence: EventOccurrence): number {
@@ -134,7 +135,7 @@ export function createMonthWeekViewModels(input: Readonly<{
         continuesFromPreviousWeek,
         continuesToNextWeek,
         colorId: occurrence.event.colorId ?? input.calendarColorId,
-        title: occurrence.event.title,
+        title: deadlineWarningLabel(occurrence.event)?`要確認・${occurrence.event.title}`:occurrence.event.title,
         temporalLabel,
         accessibilityLabel: [occurrence.event.title, temporalLabel, occurrence.occurrenceStartDate < occurrence.occurrenceThroughDate ? '複数日にまたがる予定' : null, occurrence.isRecurring ? '繰り返し予定' : null].filter((value): value is string => value !== null).join('、'),
         isFuzzyRange,

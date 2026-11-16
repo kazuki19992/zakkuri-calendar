@@ -1,3 +1,4 @@
+import type {HolidayProvider} from '@/domain/calendar/holiday';
 import {
   NOTIFICATION_PREFIX,
   type NotificationDevice,
@@ -34,6 +35,7 @@ export class NotificationCoordinator {
     private readonly repository: NotificationRepository,
     readonly device: NotificationDevice,
     private readonly now = () => new Date(),
+    private readonly holidayProvider?:HolidayProvider,
   ) {}
   getState = () => this.state;
   subscribe = (listener: () => void) => {
@@ -93,7 +95,7 @@ export class NotificationCoordinator {
         this.setState({
           hasReminders: snapshot.aggregates.some((a) => a.reminders.length > 0),
         });
-        const plan = planNotifications(snapshot, this.now());
+        const plan = planNotifications(snapshot, this.now(),this.holidayProvider);
         const allowed = permission === 'granted' || permission === 'quiet';
         const desired = allowed ? plan.requests : [];
         const stale = async () => {

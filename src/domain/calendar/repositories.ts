@@ -18,6 +18,7 @@ import type {
 import type { RecurrenceMutationPlan } from './recurrence-change';
 
 export type OccurrenceEditData = Readonly<{
+  resolvedOccurrence?: CalendarEvent;
   series: EventAggregate;
   exception: RecurrenceException | null;
   replacement: EventAggregate | null;

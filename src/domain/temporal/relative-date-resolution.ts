@@ -11,7 +11,7 @@ export type RelativeDateResolution = Readonly<{
   periodAnchorDate: string;
   startDate: string;
   endDate: string;
-  parameterSnapshot: Readonly<{ thisWeekDeadlineWeekday?: ThisWeekDeadlineWeekday; deadlineAdjustment?: DeadlineAdjustmentV1 }>;
+  parameterSnapshot: Readonly<{ thisWeekDeadlineWeekday?: ThisWeekDeadlineWeekday; deadlineAdjustment?: DeadlineAdjustmentV1; deadlineWarning?: 'noBusinessDay' | 'unsupportedHolidayRange' }>;
 }>;
 
 export type RelativeDateResolutionError = Readonly<{ message: string }>;

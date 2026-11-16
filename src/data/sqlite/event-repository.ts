@@ -1,3 +1,5 @@
+import type { HolidayProvider } from '@/domain/calendar/holiday';
+import {resolveRelativeOccurrence,validateRelativeSeries} from '@/domain/calendar/relative-recurrence';
 import { TemporalConflictError, temporalDefinitionToken, reResolveTemporalEvent, type DefinitionExpectation } from '@/domain/temporal/temporal-preferences';
 import { SqliteTemporalDefinitionRepository } from './temporal-definition-repository';
 import { SqliteSettingsRepository } from './settings-repository';
@@ -124,9 +126,14 @@ async function assertFuzzyDefinitionConsistency(
   const isRelative = definition.granularity === 'week' || definition.granularity === 'month';
   const isDay = definition.granularity === 'day';
   if ((!isRelative && !isDay) ||
-      (isRelative && (event.resolutionContext === null || event.recurrenceRule !== null)) ||
+      (isRelative && (event.resolutionContext === null || event.recurrenceRule?.version === 1)) ||
       (isDay && event.resolutionContext !== null)) {
     throw new Error('Invalid fuzzy definition consistency');
+  }
+  if(event.recurrenceRule?.version===2){
+    const full=await new SqliteTemporalDefinitionRepository(database).getById(event.temporalDefinitionId);
+    if(!full)throw new Error('Missing relative definition');
+    validateRelativeSeries(event,full);
   }
 }
 
@@ -223,9 +230,16 @@ async function assertSeriesRevision(
 async function loadValidOccurrence(
   database: AppDatabase,
   identity: OccurrenceIdentity,
+  holidayProvider?: HolidayProvider,
 ): Promise<EventAggregate | null> {
   const series = await loadAggregate(database, identity.seriesEventId);
   if (series === null || series.event.recurrenceRule === null) return null;
+  if(series.event.recurrenceRule.version===2){
+    const definition=series.event.temporalType==='fuzzy'?await new SqliteTemporalDefinitionRepository(database).getById(series.event.temporalDefinitionId):null;
+    if(!definition)throw new Error('Missing relative definition');
+    try{resolveRelativeOccurrence(series.event,identity.originalOccurrenceDate,{definitions:[definition],holidayProvider});}catch{return null;}
+    return series;
+  }
   const expanded = expandEventOccurrences({
     events: [series.event],
     from: identity.originalOccurrenceDate,
@@ -239,7 +253,7 @@ async function loadValidOccurrence(
 }
 
 export class SqliteEventRepository implements EventRepository {
-  constructor(private readonly database: AppDatabase) {}
+  constructor(private readonly database: AppDatabase,private readonly holidayProvider?: HolidayProvider) {}
 
   /** 予定本体・例外と同じtransactionで予約の世代を進め、保存後クラッシュから回復する。 */
   private async mutate(task: (transaction: AppDatabase) => Promise<void>): Promise<void> {
@@ -282,7 +296,7 @@ export class SqliteEventRepository implements EventRepository {
   async readTemporalSchedule(calendarId: string, from: string, through: string): Promise<CalendarTemporalSchedule> {
     let result!: CalendarTemporalSchedule;
     await this.database.exclusiveTransaction(async tx => {
-      const schedule = await new SqliteEventRepository(tx).listSchedule(calendarId, from, through);
+      const schedule = await new SqliteEventRepository(tx,this.holidayProvider).listSchedule(calendarId, from, through);
       const rows = await tx.all<TemporalDefinitionRow>('SELECT * FROM temporal_definitions WHERE calendar_id=$calendarId', {$calendarId:calendarId});
       result = { schedule, definitions: rows.map(mapTemporalDefinitionRow), undeterminedFadeMinutes: await new SqliteSettingsRepository(tx).getUndeterminedFadeMinutes() };
     });
@@ -336,7 +350,12 @@ export class SqliteEventRepository implements EventRepository {
   }
 
   async getOccurrenceEditData(identity: OccurrenceIdentity): Promise<OccurrenceEditData | null> {
-    const series = await loadValidOccurrence(this.database, identity);
+    let result:OccurrenceEditData|null=null;
+    await this.database.exclusiveTransaction(async tx=>{result=await new SqliteEventRepository(tx,this.holidayProvider).loadOccurrenceEditData(identity);});
+    return result;
+  }
+  private async loadOccurrenceEditData(identity: OccurrenceIdentity): Promise<OccurrenceEditData | null> {
+    const series = await loadValidOccurrence(this.database, identity, this.holidayProvider);
     if (series === null) return null;
     const rows = await this.database.all<RecurrenceExceptionRow>(
       `SELECT * FROM recurrence_exceptions
@@ -350,7 +369,13 @@ export class SqliteEventRepository implements EventRepository {
     const replacement = exception?.replacementEventId === null || exception === null
       ? null
       : await loadAggregate(this.database, exception.replacementEventId);
-    return { series, exception, replacement, exceptions };
+    let resolvedOccurrence:CalendarEvent|undefined;
+    if(series.event.recurrenceRule?.version===2&&series.event.temporalType==='fuzzy'){
+      const definition=await new SqliteTemporalDefinitionRepository(this.database).getById(series.event.temporalDefinitionId);
+      if(!definition)throw new Error('Missing relative definition');
+      resolvedOccurrence=resolveRelativeOccurrence(series.event,identity.originalOccurrenceDate,{definitions:[definition],holidayProvider:this.holidayProvider});
+    }
+    return { series, exception, replacement, exceptions,...(resolvedOccurrence?{resolvedOccurrence}:{}) };
   }
 
   async saveOccurrenceException(command: SaveOccurrenceExceptionCommand): Promise<void> {
@@ -361,7 +386,7 @@ export class SqliteEventRepository implements EventRepository {
         command.identity.seriesEventId,
         command.expectedSeriesUpdatedAt,
       );
-      const series = await loadValidOccurrence(transaction, command.identity);
+      const series = await loadValidOccurrence(transaction, command.identity,this.holidayProvider);
       if (series === null) throw new Error('Occurrence no longer exists');
       const previous = await transaction.first<RecurrenceExceptionRow>(
         `SELECT * FROM recurrence_exceptions
@@ -424,7 +449,7 @@ export class SqliteEventRepository implements EventRepository {
         command.identity.seriesEventId,
         command.expectedSeriesUpdatedAt,
       );
-      const series = await loadValidOccurrence(transaction, command.identity);
+      const series = await loadValidOccurrence(transaction, command.identity,this.holidayProvider);
       if (series === null) throw new Error('Occurrence no longer exists');
       const previous = await transaction.first<RecurrenceExceptionRow>(
         `SELECT * FROM recurrence_exceptions

@@ -168,6 +168,7 @@ export function mapEventRow(row: EventRow): CalendarEvent {
   if (recurrenceRule === null) return parsed.value;
 
   const withRecurrence = parseCalendarEvent({ ...parsed.value, recurrenceRule });
+  if(!withRecurrence.ok&&recurrenceRule.version===2)throw new CorruptDatabaseRowError('event',row.id);
   return withRecurrence.ok ? withRecurrence.value : parsed.value;
 }
 
@@ -231,11 +232,11 @@ export function mapRecurrenceExceptionRow(row: RecurrenceExceptionRow): Recurren
 }
 
 function parseStoredRecurrenceRule(value: string | null): RecurrenceRule | null {
-  if (typeof value !== 'string') return null;
-  try {
-    const parsed = parseRecurrenceRule(JSON.parse(value) as unknown);
-    return parsed.ok ? parsed.value : null;
-  } catch {
-    return null;
-  }
+  if(typeof value!=='string')return null;
+  let input:unknown;
+  try{input=JSON.parse(value) as unknown;}catch{return null;}
+  const parsed=parseRecurrenceRule(input);
+  if(parsed.ok)return parsed.value;
+  if(typeof input==='object'&&input!==null&&'version' in input&&input.version!==1)throw new CorruptDatabaseRowError('recurrence','unsupported');
+  return null;
 }

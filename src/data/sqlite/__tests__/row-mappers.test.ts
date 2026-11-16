@@ -86,12 +86,12 @@ describe('row mappers', () => {
     expect(event).not.toHaveProperty('duration_minutes');
   });
 
-  it('falls back to no recurrence for malformed or unsupported persisted recurrence JSON', () => {
+  it('旧JSONの破損は従来どおり未指定とし、V2の不整合は拒否する', () => {
     expect(mapEventRow({ ...eventRow, recurrence_rule_json: '{broken' }).recurrenceRule).toBeNull();
-    expect(mapEventRow({
+    expect(()=>mapEventRow({
       ...eventRow,
       recurrence_rule_json: '{"version":2,"frequency":"daily","interval":1,"weekdays":[],"end":{"type":"never"}}',
-    }).recurrenceRule).toBeNull();
+    })).toThrow();
   });
 
   it('書式付きメモJSONを優先して復元する', () => {

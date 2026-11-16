@@ -1,3 +1,5 @@
+import type {HolidayProvider} from '@/domain/calendar/holiday';
+import {deadlineWarningLabel} from '@/domain/calendar/relative-recurrence';
 import { addDays, differenceInCalendarDays, format, parse } from 'date-fns';
 import { expandEventOccurrences } from '@/domain/calendar/event-occurrence';
 import { getReminderTiming } from '@/domain/calendar/event-reminder';
@@ -57,7 +59,7 @@ export function reminderFireAt(
   return wallTime(event.anchorDate, minute - timing.minutesBefore).getTime();
 }
 /** 表示範囲ではなく通知日時を選別し、例外を適用済みの開催だけを予約する。 */
-export function planNotifications(snapshot: NotificationSnapshot, now: Date) {
+export function planNotifications(snapshot: NotificationSnapshot, now: Date, holidayProvider?:HolidayProvider) {
   const requests: PlannedNotification[] = [],
     failures: string[] = [];
   const horizon = addDays(now, NOTIFICATION_HORIZON_DAYS).getTime();
@@ -117,6 +119,7 @@ export function planNotifications(snapshot: NotificationSnapshot, now: Date) {
         },
         from,
         through,
+        environment:{definitions:snapshot.definitions,holidayProvider},
       });
       if (!expanded.ok) {
         failures.push(aggregate.event.id);
@@ -172,7 +175,7 @@ export function planNotifications(snapshot: NotificationSnapshot, now: Date) {
               timedEvent,
               snapshot.definitions,
             );
-            const label = `${occurrence.occurrenceStartDate} ${category === 'exact' && timedEvent.temporalType === 'exact' ? timedEvent.startTime : category === 'all_day' ? '終日' : timedEvent.temporalType === 'fuzzy' ? (snapshot.definitions.find((d) => d.id === timedEvent.temporalDefinitionId)?.label ?? '') : ''}`;
+            const label = `${deadlineWarningLabel(timedEvent)?deadlineWarningLabel(timedEvent)+" ":""}${occurrence.occurrenceStartDate} ${category === 'exact' && timedEvent.temporalType === 'exact' ? timedEvent.startTime : category === 'all_day' ? '終日' : timedEvent.temporalType === 'fuzzy' ? (snapshot.definitions.find((d) => d.id === timedEvent.temporalDefinitionId)?.label ?? '') : ''}`;
             const fingerprint = JSON.stringify([
               fireAt,
               timedEvent.title,

@@ -1,3 +1,4 @@
+import {JapaneseHolidayProvider} from '@/data/holidays/japanese-holiday-provider';
 import { notificationFailure } from './notification-notice-model';
 import {
   createContext,
@@ -49,6 +50,8 @@ export function NotificationProvider({ children }: PropsWithChildren) {
       new NotificationCoordinator(
         repositories.notifications,
         createNotificationDevice(),
+        undefined,
+        new JapaneseHolidayProvider(),
       ),
     [repositories.notifications],
   );

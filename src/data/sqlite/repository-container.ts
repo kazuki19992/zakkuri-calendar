@@ -1,3 +1,5 @@
+import {JapaneseHolidayProvider} from '@/data/holidays/japanese-holiday-provider';
+import type {HolidayProvider} from '@/domain/calendar/holiday';
 import { SqliteNotificationRepository } from './notification-repository';
 import type { NotificationRepository } from '@/domain/notifications/ports';
 import type {
@@ -20,12 +22,12 @@ export type RepositoryContainer = Readonly<{
   settings: SettingsRepository;
 }>;
 
-export function createRepositoryContainer(database: AppDatabase): RepositoryContainer {
+export function createRepositoryContainer(database: AppDatabase, holidayProvider:HolidayProvider=new JapaneseHolidayProvider()): RepositoryContainer {
   return {
     notifications: new SqliteNotificationRepository(database),
     calendars: new SqliteCalendarRepository(database),
     temporalDefinitions: new SqliteTemporalDefinitionRepository(database),
-    events: new SqliteEventRepository(database),
+    events: new SqliteEventRepository(database,holidayProvider),
     settings: new SqliteSettingsRepository(database),
   };
 }

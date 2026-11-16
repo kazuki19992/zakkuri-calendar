@@ -1,4 +1,9 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {useState} from 'react';
+import NativeDateTimePicker from '@expo/ui/community/datetime-picker';
+import {Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {format,parse} from 'date-fns';
+import {isCalendarDate} from '@/domain/calendar/month';
+import {relativePeriodStart} from '@/domain/calendar/relative-recurrence';
 import type { RecurrenceRuleV1 } from '@/domain/calendar/recurrence';
 import { useTheme } from '@/hooks/use-theme';
 import type { RecurrenceDraft, RecurrencePreset } from '../event-editor-model';
@@ -19,7 +24,9 @@ const FREQUENCIES: readonly [RecurrenceRuleV1['frequency'], string][] = [
 const WEEKDAYS: readonly [number, string][] = [[0, '日'], [1, '月'], [2, '火'], [3, '水'], [4, '木'], [5, '金'], [6, '土']];
 const ENDS: readonly [RecurrenceRuleV1['end']['type'], string][] = [['never', '終了なし'], ['until', '日付まで'], ['count', '回数']];
 
-export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFrequencyChange, onIntervalChange, onWeekdayToggle, onEndTypeChange, onUntilDateChange, onCountChange }: Readonly<{
+export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFrequencyChange, onIntervalChange, onWeekdayToggle, onEndTypeChange, onUntilDateChange, onCountChange, relativeFrequency, relativeInitialDate }: Readonly<{
+  relativeFrequency?: 'weekly' | 'monthly';
+  relativeInitialDate?: string;
   draft: RecurrenceDraft;
   disabled: boolean;
   error: string | null;
@@ -32,20 +39,24 @@ export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFre
   onCountChange(value: string): void;
 }>) {
   const theme = useTheme();
+  const [selectingUntil,setSelectingUntil]=useState(false);
+  const relativeEndLabel=relativeFrequency==='weekly'?'対象週まで':'対象月まで';
+  const untilValue=isCalendarDate(draft.untilDate)?parse(draft.untilDate,'yyyy-MM-dd',new Date()):parse(relativeInitialDate??'2000-01-01','yyyy-MM-dd',new Date());
+  const presets=relativeFrequency?PRESETS.filter(([value])=>value==='none'||value==='custom'||value===relativeFrequency):PRESETS;
   const options = <T extends string,>(items: readonly [T, string][]) =>
     items.map(([value, label]) => ({ value, label }));
   return (
     <View style={styles.container}>
-      <EventSingleSelectField label="パターン" value={draft.preset} options={options(PRESETS)}
+      <EventSingleSelectField label="パターン" value={draft.preset} options={options(presets)}
         disabled={disabled} testID="event-editor.recurrence-preset-picker"
         onChange={onPresetChange} />
-      {draft.preset === 'custom' ? (
+      {draft.preset === 'custom' || (relativeFrequency && draft.preset !== 'none') ? (
         <View style={styles.custom}>
-          <EventSingleSelectField label="単位" value={draft.frequency}
+          {!relativeFrequency?<EventSingleSelectField label="単位" value={draft.frequency}
             options={options(FREQUENCIES)} disabled={disabled}
-            testID="event-editor.recurrence-frequency-picker" onChange={onFrequencyChange} />
-          <TextInput accessibilityLabel="繰り返し間隔" keyboardType="number-pad" editable={!disabled} value={draft.intervalText} onChangeText={onIntervalChange} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} />
-          {draft.frequency === 'weekly' ? <><Text style={[styles.caption, { color: theme.textSecondary }]}>曜日</Text><View style={styles.choices}>{WEEKDAYS.map(([weekday, label]) => {
+            testID="event-editor.recurrence-frequency-picker" onChange={onFrequencyChange} />:<Text style={{color:theme.textSecondary}}>{relativeFrequency==='weekly'?'週ごと':'か月ごと'}</Text>}
+          {draft.preset==='custom'?<TextInput accessibilityLabel="繰り返し間隔" keyboardType="number-pad" editable={!disabled} value={draft.intervalText} onChangeText={onIntervalChange} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} />:null}
+          {draft.frequency === 'weekly' && !relativeFrequency ? <><Text style={[styles.caption, { color: theme.textSecondary }]}>曜日</Text><View style={styles.choices}>{WEEKDAYS.map(([weekday, label]) => {
             const selected = draft.weekdays.includes(weekday);
             return <Pressable key={weekday} accessibilityRole="button"
               accessibilityLabel={`${label}曜日`} accessibilityState={{ disabled, selected }}
@@ -61,10 +72,18 @@ export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFre
               </View> : null}
             </Pressable>;
           })}</View></> : null}
-          <EventSingleSelectField label="終了条件" value={draft.endType} options={options(ENDS)}
+          <EventSingleSelectField label="終了条件" value={draft.endType} options={options(relativeFrequency?ENDS.map(([value,label])=>[value,value==='until'?relativeEndLabel:label] as const):ENDS)}
             disabled={disabled} testID="event-editor.recurrence-end-picker"
             onChange={onEndTypeChange} />
-          {draft.endType === 'until' ? <TextInput accessibilityLabel="繰り返し終了日" editable={!disabled} value={draft.untilDate} onChangeText={onUntilDateChange} placeholder="YYYY-MM-DD" placeholderTextColor={theme.textSecondary} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} /> : null}
+          {draft.endType === 'until' && !relativeFrequency ? <TextInput accessibilityLabel="繰り返し終了日" editable={!disabled} value={draft.untilDate} onChangeText={onUntilDateChange} placeholder="YYYY-MM-DD" placeholderTextColor={theme.textSecondary} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} /> : null}
+          {draft.endType==='until'&&relativeFrequency?<>
+            <Pressable accessibilityRole="button" accessibilityLabel={relativeFrequency==='weekly'?'終了する対象週を選択':'終了する対象月を選択'} disabled={disabled} accessibilityState={{disabled}} onPress={()=>setSelectingUntil(true)} style={{minHeight:44,justifyContent:'center'}}>
+              <Text style={{color:theme.calendarAccent}}>{isCalendarDate(draft.untilDate)?relativeFrequency==='monthly'?format(untilValue,'yyyy年M月まで'):`${format(untilValue,'yyyy年M月d日')}の週まで`:'終了する対象期間を選択'}</Text>
+            </Pressable>
+            {selectingUntil?<NativeDateTimePicker testID="relative-recurrence.until-picker" mode="date" value={untilValue}
+              {...(Platform.OS==='android'?{presentation:'dialog' as const}:{locale:'ja_JP',display:'inline' as const})}
+              onDismiss={()=>setSelectingUntil(false)} onValueChange={(_,value)=>{onUntilDateChange(relativePeriodStart(format(value,'yyyy-MM-dd'),relativeFrequency));setSelectingUntil(false);}}/>:null}
+          </>:null}
           {draft.endType === 'count' ? <TextInput accessibilityLabel="繰り返し回数" keyboardType="number-pad" editable={!disabled} value={draft.countText} onChangeText={onCountChange} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} /> : null}
         </View>
       ) : null}

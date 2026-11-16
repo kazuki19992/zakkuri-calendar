@@ -63,3 +63,18 @@ it('非常に大きい間隔でも初回を返し、安全に展開を終える'
   const result=expandEventOccurrences({events:[{...event,recurrenceRule:{...event.recurrenceRule,interval:Number.MAX_SAFE_INTEGER}}],from:'2026-11-01',through:'2027-12-31',environment});
   expect(result.ok&&result.value).toHaveLength(1);
 });
+it.each(definitions.filter(d=>d.granularity!=='day'))('$label の各対象期間を一度ずつ解決する',definition=>{
+  const event=series(definition.key);const before=JSON.stringify(event);
+  const result=expandEventOccurrences({events:[event],from:'2026-11-01',through:'2027-03-31',environment});
+  expect(result.ok).toBe(true);if(!result.ok)return;
+  expect(result.value).toHaveLength(3);expect(new Set(result.value.map(o=>o.occurrenceIdentity?.originalOccurrenceDate)).size).toBe(3);
+  expect(JSON.stringify(event)).toBe(before);
+});
+it('遠い移動例外があっても表示期間の回とその例外だけを解決する',()=>{
+  const original=series('month_end','2027-01-18');if(original.temporalType!=='fuzzy'||original.recurrenceRule?.version!==2)throw new Error('fixture');
+  const event={...original,recurrenceRule:{...original.recurrenceRule,end:{type:'never' as const}}};
+  const lookup=jest.spyOn(definitions,'find');
+  const result=expandEventOccurrences({snapshot:{events:[event],replacementEvents:[{...original,id:'moved',anchorDate:'2027-02-10',endDate:'2027-02-11',recurrenceRule:null}],exceptions:[{seriesEventId:event.id,originalOccurrenceDate:'2030-01-01',kind:'replaced',replacementEventId:'moved',overrideFields:['temporal'],createdAt:'',updatedAt:''}]},from:'2027-02-01',through:'2027-02-28',environment});
+  expect(result.ok&&result.value).toHaveLength(2);
+  expect(lookup.mock.calls.length).toBeLessThanOrEqual(2);lookup.mockRestore();
+});

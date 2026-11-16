@@ -1,6 +1,7 @@
 export type RecurrenceEditScope = 'occurrence' | 'following' | 'series';
 
 export type ScopeRequest = Readonly<{
+  relativePreviews?: Partial<Record<RecurrenceEditScope,readonly string[]>>;
   operation: 'save' | 'delete';
   options: readonly Readonly<{
     scope: RecurrenceEditScope;

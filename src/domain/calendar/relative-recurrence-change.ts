@@ -43,7 +43,7 @@ export function planRelativeFollowingMutation(input:PlanFollowingMutationInput):
   const affected=input.exceptions.filter(e=>e.seriesEventId===source.id&&e.originalOccurrenceDate>=input.boundaryDate);
   const resolved=baseOccurrence(source,input.boundaryDate,environment);
   let next=input.submitted.event;
-  if(changed)next=relocate(next,resolved.anchorDate,environment);
+  if(changed)next=relocate(next,next.temporalType==='fuzzy'&&next.resolutionContext?next.resolutionContext.referenceDate:resolved.anchorDate,environment);
   let rule=next.recurrenceRule;
   if(original.end.type==='count'&&rule?.end.type==='count'&&original.end.count===rule.end.count)rule={...rule,end:{type:'count',count:original.end.count-ordinal}};
   const id=input.createSeriesId();

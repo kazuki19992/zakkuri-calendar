@@ -45,7 +45,7 @@ export function validateRelativeSeries(event:CalendarEvent,definition:TemporalDe
 }
 /** 初回だけ保存snapshotを使い、以降は対象期間内で定義を再適用する。 */
 export function resolveRelativeOccurrence(series:CalendarEvent,period:string,environment:RelativeRecurrenceEnvironment):CalendarEvent {
-  const {event,rule}=relativeSeries(series);const index=relativeOccurrenceIndex(series,period);
+  const {event}=relativeSeries(series);const index=relativeOccurrenceIndex(series,period);
   const definition=environment.definitions.find(d=>d.id===event.temporalDefinitionId);
   if(!definition)throw new Error('Missing relative definition');
   validateRelativeSeries(series,definition);

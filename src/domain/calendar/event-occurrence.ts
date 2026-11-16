@@ -357,8 +357,21 @@ export function expandEventOccurrences(
   let sourceOccurrences: readonly EventOccurrence[];
   try { sourceOccurrences = snapshot.events.flatMap((event) => {
     if (event.recurrenceRule !== null) {
+      if(event.recurrenceRule.version===2){
+        const visible=[...expandRelativeEvent(event,input.from,input.through,input.environment)];
+        const identities=new Set(visible.map(o=>o.occurrenceIdentity?.originalOccurrenceDate));
+        for(const exception of snapshot.exceptions){
+          if(exception.seriesEventId!==event.id||exception.kind!=='replaced'||identities.has(exception.originalOccurrenceDate)||!exception.overrideFields.includes('temporal'))continue;
+          const replacement=replacementById.get(exception.replacementEventId??'');
+          if(!replacement||!intersectsRange(createOccurrence(replacement,replacement.anchorDate,false),input.from,input.through))continue;
+          if(!input.environment)throw new Error('Missing relative environment');
+          const resolved=resolveRelativeOccurrence(event,exception.originalOccurrenceDate,input.environment);
+          visible.push({...createOccurrence(resolved,resolved.anchorDate,true,{seriesEventId:event.id,originalOccurrenceDate:exception.originalOccurrenceDate}),key:`${event.id}:recurrence:${exception.originalOccurrenceDate}`});
+        }
+        return visible;
+      }
       const range = getSeriesExpansionRange(event, snapshot.exceptions, input.from, input.through);
-      return event.recurrenceRule.version===2?expandRelativeEvent(event,range.from,range.through,input.environment):expandRecurringEvent(event, range.from, range.through);
+      return expandRecurringEvent(event, range.from, range.through);
     }
     const occurrence = createOccurrence(event, event.anchorDate, false);
     return intersectsRange(occurrence, input.from, input.through) ? [occurrence] : [];

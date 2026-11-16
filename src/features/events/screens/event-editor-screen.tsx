@@ -60,7 +60,13 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
             {state.endTimeError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.endTimeError}</Text> : null}
           </>)}
           {section('繰り返し', <>
-            <RecurrenceEditor draft={state.recurrenceDraft} disabled={busy || !state.isRecurrenceEditable} error={state.recurrenceError} onPresetChange={state.setRecurrencePreset} onFrequencyChange={state.setRecurrenceFrequency} onIntervalChange={state.setRecurrenceIntervalText} onWeekdayToggle={state.toggleRecurrenceWeekday} onEndTypeChange={state.setRecurrenceEndType} onUntilDateChange={state.setRecurrenceUntilDate} onCountChange={state.setRecurrenceCountText} />
+            <RecurrenceEditor relativeFrequency={state.relativeRecurrence?.frequency} relativeInitialDate={state.relativeRecurrence?.periodAnchorDate} draft={state.recurrenceDraft} disabled={busy || !state.isRecurrenceEditable} error={state.recurrenceError} onPresetChange={state.setRecurrencePreset} onFrequencyChange={state.setRecurrenceFrequency} onIntervalChange={state.setRecurrenceIntervalText} onWeekdayToggle={state.toggleRecurrenceWeekday} onEndTypeChange={state.setRecurrenceEndType} onUntilDateChange={state.setRecurrenceUntilDate} onCountChange={state.setRecurrenceCountText} />
+            {state.relativeRecurrence?<>
+              <Text style={{color:theme.text}}>{state.relativeRecurrence.label}</Text>
+              {state.relativeRecurrence.notice?<Text style={{color:theme.textSecondary}}>{state.relativeRecurrence.notice}</Text>:null}
+              {state.relativeRecurrence.policyDescription?<><Text style={{color:theme.textSecondary}}>{state.relativeRecurrence.policyDescription}</Text><Pressable accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={()=>{void state.relativeRecurrence?.updatePolicy?.();}} style={{minHeight:44,justifyContent:'center'}}><Text style={{color:theme.calendarAccent}}>締切条件を現在の設定に更新</Text></Pressable></>:null}
+              {state.relativeRecurrence.preview.map((label,index)=><Text key={index} style={{color:theme.textSecondary}}>{index===0?'初回':`次の${index}回目`}: {label}</Text>)}
+            </>:null}
             {!state.isRecurrenceEditable ? <Text style={{ color: theme.textSecondary }}>複数日のざっくり予定では現在利用できません</Text> : null}
           </>)}
           {section('カレンダーと色', <View style={styles.group}>

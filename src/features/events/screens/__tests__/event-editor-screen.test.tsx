@@ -1,3 +1,4 @@
+import {InlineNoteSession} from '../../event-note/inline-note-session';
 import { render, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import type { EventEditorState } from '../../hooks/use-event-editor';
@@ -10,6 +11,7 @@ jest.mock('@expo/ui/community/datetime-picker', () => {
 });
 
 const state: EventEditorState = {
+  noteSession:new InlineNoteSession(),isBusy:false,confirmLeave:jest.fn(),canLeave:()=>false,
   exactDurationType: 'fixed', exactDurationStatus: 'ready', setExactDurationType: jest.fn(), retryExactDuration: jest.fn(),
   reminderCategory: 'exact', allowReminderEnd: true, notificationDefaultStatus: 'ready', retryNotificationDefaults: jest.fn(), resetReminderDefaults: jest.fn(), updateReminder: jest.fn(),
   status: 'ready', mode: 'create', title: '', editorTab: 'exact', isAllDay: false, isDateEditable: true,

@@ -1,6 +1,6 @@
+import {useEventLeaveGuard} from '@/features/events/hooks/use-event-leave-guard';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect } from 'react';
-import { BackHandler } from 'react-native';
+import { useCallback } from 'react';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { JapaneseHolidayProvider } from '@/data/holidays/japanese-holiday-provider';
 import { toCalendarDate } from '@/domain/calendar/month';
@@ -42,18 +42,12 @@ export default function NewEventRoute() {
     router.back();
   }, [notifyChanged, router, state]);
 
-  useEffect(() => {
-    if (!state.isSaving && !state.isDeleting) return;
-    const subscription = BackHandler.addEventListener(
-      'hardwareBackPress',
-      () => true,
-    );
-    return () => subscription.remove();
-  }, [state.isDeleting, state.isSaving]);
+  useEventLeaveGuard(state);
+
 
   return (
     <>
-      <Stack.Screen options={{ gestureEnabled: !(state.isSaving || state.isDeleting) }} />
+      <Stack.Screen options={{ gestureEnabled: !state.isBusy }} />
       <EventEditorScreen state={state} onSave={save} onDelete={() => {}} onCancel={router.back} />
     </>
   );

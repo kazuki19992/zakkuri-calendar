@@ -787,3 +787,45 @@ it('開催読込後に定義一覧が更新されても保存には開催読込�
   await act(async () => {expect(await result.current.selectScope('occurrence')).toBe(true);});
   expect(f.repositories.events.saveOccurrenceException).toHaveBeenCalledWith(expect.objectContaining({expectedDefinition:expected,expectedDefinitions:[expected]}));
 });
+
+function attachInlineSession(state:ReturnType<typeof useEventEditor>,document=eventNoteFromPlainText('最後の文字')){
+ const session=state.noteSession;const sessionId=session.getSnapshot().sessionId;
+ const transport={request:jest.fn((requestId:number)=>session.receive({sessionId,requestId,revision:1,document})),release:jest.fn(),blur:jest.fn()};session.attach(transport);session.ready(sessionId);return {session,sessionId,transport};
+}
+it('保存はDOMの最新本文を待ち、通知前の一文字も保存し連打を抑止する',async()=>{
+ const repositories=createRepositories();const {result}=await renderHook(()=>useEventEditor({...repositories,initial,createId:()=> 'inline-created'}));await waitFor(()=>expect(result.current.status).toBe('ready'));
+ await act(async()=>result.current.setTitle('最新メモ'));
+ let f!:ReturnType<typeof attachInlineSession>;await act(async()=>{f=attachInlineSession(result.current);f.transport.request.mockImplementation(()=>{});});
+ let saving!:Promise<boolean>;await act(async()=>{saving=result.current.save();});
+ expect(result.current.isSaving).toBe(true);expect(repositories.events.create).not.toHaveBeenCalled();
+ await act(async()=>{expect(await result.current.save()).toBe(false);f.session.receive({sessionId:f.sessionId,requestId:1,revision:1,document:eventNoteFromPlainText('最後の文字')});expect(await saving).toBe(true);});
+ expect(repositories.events.create.mock.calls[0][0].event.noteDocument).toEqual(eventNoteFromPlainText('最後の文字'));
+});
+it.each(['database','validation'])('%sの失敗後も取得した最新メモを保持する',async reason=>{
+ const repositories=createRepositories();if(reason==='database')repositories.events.create.mockRejectedValue(new Error('failed'));
+ const {result}=await renderHook(()=>useEventEditor({...repositories,initial,createId:()=> 'inline-created'}));await waitFor(()=>expect(result.current.status).toBe('ready'));
+ if(reason==='database')await act(async()=>result.current.setTitle('失敗時保持'));
+ await act(async()=>{attachInlineSession(result.current);expect(await result.current.save()).toBe(false);});
+ expect(result.current.noteDocument).toEqual(eventNoteFromPlainText('最後の文字'));expect(result.current.isSaving).toBe(false);if(reason==='database')expect(repositories.events.create).toHaveBeenCalledTimes(1);
+});
+it.each(['occurrence','following','series'] as const)('範囲%sの保存と取消に最新メモを引き継ぐ',async scope=>{
+ const f=relativeOccurrenceFixture();const {result}=await renderHook(()=>useEventEditor({...f.repositories,initial,createId:()=> 'inline-created',eventId:f.series.id,occurrenceDate:'2027-02-01'}));await waitFor(()=>expect(result.current.status).toBe('ready'));
+ await act(async()=>{attachInlineSession(result.current);await result.current.save();});
+ await act(async()=>result.current.cancelScope());expect(result.current.noteDocument).toEqual(eventNoteFromPlainText('最後の文字'));
+ await act(async()=>{await result.current.save();});await act(async()=>{expect(await result.current.selectScope(scope)).toBe(true);});
+ if(scope==='occurrence')expect(f.repositories.events.saveOccurrenceException.mock.calls[0][0].replacement.event.noteDocument).toEqual(eventNoteFromPlainText('最後の文字'));
+ else expect(f.repositories.events.applyRecurrenceMutation.mock.calls[0][0].plan.nextSeries?.event.noteDocument).toEqual(eventNoteFromPlainText('最後の文字'));
+});
+it('メモを空にして保存でき、未準備の保存では元文書を使う',async()=>{
+ const repositories=createRepositories();repositories.events.getById.mockResolvedValue(exactAggregate);
+ const {result}=await renderHook(()=>useEventEditor({...repositories,initial,eventId:exactEvent.id}));await waitFor(()=>expect(result.current.status).toBe('ready'));
+ await act(async()=>{expect(await result.current.save()).toBe(true);});expect(repositories.events.update.mock.calls[0][0].event.noteDocument).toEqual(exactEvent.noteDocument);
+ await act(async()=>{attachInlineSession(result.current,{version:1,blocks:[]});expect(await result.current.save()).toBe(true);});expect(repositories.events.update.mock.calls[1][0].event.noteDocument).toBeNull();
+});
+it('取消でも最新本文を確認し、変更があれば予定全体の破棄を一度だけ確認する',async()=>{
+ const {Alert}=jest.requireActual<typeof import('react-native')>('react-native');const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
+ const repositories=createRepositories();const {result}=await renderHook(()=>useEventEditor({...repositories,initial,createId:()=> 'inline-created'}));await waitFor(()=>expect(result.current.status).toBe('ready'));
+ await act(async()=>{attachInlineSession(result.current);});let leave!:Promise<boolean>;await act(async()=>{leave=result.current.confirmLeave();});
+ expect(alert).toHaveBeenCalledTimes(1);expect(repositories.events.create).not.toHaveBeenCalled();
+ await act(async()=>{alert.mock.calls[0][2]![0].onPress?.();expect(await leave).toBe(false);});expect(result.current.noteDocument).toEqual(eventNoteFromPlainText('最後の文字'));alert.mockRestore();
+});

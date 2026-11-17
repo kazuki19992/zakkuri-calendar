@@ -1,3 +1,4 @@
+import {deadlineWarningLabel} from '@/domain/calendar/relative-recurrence';
 import type { CalendarEvent } from '@/domain/calendar/event';
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import type { HolidayRangeResult } from '@/domain/calendar/holiday';
@@ -53,7 +54,7 @@ export function getHolidayInfo(
   };
 }
 
-function getTemporalLabel(
+export function getTemporalLabel(
   event: CalendarEvent,
   definitionLabels: ReadonlyMap<string, string>,
 ): string {
@@ -61,9 +62,8 @@ function getTemporalLabel(
   if (event.temporalType === 'allDay') return '終日';
 
   const definitionLabel = definitionLabels.get(event.temporalDefinitionId);
-  return definitionLabel !== undefined && definitionLabel.trim().length > 0
-    ? definitionLabel
-    : 'ざっくり';
+  const label=definitionLabel !== undefined && definitionLabel.trim().length > 0?definitionLabel:'ざっくり';
+  const warning=deadlineWarningLabel(event);return warning?`${label}・${warning}`:label;
 }
 
 export function createAgendaItems(
@@ -83,7 +83,7 @@ export function createAgendaItems(
       ...(occurrence.occurrenceIdentity === null
         ? {}
         : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),
-      title: event.title,
+      title: deadlineWarningLabel(event)?`要確認・${event.title}`:event.title,
       temporalLabel,
       ...(rangeLabel === null ? {} : { rangeLabel }),
       accessibilityLabel: [

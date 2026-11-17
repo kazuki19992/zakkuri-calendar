@@ -112,3 +112,76 @@ it('深夜への範囲変更後も繰り返しと個別例外identityを維持�
   expect((await repos.events.getById('e'))?.event).toEqual(series);
   expect(after.definitions.find(d=>d.id===definition.id)?.resolverConfig).toEqual(patch.resolverConfig);
 });
+
+async function relativeSeriesFixture(){
+  const definition=(await repos.temporalDefinitions.listEnabled('personal-default')).find(d=>d.key==='month_end')!;
+  const event:CalendarEvent={id:'relative-series',calendarId:'personal-default',title:'月末',temporalType:'fuzzy',temporalDefinitionId:definition.id,anchorDate:'2027-01-27',endDate:'2027-01-31',resolutionContext:{version:1,referenceDate:'2027-01-18',periodAnchorDate:'2027-01-01',parameterSnapshot:{}},recurrenceRule:{version:2,kind:'relativePeriod',frequency:'monthly',interval:1,end:{type:'never'},deadlinePolicy:null},location:null,noteDocument:null,colorId:null,createdTimeZoneId:'Asia/Tokyo',createdAt:now,updatedAt:now};
+  await repos.events.create({event,reminders:[{id:'relative-reminder',eventId:event.id,sortOrder:0,timing:{version:1,kind:'relativeDate',anchor:'end',daysBefore:1,time:'09:00'}}]});
+  return {event,definition};
+}
+it('V2を再接続後も保持し、月初identityから月末の回を開く',async()=>{
+  const {event}=await relativeSeriesFixture();
+  await connection.close();connection=await openNodeSqliteDatabase(join(dir,'test.db'));repos=createRepositoryContainer(connection.database);
+  expect((await repos.events.getById(event.id))?.event).toEqual(event);
+  const data=await repos.events.getOccurrenceEditData({seriesEventId:event.id,originalOccurrenceDate:'2027-02-01'});
+  expect(data?.resolvedOccurrence).toMatchObject({anchorDate:'2027-02-24',endDate:'2027-02-28'});
+});
+it('V2の定義編集は元の月と例外identityを保ち、未来の通知を再計算する',async()=>{
+  const {event,definition}=await relativeSeriesFixture();
+  const identity={seriesEventId:event.id,originalOccurrenceDate:'2027-02-01'};
+  await repos.events.deleteOccurrenceException({identity,expectedSeriesUpdatedAt:now,now});
+  const patch={resolverConfig:{kind:'monthLastDays',selectionMonthOffset:0,count:7}} as const;
+  const preview=await repos.temporalDefinitions.previewUpdate(definition.id,patch);
+  await repos.temporalDefinitions.updateDefinition({id:definition.id,patch,token:preview.token,now:'2026-11-18T00:00:00Z'});
+  expect((await repos.events.getById(event.id))?.event).toMatchObject({anchorDate:'2027-01-25',endDate:'2027-01-31'});
+  const snapshot=await repos.notifications.readSnapshot();
+  expect(snapshot.exceptions).toContainEqual(expect.objectContaining(identity));
+  const plan=planNotifications(snapshot,new Date(2027,0,1));
+  expect(plan.failures).toEqual([]);
+  expect(plan.requests.some(request=>request.target.occurrenceDate==='2027-02-01')).toBe(false);
+  expect(plan.requests.some(request=>request.target.occurrenceDate==='2027-03-01')).toBe(true);
+});
+it('V2のmetadata例外を保存しても範囲を月初へ移動しない',async()=>{
+  const {event}=await relativeSeriesFixture();const identity={seriesEventId:event.id,originalOccurrenceDate:'2027-02-01'};
+  const data=await repos.events.getOccurrenceEditData(identity);if(!data?.resolvedOccurrence)throw new Error('missing occurrence');
+  await repos.events.saveOccurrenceException({identity,replacement:{event:{...data.resolvedOccurrence,id:'replacement-v2',title:'個別メモの予定'},reminders:[]},overrideFields:['title'],expectedSeriesUpdatedAt:now,now});
+  const after=await repos.events.getOccurrenceEditData(identity);
+  expect(after?.replacement?.event.title).toBe('個別メモの予定');expect(after?.resolvedOccurrence).toMatchObject({anchorDate:'2027-02-24',endDate:'2027-02-28'});
+});
+it('初回範囲が同じでも元定義が変わったV2変更計画を保存しない',async()=>{
+  const {event,definition}=await relativeSeriesFixture();
+  const initialPatch={resolverConfig:{kind:'monthLastDays',selectionMonthOffset:0,count:30}} as const;
+  let preview=await repos.temporalDefinitions.previewUpdate(definition.id,initialPatch);
+  await repos.temporalDefinitions.updateDefinition({id:definition.id,patch:initialPatch,token:preview.token,now});
+  const source={...event,anchorDate:'2027-02-01',endDate:'2027-02-28',resolutionContext:{version:1 as const,referenceDate:'2027-02-01',periodAnchorDate:'2027-02-01',parameterSnapshot:{}}};
+  await repos.events.update({event:source,reminders:[]});
+  const before=await repos.temporalDefinitions.getById(definition.id);if(!before)throw new Error('missing definition');
+  const patch={resolverConfig:{kind:'monthLastDays',selectionMonthOffset:0,count:31}} as const;
+  preview=await repos.temporalDefinitions.previewUpdate(definition.id,patch);
+  await repos.temporalDefinitions.updateDefinition({id:definition.id,patch,token:preview.token,now:'2026-11-18T00:00:00Z'});
+  expect((await repos.events.getById(event.id))?.event.updatedAt).toBe(now);
+  const target=await repos.temporalDefinitions.getById('personal-default:next_month');if(!target)throw new Error('missing target');
+  await expect(repos.events.applyRecurrenceMutation({seriesId:event.id,expectedSeriesUpdatedAt:now,expectedDefinition:{id:target.id,token:temporalDefinitionToken(target)},expectedDefinitions:[{id:before.id,token:temporalDefinitionToken(before)}],plan:{removePreviousSeries:false,previousSeries:null,nextSeries:{event:{...source,title:'変更',temporalType:'fuzzy',temporalDefinitionId:target.id},reminders:[]},upsertExceptions:[],deleteExceptionIdentities:[],deleteReplacementEventIds:[]}})).rejects.toBeInstanceOf(TemporalConflictError);
+  expect((await repos.events.getById(event.id))?.event.title).toBe('月末');
+});
+
+it('開催解決と同じtransactionで元予定と置換予定の定義tokenを読み、後の更新を拒否する', async () => {
+  const {event,definition} = await relativeSeriesFixture();
+  const identity = {seriesEventId:event.id,originalOccurrenceDate:'2027-02-01'};
+  const data = await repos.events.getOccurrenceEditData(identity);
+  if (!data?.resolvedOccurrence) throw new Error('fixture');
+  const morning = (await repos.temporalDefinitions.listEnabled(event.calendarId)).find(d => d.key === 'morning')!;
+  const replacement = {...data.resolvedOccurrence,temporalType:'fuzzy' as const,id:'snapshot-replacement',temporalDefinitionId:morning.id,anchorDate:'2027-02-24',endDate:'2027-02-24',resolutionContext:null};
+  await repos.events.saveOccurrenceException({identity,replacement:{event:replacement,reminders:[]},overrideFields:['temporal'],expectedSeriesUpdatedAt:now,now});
+  const loaded = await repos.events.getOccurrenceEditData(identity);
+  expect(loaded?.definitionExpectations).toEqual([
+    {id:definition.id,token:temporalDefinitionToken(definition)},
+    {id:morning.id,token:temporalDefinitionToken(morning)},
+  ]);
+  const patch = {fadeInRatio:0.1};
+  const preview = await repos.temporalDefinitions.previewUpdate(definition.id,patch);
+  await repos.temporalDefinitions.updateDefinition({id:definition.id,patch,token:preview.token,now:'2026-11-18T00:00:00Z'});
+  expect((await repos.events.getById(event.id))?.event.updatedAt).toBe(now);
+  await expect(repos.events.saveOccurrenceException({identity,replacement:{event:{...replacement,title:'古い表示から変更'},reminders:[]},overrideFields:['temporal','title'],expectedDefinitions:loaded?.definitionExpectations,expectedSeriesUpdatedAt:now,now})).rejects.toBeInstanceOf(TemporalConflictError);
+  expect((await repos.events.getById(replacement.id))?.event.title).toBe(event.title);
+});

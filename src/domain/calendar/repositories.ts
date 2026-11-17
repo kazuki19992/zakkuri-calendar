@@ -18,6 +18,9 @@ import type {
 import type { RecurrenceMutationPlan } from './recurrence-change';
 
 export type OccurrenceEditData = Readonly<{
+  resolvedOccurrence?: CalendarEvent;
+  /** 開催データと同じ読込snapshotに属する定義の検証値。 */
+  definitionExpectations?: readonly DefinitionExpectation[];
   series: EventAggregate;
   exception: RecurrenceException | null;
   replacement: EventAggregate | null;
@@ -26,6 +29,7 @@ export type OccurrenceEditData = Readonly<{
 
 export type SaveOccurrenceExceptionCommand = Readonly<{
   expectedDefinition?: DefinitionExpectation;
+  expectedDefinitions?: readonly DefinitionExpectation[];
   identity: OccurrenceIdentity;
   replacement: EventAggregate;
   overrideFields: readonly EventOverrideField[];
@@ -41,6 +45,7 @@ export type DeleteOccurrenceExceptionCommand = Readonly<{
 
 export type ApplyRecurrenceMutationCommand = Readonly<{
   expectedDefinition?: DefinitionExpectation;
+  expectedDefinitions?: readonly DefinitionExpectation[];
   seriesId: string;
   expectedSeriesUpdatedAt: string;
   plan: RecurrenceMutationPlan;

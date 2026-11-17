@@ -134,11 +134,12 @@ export function materializeOccurrenceReplacement(input: Readonly<{
   replacementEvent: CalendarEvent;
   overrideFields: readonly EventOverrideField[];
   occurrenceDate: string;
+  resolvedOccurrence?: CalendarEvent;
 }>): CalendarEvent {
   const fields = new Set(input.overrideFields);
   const temporalSource = fields.has('temporal')
     ? { ...input.replacementEvent, recurrenceRule: null }
-    : moveSeriesEventToOccurrence(input.seriesEvent, input.occurrenceDate);
+    : input.resolvedOccurrence ?? moveSeriesEventToOccurrence(input.seriesEvent, input.occurrenceDate);
 
   return {
     ...temporalSource,

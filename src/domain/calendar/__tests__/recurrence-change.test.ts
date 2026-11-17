@@ -165,6 +165,6 @@ describe('繰り返しシリーズの変更計画', () => {
       createSeriesId: () => 'series-2', now: NOW,
     });
 
-    expect(plan.nextSeries?.event.recurrenceRule?.weekdays).toEqual([2]);
+    expect((plan.nextSeries?.event.recurrenceRule?.version===1?plan.nextSeries.event.recurrenceRule.weekdays:undefined)).toEqual([2]);
   });
 });

@@ -1,3 +1,4 @@
+import {validateRelativeSeries} from '@/domain/calendar/relative-recurrence';
 import {getISODay,parse} from 'date-fns';
 import type { CalendarEvent } from '@/domain/calendar/event';
 import { isCalendarDate } from '@/domain/calendar/month';
@@ -38,8 +39,9 @@ export function reResolveTemporalEvent(event: CalendarEvent, definition: Tempora
     if (event.resolutionContext !== null) throw new Error('時間表現の保存形式が不正です');
     return event;
   }
+  if(event.recurrenceRule?.version===2)validateRelativeSeries(event,definition);
   const context = event.resolutionContext;
-  if (context === null || event.recurrenceRule !== null || !isCalendarDate(context.periodAnchorDate)) throw new Error('対象期間を再解決できません');
+  if (context === null || event.recurrenceRule?.version === 1 || !isCalendarDate(context.periodAnchorDate)) throw new Error('対象期間を再解決できません');
   const period = parse(context.periodAnchorDate, 'yyyy-MM-dd', new Date());
   if ((definition.granularity === 'week' && getISODay(period) !== 1) || (definition.granularity === 'month' && period.getDate() !== 1)) throw new Error('対象期間の起点が不正です');
   if (definition.resolverConfig.kind === 'weekRemainder') return event;

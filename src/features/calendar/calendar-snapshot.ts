@@ -88,7 +88,7 @@ export async function loadCalendarSnapshot(input: CalendarSnapshotInput, target:
       result: holidayProvider.list(monthRange.from, monthRange.through),
     };
   });
-  const expanded = expandEventOccurrences({ snapshot: schedule, from: range.from, through: range.through });
+  const expanded = expandEventOccurrences({ snapshot: schedule, from: range.from, through: range.through,environment:{definitions,holidayProvider:input.holidayProvider} });
   if (!expanded.ok) throw new Error('event occurrence expansion failed');
   const occurrences = expanded.value;
 

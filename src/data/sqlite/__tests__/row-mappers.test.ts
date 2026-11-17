@@ -86,12 +86,12 @@ describe('row mappers', () => {
     expect(event).not.toHaveProperty('duration_minutes');
   });
 
-  it('falls back to no recurrence for malformed or unsupported persisted recurrence JSON', () => {
+  it('旧JSONの破損は従来どおり未指定とし、V2の不整合は拒否する', () => {
     expect(mapEventRow({ ...eventRow, recurrence_rule_json: '{broken' }).recurrenceRule).toBeNull();
-    expect(mapEventRow({
+    expect(()=>mapEventRow({
       ...eventRow,
       recurrence_rule_json: '{"version":2,"frequency":"daily","interval":1,"weekdays":[],"end":{"type":"never"}}',
-    }).recurrenceRule).toBeNull();
+    })).toThrow();
   });
 
   it('書式付きメモJSONを優先して復元する', () => {
@@ -170,4 +170,13 @@ describe('row mappers', () => {
     expect(map).toThrow(/(?:event-1|personal-default:morning|reminder-1)/);
     expect(map).not.toThrow(/歯医者/);
   });
+});
+
+it('終了対象が初回より前のV2行を単発や空の予定として受理しない', () => {
+  const row = {...eventRow, temporal_type: 'fuzzy', temporal_definition_id: 'month-end',
+    anchor_date: '2026-11-26', end_date: '2026-11-30',
+    fuzzy_resolution_context_json: JSON.stringify({version:1, referenceDate:'2026-11-18', periodAnchorDate:'2026-11-01', parameterSnapshot:{}}),
+    recurrence_rule_json: JSON.stringify({version:2, kind:'relativePeriod', frequency:'monthly', interval:1,
+      end:{type:'untilPeriod',periodAnchorDate:'2026-10-01'},deadlinePolicy:null})};
+  expect(() => mapEventRow(row)).toThrow(CorruptDatabaseRowError);
 });

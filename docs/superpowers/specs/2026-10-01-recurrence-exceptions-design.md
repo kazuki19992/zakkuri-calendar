@@ -471,3 +471,8 @@ screenは表示とcallbackに限定し、series分割や例外mergeを行わな�
 - きっちり、終日、日内ざっくり予定が同じ操作境界で動作する。
 - SQLite rowや例外内部構造をUIへ漏らさない。
 - lint、typecheck、全自動テストが成功する。
+
+
+## 2026-11-17 後続実装
+
+#61のV2では、identityを週の月曜／月初とし、実期間と区別する。日時だけの単回変更と繰り返し規則の変更を区別し、内容変更時の例外維持、意味変更時のリセット、期間単位の分割へ対応する。 詳細は`2026-11-17-relative-recurrence-design.md`、検証は`docs/verification/2026-11-17-relative-recurrence.md`を参照する。本書の従来リリースの範囲と区別する。

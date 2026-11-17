@@ -1,4 +1,5 @@
-import { render, userEvent } from '@testing-library/react-native';
+import {createScopeRequest} from '../../recurrence-edit-model';
+import { render, userEvent, fireEvent } from '@testing-library/react-native';
 import { RecurrenceScopeDialog } from '../recurrence-scope-dialog';
 
 jest.mock('@/global.css', () => ({}));
@@ -44,4 +45,27 @@ describe('繰り返し予定の範囲選択dialog', () => {
     await user.press(view.getByLabelText('リセットして変更'));
     expect(onSelect).toHaveBeenCalledWith('following');
   });
+});
+
+it('相対予定の範囲を選んだ後に実期間を確認してから保存する',async()=>{
+  const onSelect=jest.fn();
+  const screen=await render(<RecurrenceScopeDialog request={{...createScopeRequest('save',false),relativePreviews:{following:['基準の開始日: 12月3日','初回: 12月1日〜12月5日','終了なし']}}} busy={false} onSelect={onSelect} onCancel={jest.fn()}/>);
+  await fireEvent.press(screen.getByText('これ以降の予定'));
+  expect(onSelect).not.toHaveBeenCalled();expect(screen.getByText('初回: 12月1日〜12月5日')).toBeTruthy();
+  await fireEvent.press(screen.getByText('この内容で変更'));
+  expect(onSelect).toHaveBeenCalledWith('following');
+});
+
+it('時間表現だけの変更では単回を選べて、シリーズ変更だけリセットを確認する',async()=>{
+  const onSelect=jest.fn();
+  const screen=await render(<RecurrenceScopeDialog request={createScopeRequest('save',false,true)} busy={false} onSelect={onSelect} onCancel={jest.fn()}/>);
+  expect(screen.queryByText('1件だけの予定には繰り返し設定を適用できません')).toBeNull();
+  await fireEvent.press(screen.getByLabelText('この予定'));
+  expect(screen.queryByText('現在のシリーズ全体の個別変更をリセットします')).toBeNull();
+  await fireEvent.press(screen.getByLabelText('この内容で変更'));
+  expect(onSelect).toHaveBeenCalledWith('occurrence');
+  await fireEvent.press(screen.getByLabelText('これ以降の予定'));
+  expect(screen.getByText('これ以降の個別変更をリセットします')).toBeTruthy();
+  await fireEvent.press(screen.getByLabelText('リセットして変更'));
+  expect(onSelect).toHaveBeenCalledWith('following');
 });

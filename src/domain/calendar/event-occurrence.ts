@@ -1,3 +1,4 @@
+import {relativePeriodAt,relativePeriodStart,relativeSeries,resolveRelativeOccurrence,type RelativeRecurrenceEnvironment} from './relative-recurrence';
 import {
   addDays,
   addMonths,
@@ -125,7 +126,7 @@ function expandDaily(
   through: string,
 ): readonly EventOccurrence[] {
   const rule = event.recurrenceRule;
-  if (rule === null) return [];
+  if (rule === null || rule.version !== 1) return [];
   const dayDifference = differenceInCalendarDays(
     parseCalendarDate(searchFrom),
     parseCalendarDate(event.anchorDate),
@@ -151,7 +152,7 @@ function expandWeekly(
   through: string,
 ): readonly EventOccurrence[] {
   const rule = event.recurrenceRule;
-  if (rule === null || rule.weekdays.length === 0) return [];
+  if (rule === null || rule.version !== 1 || rule.weekdays.length === 0) return [];
 
   const anchorDate = parseCalendarDate(event.anchorDate);
   const anchorWeek = startOfWeek(anchorDate, { weekStartsOn: 1 });
@@ -206,7 +207,7 @@ function expandMonthly(
   through: string,
 ): readonly EventOccurrence[] {
   const rule = event.recurrenceRule;
-  if (rule === null) return [];
+  if (rule === null || rule.version !== 1) return [];
   const anchorDate = parseCalendarDate(event.anchorDate);
   const anchorMonth = startOfMonth(anchorDate);
   const monthDifference = differenceInCalendarMonths(
@@ -242,7 +243,7 @@ function expandYearly(
   through: string,
 ): readonly EventOccurrence[] {
   const rule = event.recurrenceRule;
-  if (rule === null) return [];
+  if (rule === null || rule.version !== 1) return [];
   const anchorDate = parseCalendarDate(event.anchorDate);
   const anchorYear = startOfYear(anchorDate);
   const yearDifference = differenceInCalendarYears(
@@ -278,7 +279,7 @@ function expandRecurringEvent(
   through: string,
 ): readonly EventOccurrence[] {
   const rule = event.recurrenceRule;
-  if (rule === null) return [];
+  if (rule === null || rule.version !== 1) return [];
   const searchFrom = addCalendarDays(from, -getOccurrenceSpanDays(event));
   const occurrences = rule.frequency === 'daily'
     ? expandDaily(event, searchFrom, through)
@@ -293,10 +294,27 @@ function expandRecurringEvent(
 type EventOccurrenceExpansionInput = Readonly<{
   from: string;
   through: string;
+  environment?: RelativeRecurrenceEnvironment;
 }> & (
   | Readonly<{ events: readonly CalendarEvent[]; snapshot?: never }>
   | Readonly<{ snapshot: CalendarScheduleSnapshot; events?: never }>
 );
+
+function expandRelativeEvent(event: CalendarEvent, from: string, through: string, environment?: RelativeRecurrenceEnvironment): readonly EventOccurrence[] {
+  if (!environment) throw new Error('Missing relative environment');
+  const {rule,context}=relativeSeries(event);
+  const distance=rule.frequency==='weekly'
+    ?differenceInCalendarWeeks(parseCalendarDate(relativePeriodStart(from,rule.frequency)),parseCalendarDate(context.periodAnchorDate),{weekStartsOn:1})
+    :differenceInCalendarMonths(parseCalendarDate(relativePeriodStart(from,rule.frequency)),parseCalendarDate(context.periodAnchorDate));
+  const output:EventOccurrence[]=[];
+  for(let index=Math.max(0,Math.floor(distance/rule.interval));;index++){
+    const period=relativePeriodAt(event,index);
+    if(!period||period>through||(rule.end.type==='count'&&index>=rule.end.count)||(rule.end.type==='untilPeriod'&&period>rule.end.periodAnchorDate))break;
+    const resolved=resolveRelativeOccurrence(event,period,environment);
+    output.push({...createOccurrence(resolved,resolved.anchorDate,true,{seriesEventId:event.id,originalOccurrenceDate:period}),key:`${event.id}:recurrence:${period}`});
+  }
+  return output;
+}
 
 function exceptionKey(identity: OccurrenceIdentity): string {
   return `${identity.seriesEventId}\u0000${identity.originalOccurrenceDate}`;
@@ -336,14 +354,30 @@ export function expandEventOccurrences(
     return fail('exceptions', 'replacement event must exist');
   }
 
-  const sourceOccurrences = snapshot.events.flatMap((event) => {
+  let sourceOccurrences: readonly EventOccurrence[];
+  try { sourceOccurrences = snapshot.events.flatMap((event) => {
     if (event.recurrenceRule !== null) {
+      if(event.recurrenceRule.version===2){
+        const visible=[...expandRelativeEvent(event,input.from,input.through,input.environment)];
+        const identities=new Set(visible.map(o=>o.occurrenceIdentity?.originalOccurrenceDate));
+        for(const exception of snapshot.exceptions){
+          if(exception.seriesEventId!==event.id||exception.kind!=='replaced'||identities.has(exception.originalOccurrenceDate)||!exception.overrideFields.includes('temporal'))continue;
+          const replacement=replacementById.get(exception.replacementEventId??'');
+          if(!replacement||!intersectsRange(createOccurrence(replacement,replacement.anchorDate,false),input.from,input.through))continue;
+          if(!input.environment)throw new Error('Missing relative environment');
+          const resolved=resolveRelativeOccurrence(event,exception.originalOccurrenceDate,input.environment);
+          visible.push({...createOccurrence(resolved,resolved.anchorDate,true,{seriesEventId:event.id,originalOccurrenceDate:exception.originalOccurrenceDate}),key:`${event.id}:recurrence:${exception.originalOccurrenceDate}`});
+        }
+        return visible;
+      }
       const range = getSeriesExpansionRange(event, snapshot.exceptions, input.from, input.through);
       return expandRecurringEvent(event, range.from, range.through);
     }
     const occurrence = createOccurrence(event, event.anchorDate, false);
     return intersectsRange(occurrence, input.from, input.through) ? [occurrence] : [];
   });
+
+  } catch { return fail('recurrenceRule','Unable to resolve recurrence'); }
 
   const occurrences = sourceOccurrences.flatMap((occurrence): readonly EventOccurrence[] => {
     if (occurrence.occurrenceIdentity === null) return [occurrence];
@@ -357,6 +391,7 @@ export function expandEventOccurrences(
       replacementEvent,
       overrideFields: exception.overrideFields,
       occurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate,
+      ...(snapshot.events.find(event=>event.id===occurrence.eventId)?.recurrenceRule?.version===2?{resolvedOccurrence:occurrence.event}:{}),
     });
     const replacementOccurrence = createOccurrence(
       event,

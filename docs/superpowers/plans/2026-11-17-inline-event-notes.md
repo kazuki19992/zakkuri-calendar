@@ -76,7 +76,7 @@
 - [x] typecheck/lint/全Jest/diff check、iOS/Android export、DST専用TZを確認する。
 - [x] README・旧メモ設計・本設計・検証記録を更新する。OSのスクロール・IME・アクセシビリティ・再起動は実機未確認として明示する。
 - [x] 一度の独立レビューを行い、重要指摘は自分でRED→GREENと全体検証により一回の修正工程で解消する。
-- [ ] develop向け通常Open PR（Closes #62）を作成しattach。Issue #62と#1を根拠に沿って更新。Botの再レビューは待たない。
+- [x] develop向け通常Open PR（Closes #62）を作成しattach。Issue #62と#1を根拠に沿って更新。Botの再レビューは待たない。
 
 ## 実行方針
 
@@ -85,3 +85,5 @@
 - 2026-11-17: Tasks 1〜4完了。文書セッション、IME待機、最新本文の保存、範囲確認中の固定、取消・戻る、inline UIを接続した。全体981 tests成功。独立レビューとPR作成は未完了。
 
 - 2026-11-17: 独立レビューの重要2件を3つの再現テストで修正。全体984 tests・型チェック・lint・iOS export成功。最終Android exportとPR作成を進める。
+
+- 2026-11-17: 最終Android exportも成功。[PR #66](https://github.com/kazuki19992/zakkuri-calendar/pull/66)をdevelop向けOpen PRとして作成し、Issue #62と#1へ実装・自動検証と実機未確認の状態を反映。全タスク完了、マージ待ち。

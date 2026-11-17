@@ -2,7 +2,7 @@
 
 ## 対象
 
-Issue #62。全画面Modalを予定フォーム内のエディタへ置き換え、予定全体の保存・取消へ統合する。DBの文書JSON・テキスト投影・schema version 7・既存の対応書式とURL制限は維持する。依存追加・migrationはない。
+Issue #62、[PR #66](https://github.com/kazuki19992/zakkuri-calendar/pull/66)。対象コードcommit `cc178c2`（以降の文書だけの更新を除く）。全画面Modalを予定フォーム内のエディタへ置き換え、予定全体の保存・取消へ統合する。DBの文書JSON・テキスト投影・schema version 7・既存の対応書式とURL制限は維持する。依存追加・migrationはない。
 
 設計: `docs/superpowers/specs/2026-11-17-inline-event-notes-design.md`。計画: `docs/superpowers/plans/2026-11-17-inline-event-notes.md`。
 

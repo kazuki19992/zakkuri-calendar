@@ -693,3 +693,48 @@ it('タブごとに繰り返し入力を保持し、きっちりの変更をざ�
   await act(async()=>result.current.setEditorTab('exact'));await act(async()=>result.current.setRecurrencePreset('daily'));
   await act(async()=>result.current.setEditorTab('fuzzy'));expect(result.current.recurrenceDraft.preset).toBe('weekly');
 });
+
+function relativeOccurrenceFixture(){
+  const repositories=createRepositories();
+  const definition={...nextWeek,id:'v2-source-month',key:'month_end',label:'月末',granularity:'month' as const,resolverConfig:{kind:'monthLastDays',selectionMonthOffset:0,count:5} as const};
+  const other={...definition,id:'v2-target-month',key:'month_start',label:'月初',resolverConfig:{kind:'monthDays',selectionMonthOffset:0,startDay:1,endDay:5} as const};
+  const series={...exactEvent,temporalType:'fuzzy' as const,temporalDefinitionId:definition.id,anchorDate:'2027-01-27',endDate:'2027-01-31',resolutionContext:{version:1 as const,referenceDate:'2027-01-18',periodAnchorDate:'2027-01-01',parameterSnapshot:{}},recurrenceRule:{version:2 as const,kind:'relativePeriod' as const,frequency:'monthly' as const,interval:1,end:{type:'count' as const,count:5},deadlinePolicy:null}};
+  const resolved={...series,anchorDate:'2027-02-24',endDate:'2027-02-28',resolutionContext:{...series.resolutionContext,referenceDate:'2027-02-01',periodAnchorDate:'2027-02-01'},recurrenceRule:null};
+  const data={series:{event:series,reminders:[]},resolvedOccurrence:resolved,exception:null,replacement:null,exceptions:[]};
+  repositories.events.getOccurrenceEditData.mockResolvedValue(data);repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning,definition,other,nextWeek]);
+  return {repositories,definition,other,series,resolved,data};
+}
+it.each(['same','week','exact'])('V2から%sへ日時だけ変更する単回例外を作成できる',async mode=>{
+  const f=relativeOccurrenceFixture();const {result}=await renderHook(()=>useEventEditor({...f.repositories,initial,eventId:f.series.id,occurrenceDate:'2027-02-01',createId:()=> 'single-v2',now:()=> '2026-11-17T00:00:00Z'}));
+  await waitFor(()=>expect(result.current.status).toBe('ready'));
+  await act(async()=>{if(mode==='exact')result.current.setEditorTab('exact');else result.current.selectDefinition(mode==='same'?f.other.id:nextWeek.id);});
+  await act(async()=>{expect(await result.current.save()).toBe(false);});
+  expect(result.current.scopeRequest?.options.map(o=>o.scope)).toContain('occurrence');
+  await act(async()=>{expect(await result.current.selectScope('occurrence')).toBe(true);});
+  expect(f.repositories.events.saveOccurrenceException).toHaveBeenCalledWith(expect.objectContaining({overrideFields:expect.arrayContaining(['temporal']),replacement:expect.objectContaining({event:expect.objectContaining({recurrenceRule:null,temporalType:mode==='exact'?'exact':'fuzzy'})})}));
+});
+it('月シリーズの週単位の個別例外を再度開いてタイトルだけ編集できる',async()=>{
+  const f=relativeOccurrenceFixture();const replacement={...f.resolved,id:'week-override',temporalDefinitionId:nextWeek.id,anchorDate:'2027-02-22',endDate:'2027-02-24',resolutionContext:{version:1 as const,referenceDate:'2027-02-22',periodAnchorDate:'2027-02-22',parameterSnapshot:{}}};
+  f.repositories.events.getOccurrenceEditData.mockResolvedValue({...f.data,replacement:{event:replacement,reminders:[]},exception:{seriesEventId:f.series.id,originalOccurrenceDate:'2027-02-01',kind:'replaced',replacementEventId:replacement.id,overrideFields:['temporal'],createdAt:'old',updatedAt:'old'}});
+  const {result}=await renderHook(()=>useEventEditor({...f.repositories,initial,eventId:f.series.id,occurrenceDate:'2027-02-01',createId:()=> 'single-v2',now:()=> '2026-11-17T00:00:00Z'}));
+  await waitFor(()=>expect(result.current.status).toBe('ready'));expect(result.current.isSaveDisabled).toBe(false);
+  await act(async()=>result.current.setTitle('タイトルだけ変更'));
+  await act(async()=>{await result.current.save();});await act(async()=>{expect(await result.current.selectScope('occurrence')).toBe(true);});
+  expect(f.repositories.events.saveOccurrenceException).toHaveBeenCalledWith(expect.objectContaining({overrideFields:expect.arrayContaining(['temporal','title']),replacement:expect.objectContaining({event:expect.objectContaining({anchorDate:'2027-02-22',endDate:'2027-02-24'})})}));
+});
+it('保存済みの月単発からカスタム2か月ごとへ変換できる',async()=>{
+  const f=relativeOccurrenceFixture();f.repositories.events.getById.mockResolvedValue({event:{...f.series,recurrenceRule:null},reminders:[]});
+  const {result}=await renderHook(()=>useEventEditor({...f.repositories,initial,eventId:f.series.id,now:()=> '2026-11-17T00:00:00Z'}));await waitFor(()=>expect(result.current.status).toBe('ready'));
+  await act(async()=>{result.current.setRecurrencePreset('custom');result.current.setRecurrenceIntervalText('2');});
+  await act(async()=>{expect(await result.current.save()).toBe(true);});
+  expect(f.repositories.events.update.mock.calls[0][0].event.recurrenceRule).toMatchObject({version:2,frequency:'monthly',interval:2});
+});
+it('保存済み単発から毎週へ変換するときもタブ往復では締切snapshotを置換しない',async()=>{
+  const repositories=createRepositories();const definition={...nextWeek,id:'saved-single-deadline',key:'this_week',label:'今週中',resolverConfig:{kind:'weekRemainder',selectionWeekOffset:0} as const};
+  const event={...exactEvent,temporalType:'fuzzy' as const,temporalDefinitionId:definition.id,anchorDate:'2026-11-18',endDate:'2026-11-20',resolutionContext:{version:1 as const,referenceDate:'2026-11-18',periodAnchorDate:'2026-11-16',parameterSnapshot:{thisWeekDeadlineWeekday:5 as const}},recurrenceRule:null};
+  repositories.events.getById.mockResolvedValue({event,reminders:[]});repositories.temporalDefinitions.listEnabled.mockResolvedValue([definition]);repositories.settings.getThisWeekDeadlineWeekday.mockResolvedValue(7);
+  const {result}=await renderHook(()=>useEventEditor({...repositories,initial,eventId:event.id,now:()=> '2026-11-17T00:00:00Z'}));await waitFor(()=>expect(result.current.status).toBe('ready'));
+  await act(async()=>result.current.setEditorTab('exact'));await act(async()=>result.current.setEditorTab('fuzzy'));await act(async()=>result.current.setRecurrencePreset('weekly'));
+  await act(async()=>{expect(await result.current.save()).toBe(true);});
+  expect(repositories.events.update.mock.calls[0][0].event).toMatchObject({endDate:'2026-11-20',recurrenceRule:{deadlinePolicy:{weekday:5}}});
+});

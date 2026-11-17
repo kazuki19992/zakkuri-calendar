@@ -1,10 +1,15 @@
 import {addDays,differenceInCalendarDays,format,parse} from 'date-fns';
 import type {CalendarEvent} from './event';
+import type {RecurrenceRule} from './recurrence';
 import type {EventAggregate} from './event-reminder';
 import type {PlanFollowingMutationInput,PlanSeriesMutationInput,RecurrenceMutationPlan} from './recurrence-change';
 import {expandEventOccurrences} from './event-occurrence';
 import {rebaseRelativeSeries,relativeOccurrenceIndex,resolveRelativeOccurrence,type RelativeRecurrenceEnvironment} from './relative-recurrence';
 const equal=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
+export function recurrenceStructureChanged(before:RecurrenceRule|null,after:RecurrenceRule|null):boolean {
+  if(before?.version===2&&after?.version===2)return !equal({frequency:before.frequency,interval:before.interval,end:before.end},{frequency:after.frequency,interval:after.interval,end:after.end});
+  return !equal(before,after);
+}
 export function relativeMeaningChanged(before:CalendarEvent,after:CalendarEvent):boolean {
   if(before.recurrenceRule?.version!==2&&after.recurrenceRule?.version!==2)return false;
   return !equal(before.recurrenceRule,after.recurrenceRule)||before.temporalType!==after.temporalType||
@@ -37,13 +42,11 @@ function relocate(candidate:CalendarEvent,reference:string,environment:RelativeR
   return {...candidate,anchorDate:reference,...(candidate.temporalType!=='exact'?{endDate:format(addDays(parse(candidate.endDate,'yyyy-MM-dd',new Date()),delta),'yyyy-MM-dd')}:{})};
 }
 export function planRelativeFollowingMutation(input:PlanFollowingMutationInput):RecurrenceMutationPlan{
-  const environment=input.environment??{definitions:[]},source=input.series.event,original=source.recurrenceRule;
+  const source=input.series.event,original=source.recurrenceRule;
   if(!original)throw new Error('Missing recurrence');
   const ordinal=countBefore(source,input.boundaryDate),changed=relativeMeaningChanged(source,input.submitted.event);
   const affected=input.exceptions.filter(e=>e.seriesEventId===source.id&&e.originalOccurrenceDate>=input.boundaryDate);
-  const resolved=baseOccurrence(source,input.boundaryDate,environment);
-  let next=input.submitted.event;
-  if(changed)next=relocate(next,next.temporalType==='fuzzy'&&next.resolutionContext?next.resolutionContext.referenceDate:resolved.anchorDate,environment);
+  const next=input.submitted.event;
   let rule=next.recurrenceRule;
   if(original.end.type==='count'&&rule?.end.type==='count'&&original.end.count===rule.end.count)rule={...rule,end:{type:'count',count:original.end.count-ordinal}};
   const id=input.createSeriesId();
@@ -60,6 +63,13 @@ export function planRelativeSeriesMutation(input:PlanSeriesMutationInput):Recurr
   if(!changed){
     const candidate=input.submitted.event;
     next={...source,title:candidate.title,location:candidate.location,noteDocument:candidate.noteDocument,colorId:candidate.colorId};
+  }else if(input.boundaryDate===(source.temporalType==='fuzzy'?source.resolutionContext?.periodAnchorDate:source.anchorDate)){
+    // 初回を変更する場合、提出された解決済み期間を再度selection offset前へ戻さない。
+    next=input.submitted.event;
+  }else if(input.submitted.event.recurrenceRule===null&&source.recurrenceRule?.version===2){
+    const occurrence=baseOccurrence(source,input.boundaryDate,environment),candidate=input.submitted.event;
+    const sameTime=candidate.temporalType==='fuzzy'&&occurrence.temporalType==='fuzzy'&&candidate.temporalDefinitionId===occurrence.temporalDefinitionId&&candidate.anchorDate===occurrence.anchorDate&&candidate.endDate===occurrence.endDate&&equal(candidate.resolutionContext,occurrence.resolutionContext);
+    next=sameTime?{...source,title:candidate.title,location:candidate.location,noteDocument:candidate.noteDocument,colorId:candidate.colorId,recurrenceRule:null}:relocate(candidate,source.anchorDate,environment);
   }else next=relocate(input.submitted.event,source.anchorDate,environment);
   const nextSeries:EventAggregate={event:{...next,id:source.id,createdAt:source.createdAt,updatedAt:input.now},reminders:input.submitted.reminders.map(r=>({...r,eventId:source.id}))};
   return {removePreviousSeries:false,previousSeries:null,nextSeries,upsertExceptions:changed?[]:input.exceptions,

@@ -19,12 +19,13 @@ const OPTIONS: ScopeRequest['options'] = [
 export function createScopeRequest(
   operation: ScopeRequest['operation'],
   recurrenceChanged: boolean,
+  seriesMeaningChanged = false,
 ): ScopeRequest {
   return {
     operation,
     options: recurrenceChanged
       ? OPTIONS.filter((option) => option.scope !== 'occurrence')
       : OPTIONS,
-    needsExceptionResetConfirmation: recurrenceChanged,
+    needsExceptionResetConfirmation: recurrenceChanged || seriesMeaningChanged,
   };
 }

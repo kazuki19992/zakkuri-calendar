@@ -1,4 +1,4 @@
-import {planRelativeFollowingMutation,planRelativeSeriesMutation,relativeMeaningChanged} from './relative-recurrence-change';
+import {planRelativeFollowingMutation,planRelativeSeriesMutation,recurrenceStructureChanged} from './relative-recurrence-change';
 import {resolveRelativeOccurrence,type RelativeRecurrenceEnvironment} from './relative-recurrence';
 import { getReminderTiming } from './event-reminder';
 import { addDays, addYears, differenceInCalendarDays, format, parse } from 'date-fns';
@@ -78,7 +78,7 @@ export function getChangedEventFields(
   if (before.event.colorId !== after.event.colorId) changed.push('color');
   if (!jsonEqual(before.reminders.map(getReminderTiming),
     after.reminders.map(getReminderTiming))) changed.push('reminders');
-  if (!jsonEqual(before.event.recurrenceRule, after.event.recurrenceRule) || relativeMeaningChanged(before.event,after.event)) changed.push('recurrence');
+  if (recurrenceStructureChanged(before.event.recurrenceRule,after.event.recurrenceRule)) changed.push('recurrence');
   return changed;
 }
 
@@ -103,7 +103,7 @@ export function buildSeriesScopedAggregate(input: Readonly<{
     event: {
       ...event,
       id: input.series.event.id,
-      recurrenceRule: changed.has('recurrence')
+      recurrenceRule: (changed.has('recurrence') || (changed.has('temporal')&&input.series.event.recurrenceRule?.version===2&&input.submitted.event.recurrenceRule?.version===2))
         ? input.submitted.event.recurrenceRule
         : input.series.event.recurrenceRule,
       createdAt: input.series.event.createdAt,

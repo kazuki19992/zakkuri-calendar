@@ -61,6 +61,7 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
           </>)}
           {section('繰り返し', <>
             <RecurrenceEditor relativeFrequency={state.relativeRecurrence?.frequency} relativeInitialDate={state.relativeRecurrence?.periodAnchorDate} draft={state.recurrenceDraft} disabled={busy || !state.isRecurrenceEditable} error={state.recurrenceError} onPresetChange={state.setRecurrencePreset} onFrequencyChange={state.setRecurrenceFrequency} onIntervalChange={state.setRecurrenceIntervalText} onWeekdayToggle={state.toggleRecurrenceWeekday} onEndTypeChange={state.setRecurrenceEndType} onUntilDateChange={state.setRecurrenceUntilDate} onCountChange={state.setRecurrenceCountText} />
+            {state.occurrenceRecurrenceNotice?<Text style={{color:theme.textSecondary}}>{state.occurrenceRecurrenceNotice}</Text>:null}
             {state.relativeRecurrence?<>
               <Text style={{color:theme.text}}>{state.relativeRecurrence.label}</Text>
               {state.relativeRecurrence.notice?<Text style={{color:theme.textSecondary}}>{state.relativeRecurrence.notice}</Text>:null}

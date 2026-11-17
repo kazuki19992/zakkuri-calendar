@@ -55,3 +55,17 @@ it('相対予定の範囲を選んだ後に実期間を確認してから保存�
   await fireEvent.press(screen.getByText('この内容で変更'));
   expect(onSelect).toHaveBeenCalledWith('following');
 });
+
+it('時間表現だけの変更では単回を選べて、シリーズ変更だけリセットを確認する',async()=>{
+  const onSelect=jest.fn();
+  const screen=await render(<RecurrenceScopeDialog request={createScopeRequest('save',false,true)} busy={false} onSelect={onSelect} onCancel={jest.fn()}/>);
+  expect(screen.queryByText('1件だけの予定には繰り返し設定を適用できません')).toBeNull();
+  await fireEvent.press(screen.getByLabelText('この予定'));
+  expect(screen.queryByText('現在のシリーズ全体の個別変更をリセットします')).toBeNull();
+  await fireEvent.press(screen.getByLabelText('この内容で変更'));
+  expect(onSelect).toHaveBeenCalledWith('occurrence');
+  await fireEvent.press(screen.getByLabelText('これ以降の予定'));
+  expect(screen.getByText('これ以降の個別変更をリセットします')).toBeTruthy();
+  await fireEvent.press(screen.getByLabelText('リセットして変更'));
+  expect(onSelect).toHaveBeenCalledWith('following');
+});

@@ -3,7 +3,7 @@ import type {FuzzyResolutionContextV1,EventValidationError} from '@/domain/calen
 import type {TemporalDefinition} from '@/domain/temporal/temporal-definition';
 import {relativePeriodStart} from '@/domain/calendar/relative-recurrence';
 import type {Result} from '@/domain/shared/result';
-import type {RecurrenceDraft} from './event-editor-model';
+import {getRecurrenceDraft,type RecurrenceDraft} from './event-editor-model';
 export function buildRelativeRecurrenceRule(draft:RecurrenceDraft,definition:TemporalDefinition,context:FuzzyResolutionContextV1):Result<RelativeRecurrenceRuleV2|null,EventValidationError>{
   const fail=(message:string):Result<never,EventValidationError>=>({ok:false,error:{field:'recurrenceRule',message}});
   if(draft.preset==='none')return {ok:true,value:null};
@@ -31,4 +31,10 @@ export function relativeEndDescription(rule:import('@/domain/calendar/recurrence
   if(rule.end.type==='count')return `${rule.end.count}回`;
   if(rule.end.type==='untilPeriod'){const [year,month,day]=rule.end.periodAnchorDate.split('-').map(Number);return rule.frequency==='weekly'?`${year}年${month}月${day}日の週まで`:`${year}年${month}月まで`;}
   return `${rule.end.date}まで`;
+}
+
+/** 単回の日時候補と、シリーズへ適用する場合の規則を分離する。 */
+export function inheritRelativeRecurrenceRule(source:RelativeRecurrenceRuleV2,definition:TemporalDefinition,context:FuzzyResolutionContextV1):Result<RelativeRecurrenceRuleV2|null,EventValidationError>{
+  if((definition.granularity==='week'?'weekly':definition.granularity==='month'?'monthly':null)!==source.frequency)return {ok:false,error:{field:'recurrenceRule',message:'単位を変更する場合は繰り返しを選び直してください'}};
+  return buildRelativeRecurrenceRule({...getRecurrenceDraft(source,context.referenceDate),preset:'custom'},definition,context);
 }

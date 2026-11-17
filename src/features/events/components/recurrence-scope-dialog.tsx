@@ -16,7 +16,8 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Rea
   if (request === null) return null;
   const title = request.operation === 'delete' ? '削除する範囲' : '変更する範囲';
   const preview=confirmationScope?request.relativePreviews?.[confirmationScope]:undefined;
-  const confirmText=request.needsExceptionResetConfirmation?'リセットして変更':'この内容で変更';
+  const resetNeeded=request.needsExceptionResetConfirmation&&confirmationScope!=='occurrence';
+  const confirmText=resetNeeded?'リセットして変更':'この内容で変更';
   const confirmationLabel = confirmationScope === 'following'
     ? 'これ以降の個別変更をリセットします'
     : '現在のシリーズ全体の個別変更をリセットします';
@@ -32,16 +33,16 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Rea
           borderColor: theme.calendarBorder,
         }]}>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-            {confirmationScope === null ? title : request.needsExceptionResetConfirmation?'個別変更のリセット':'変更内容の確認'}
+            {confirmationScope === null ? title : resetNeeded?'個別変更のリセット':'変更内容の確認'}
           </Text>
-          {confirmationScope === null && request.needsExceptionResetConfirmation ? (
+          {confirmationScope === null && request.needsExceptionResetConfirmation && !request.options.some(option=>option.scope==='occurrence') ? (
             <Text style={[styles.warning, { color: theme.textSecondary }]}>
               1件だけの予定には繰り返し設定を適用できません
             </Text>
           ) : null}
           {confirmationScope !== null ? (
             <>
-              {request.needsExceptionResetConfirmation?<Text style={[styles.warning, { color: theme.textSecondary }]}>{confirmationLabel}</Text>:null}
+              {resetNeeded?<Text style={[styles.warning, { color: theme.textSecondary }]}>{confirmationLabel}</Text>:null}
               {preview?.map((line,index)=><Text key={index} style={[styles.warning,{color:theme.text}]}>{line}</Text>)}
               <Pressable accessibilityRole="button" accessibilityLabel={confirmText}
                 accessibilityState={{ disabled: busy }} disabled={busy}

@@ -35,3 +35,18 @@ it('繰り返しを外す全体変更では初回の期間を単発として残�
   const next=submitted();const plan=planSeriesMutation({series,boundaryDate:'2027-02-01',submitted:{...next,event:{...next.event,recurrenceRule:null}},exceptions:[exception],now:'new',environment});
   expect(plan.nextSeries?.event).toMatchObject({anchorDate:'2027-01-27',endDate:'2027-01-31',recurrenceRule:null});
 });
+it.each([
+  ['next_week','interval'],['next_week','stop'],['next_month','interval'],['next_month','stop'],
+])('%sの初回を%s変更しても選択offset適用前へ戻さない',(key,change)=>{
+  const definition=definitions.find(d=>d.key===key)!;const result=resolveRelativeDateRange('2026-11-18',definition,5);if(!result.ok)throw new Error('fixture');
+  const current:CalendarEvent={...event,temporalType:'fuzzy',temporalDefinitionId:definition.id,anchorDate:result.value.startDate,endDate:result.value.endDate,resolutionContext:{version:1,referenceDate:result.value.referenceDate,periodAnchorDate:result.value.periodAnchorDate,parameterSnapshot:{}},recurrenceRule:{version:2,kind:'relativePeriod',frequency:definition.granularity==='week'?'weekly':'monthly',interval:1,end:{type:'count',count:5},deadlinePolicy:null}};
+  if(current.recurrenceRule?.version!==2)throw new Error('fixture');
+  const plan=planFollowingMutation({series:{event:current,reminders:[]},boundaryDate:result.value.periodAnchorDate,submitted:{event:{...current,recurrenceRule:change==='stop'?null:{...current.recurrenceRule,interval:2}},reminders:[]},exceptions:[],createSeriesId:()=> 'split',now:'new',environment});
+  expect(plan.nextSeries?.event).toMatchObject({anchorDate:result.value.startDate,endDate:result.value.endDate,resolutionContext:current.temporalType==='fuzzy'?current.resolutionContext:null});
+});
+it('保存済みの祝日調整結果を全体の単発化で再計算しない',()=>{
+  const definition=definitions.find(d=>d.key==='this_week')!;
+  const current:CalendarEvent={...event,temporalType:'fuzzy',temporalDefinitionId:definition.id,anchorDate:'2026-11-18',endDate:'2026-11-19',resolutionContext:{version:1,referenceDate:'2026-11-18',periodAnchorDate:'2026-11-16',parameterSnapshot:{thisWeekDeadlineWeekday:5,deadlineAdjustment:{version:1,calendarId:'jp',unadjustedDeadlineDate:'2026-11-20'}}},recurrenceRule:{version:2,kind:'relativePeriod',frequency:'weekly',interval:1,end:{type:'never'},deadlinePolicy:{version:1,weekday:5,adjustNonWorkingDays:true,holidayCalendarId:'jp'}}};
+  const plan=planSeriesMutation({series:{event:current,reminders:[]},boundaryDate:'2026-11-16',submitted:{event:{...current,recurrenceRule:null},reminders:[]},exceptions:[],now:'new',environment});
+  expect(plan.nextSeries?.event).toMatchObject({anchorDate:'2026-11-18',endDate:'2026-11-19',resolutionContext:current.temporalType==='fuzzy'?current.resolutionContext:null,recurrenceRule:null});
+});

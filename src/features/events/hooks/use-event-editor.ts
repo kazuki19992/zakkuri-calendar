@@ -1,4 +1,5 @@
-import {buildRelativeRecurrenceRule,relativeEndDescription} from '../relative-recurrence-draft';
+import {recurrenceStructureChanged,relativeMeaningChanged} from '@/domain/calendar/relative-recurrence-change';
+import {buildRelativeRecurrenceRule,inheritRelativeRecurrenceRule,relativeEndDescription} from '../relative-recurrence-draft';
 import {relativePeriodAt,resolveRelativeOccurrence,deadlineWarningLabel,type RelativeRecurrenceEnvironment} from '@/domain/calendar/relative-recurrence';
 import { TemporalConflictError, temporalDefinitionToken, type DefinitionExpectation } from '@/domain/temporal/temporal-preferences';
 import { useNewReminderDefaults } from './use-new-reminder-defaults';
@@ -86,6 +87,7 @@ export type EventEditorState = Readonly<{
   isDateEditable: boolean;
   isRecurrenceEditable: boolean;
   relativeDatePreview: string | null;
+  occurrenceRecurrenceNotice?: string | null;
   relativeRecurrence?: Readonly<{ frequency:'weekly'|'monthly'; periodAnchorDate:string; label:string; preview:readonly string[]; policyDescription:string|null; updatePolicy?():Promise<void>; notice:string|null }>;
   startDate: string;
   startTime: string;
@@ -264,6 +266,7 @@ export function useEventEditor({
   const [noteLinkError, setNoteLinkError] = useState<string | null>(null);
   const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrenceDraft>(() =>
     getRecurrenceDraft(null, initialValues.date));
+  const [recurrenceEdited, setRecurrenceEdited] = useState(false);
   const [reminders, setReminders] = useState<readonly ReminderDraft[]>([]);
   const reminderCategory: NotificationCategory = editorTab === 'exact' ? isAllDay ? 'all_day' : 'exact'
     : definitions.find(d => d.id === selectedDefinitionId)?.resolverConfig.kind === 'timeOfDay' ? 'fuzzy_day' : 'fuzzy_period';
@@ -380,6 +383,7 @@ export function useEventEditor({
           setLocationValue(event.location ?? '');
           setNoteDocument(event.noteDocument);
           setRecurrenceDraft(getRecurrenceDraft(event.recurrenceRule, event.anchorDate));
+          setRecurrenceEdited(false);
           setReminders(getReminderDrafts(loadedAggregate.reminders));
           if (event.temporalType === 'fuzzy') {
             setEditorTabValue('fuzzy');
@@ -417,6 +421,8 @@ export function useEventEditor({
 
   const recurrenceTabCache=useRef<Partial<Record<EventEditorTab,RecurrenceDraft>>>({});
   const recurrenceGranularityCache=useRef<Partial<Record<'day'|'week'|'month',RecurrenceDraft>>>({});
+  const recurrenceTabIntent=useRef<Partial<Record<EventEditorTab,boolean>>>({});
+  const recurrenceGranularityIntent=useRef<Partial<Record<'day'|'week'|'month',boolean>>>({});
   const clearErrors = useCallback(() => {
     setTitleError(null);
     setDateError(null);
@@ -429,12 +435,13 @@ export function useEventEditor({
   const setEditorTab = useCallback((value: EventEditorTab) => {
     if (value === editorTab) return;
     recurrenceTabCache.current[editorTab]=recurrenceDraft;
+    recurrenceTabIntent.current[editorTab]=recurrenceEdited;
     const cached=recurrenceTabCache.current[value];if(cached)setRecurrenceDraft(cached);
-    setTemporalReselected(true);
+    setRecurrenceEdited(recurrenceTabIntent.current[value]??false);
     setEditorTabValue(value);
     clearErrors();
     if (status === 'ready') void settings.setLastEventEditorTab(value, now()).catch(() => {});
-  }, [clearErrors, editorTab, now, settings, status,recurrenceDraft]);
+  }, [clearErrors, editorTab, now, settings, status,recurrenceDraft,recurrenceEdited]);
   const setAllDay = useCallback((value: boolean) => {
     if (value && !allDayDraftInitialized.current) {
       setAllDayEndDate(endDate);
@@ -483,14 +490,16 @@ export function useEventEditor({
       const oldRange=previous.granularity!=='day'?resolveRelativeDateRange(relativeReference??startDate,previous,thisWeekDeadlineWeekday):null;
       setRelativeReference(previous.granularity!=='day'&&next.granularity!=='day'?(visible??(oldRange?.ok?oldRange.value.startDate:startDate)):null);
       recurrenceGranularityCache.current[previous.granularity]=recurrenceDraft;
+      recurrenceGranularityIntent.current[previous.granularity]=recurrenceEdited;
       const cached=recurrenceGranularityCache.current[next.granularity];
+      setRecurrenceEdited(recurrenceGranularityIntent.current[next.granularity]??false);
       setRecurrenceDraft(cached??{...recurrenceDraft,preset:'none',frequency:next.granularity==='month'?'monthly':'weekly',untilDate:recurrenceDraft.endType==='until'?'':recurrenceDraft.untilDate});
       setRelativeSelectionNotice(cached?'以前の入力内容を復元しました。期間を再確認してください。':'単位が変わったため繰り返しを未設定にしました。新しい単位で選び直してください。');
     }
     if(previous&&next&&previous.granularity!=='day'&&previous.granularity===next.granularity&&existingAggregate?.event.recurrenceRule?.version===2)setRelativeReference(existingAggregate.event.anchorDate);
     if (value !== selectedDefinitionId) setTemporalReselected(true);
     setSelectedDefinitionId(value); clearErrors();
-  }, [clearErrors, selectedDefinitionId,definitions,existingAggregate,temporalReselected,relativeReference,startDate,thisWeekDeadlineWeekday,recurrenceDraft]);
+  }, [clearErrors, selectedDefinitionId,definitions,existingAggregate,temporalReselected,relativeReference,startDate,thisWeekDeadlineWeekday,recurrenceDraft,recurrenceEdited]);
   const setColorId = useCallback((value: EventColorId | null) => { setColorIdValue(value); clearErrors(); }, [clearErrors]);
   const setLocation = useCallback((value: string) => { setLocationValue(value); clearErrors(); }, [clearErrors]);
   const openNoteEditor = useCallback(() => {
@@ -517,13 +526,21 @@ export function useEventEditor({
     }
   }, [openBrowser]);
   const updateRecurrence = useCallback((update: Partial<RecurrenceDraft>) => {
-    setRecurrenceDraft((value) => ({ ...value, ...update }));
+    const definition=definitions.find(item=>item.id===selectedDefinitionId);
+    setRecurrenceEdited(true);
+    setRecurrenceDraft((value) => {
+      const frequency:RecurrenceDraft['frequency']|null=editorTab==='fuzzy'&&definition?.granularity!=='day'&&definition
+        ? definition.granularity==='month'?'monthly':'weekly' : null;
+      const base=frequency&&value.frequency!==frequency?{...value,preset:'none' as const,frequency,untilDate:value.endType==='until'?'':value.untilDate}:value;
+      return {...base,...update,...(frequency?{frequency}:{})};
+    });
     setRecurrenceError(null);
-  }, []);
+  }, [definitions,selectedDefinitionId,editorTab]);
   const setRecurrencePreset = useCallback((value: RecurrencePreset) => updateRecurrence({ preset: value }), [updateRecurrence]);
   const setRecurrenceFrequency = useCallback((value: RecurrenceRuleV1['frequency']) => updateRecurrence({ frequency: value }), [updateRecurrence]);
   const setRecurrenceIntervalText = useCallback((value: string) => updateRecurrence({ intervalText: value }), [updateRecurrence]);
   const toggleRecurrenceWeekday = useCallback((value: number) => {
+    setRecurrenceEdited(true);
     setRecurrenceDraft((draft) => ({
       ...draft,
       weekdays: draft.weekdays.includes(value)
@@ -599,7 +616,7 @@ export function useEventEditor({
           const adjusted = adjustThisWeekDeadline(resolution.value, holidayPreferences,
             provider.list(resolution.value.referenceDate, resolution.value.endDate));
           if (adjusted.ok) relativeResolution = adjusted.value;
-          else if(recurrenceDraft.preset!=='none')relativeResolution={...resolution.value,parameterSnapshot:{...resolution.value.parameterSnapshot,deadlineAdjustment:{version:1,calendarId:holidayPreferences.calendarId,unadjustedDeadlineDate:resolution.value.endDate},deadlineWarning:adjusted.error}};
+          else if(recurrenceDraft.preset!=='none'||occurrenceEditData?.series.event.recurrenceRule?.version===2)relativeResolution={...resolution.value,parameterSnapshot:{...resolution.value.parameterSnapshot,deadlineAdjustment:{version:1,calendarId:holidayPreferences.calendarId,unadjustedDeadlineDate:resolution.value.endDate},deadlineWarning:adjusted.error}};
           else relativeDateError = adjusted.error === 'noBusinessDay'
             ? '対象となる平日がありません。基準日または締切設定を見直してください。'
             : 'この期間の祝日情報に対応していないため、締切を確定できません。';
@@ -613,7 +630,15 @@ export function useEventEditor({
 
   const relativeEnvironment:RelativeRecurrenceEnvironment={definitions,holidayProvider};
   const relativeContext=relativeResolution?{version:1 as const,referenceDate:relativeResolution.referenceDate,periodAnchorDate:relativeResolution.periodAnchorDate,parameterSnapshot:relativeResolution.parameterSnapshot}:null;
-  const relativeRule=isRelativeDefinition&&selectedDefinition&&relativeContext?buildRelativeRecurrenceRule(recurrenceDraft,selectedDefinition,relativeContext):null;
+  const sourceRelativeRule=occurrenceEditData?.series.event.recurrenceRule?.version===2?occurrenceEditData.series.event.recurrenceRule:null;
+  const preservingSourceRule=sourceRelativeRule!==null&&!recurrenceEdited;
+  const inheritedRule=sourceRelativeRule&&selectedDefinition&&relativeContext?inheritRelativeRecurrenceRule(sourceRelativeRule,selectedDefinition,relativeContext):null;
+  const canInheritSource=isRelativeDefinition&&inheritedRule?.ok===true;
+  const recurrenceDisplayDraft=preservingSourceRule&&isRelativeDefinition&&!canInheritSource
+    ? {...recurrenceDraft,preset:'none' as const,frequency:selectedDefinition?.granularity==='month'?'monthly' as const:'weekly' as const}:recurrenceDraft;
+  const relativeRule=preservingSourceRule?(canInheritSource?inheritedRule:{ok:true as const,value:null})
+    :isRelativeDefinition&&selectedDefinition&&relativeContext?buildRelativeRecurrenceRule(recurrenceDraft,selectedDefinition,relativeContext):null;
+  const occurrenceRecurrenceNotice=preservingSourceRule&&!canInheritSource?'この回の日時だけを変更できます。これ以降・全体を変更する場合は、新しい日時に対応する繰り返しを選び直してください。':null;
   const relativePreview:string[]=[];
   if(relativeRule?.ok&&relativeRule.value&&relativeResolution&&relativeContext&&selectedDefinition){
     const event={id:'preview',calendarId:calendarId??'',title:'',temporalType:'fuzzy' as const,temporalDefinitionId:selectedDefinition.id,anchorDate:relativeResolution.startDate,endDate:relativeResolution.endDate,resolutionContext:relativeContext,recurrenceRule:relativeRule.value,location:null,noteDocument:null,colorId:null,createdAt:'',updatedAt:'',createdTimeZoneId:'UTC'};
@@ -667,7 +692,7 @@ export function useEventEditor({
       (targetDefinition !== null && targetDefinition.granularity !== 'day') || isExistingRelative
     );
     const contextForSave=relativeResolution?{version:1 as const,referenceDate:relativeResolution.referenceDate,periodAnchorDate:relativeResolution.periodAnchorDate,parameterSnapshot:relativeResolution.parameterSnapshot}:null;
-    const recurrence = isRelative
+    const recurrence = preservingSourceRule ? {ok:true as const,value:null} : isRelative
       ? targetDefinition&&contextForSave?buildRelativeRecurrenceRule(recurrenceDraft,targetDefinition,contextForSave):recurrenceDraft.preset==='none'?{ok:true as const,value:null}:{ok:false as const,error:{field:'recurrence',message:'対象期間を確認してください'}}
       : buildRecurrenceRule(recurrenceDraft, startDate);
     if (!recurrence.ok) { setRecurrenceError(recurrence.error.message); return false; }
@@ -742,13 +767,19 @@ export function useEventEditor({
         if (expected) await events.create(aggregate, expected); else await events.create(aggregate);
       }
       else if (occurrenceEditData !== null && existingAggregate !== null) {
-        const recurrenceChanged = getChangedEventFields(existingAggregate, aggregate)
-          .includes('recurrence');
-        setPendingAggregate(aggregate);
-        const request=createScopeRequest('save',recurrenceChanged);
+        if(preservingSourceRule&&!canInheritSource){
+          setPendingAggregate(aggregate);
+          setScopeRequest({operation:'save',options:[{scope:'occurrence',label:'この予定'}],needsExceptionResetConfirmation:false});
+          return false;
+        }
+        const scopedCandidate=preservingSourceRule&&inheritedRule?.ok?{...aggregate,event:{...aggregate.event,recurrenceRule:inheritedRule.value}}:aggregate;
+        setPendingAggregate(scopedCandidate);
+        const scopedSubmitted=buildSeriesScopedAggregate({series:occurrenceEditData.series,occurrenceDate:occurrenceDate!,displayed:existingAggregate,submitted:scopedCandidate,environment:{definitions,holidayProvider}});
+        const recurrenceChanged=recurrenceStructureChanged(occurrenceEditData.series.event.recurrenceRule,scopedCandidate.event.recurrenceRule);
+        const request=createScopeRequest('save',recurrenceChanged,relativeMeaningChanged(occurrenceEditData.series.event,scopedSubmitted.event));
         if(occurrenceEditData.series.event.recurrenceRule?.version===2||aggregate.event.recurrenceRule?.version===2){
           const environment={definitions,holidayProvider};
-          const submitted=buildSeriesScopedAggregate({series:occurrenceEditData.series,occurrenceDate:occurrenceDate!,displayed:existingAggregate,submitted:aggregate,environment});
+          const submitted=scopedSubmitted;
           const common={series:occurrenceEditData.series,boundaryDate:occurrenceDate!,submitted,exceptions:occurrenceEditData.exceptions,now:timestamp,environment};
           const plans={following:planFollowingMutation({...common,createSeriesId:()=> 'relative-preview'}),series:planSeriesMutation(common)};
           const previews:Partial<Record<RecurrenceEditScope,readonly string[]>>={};
@@ -777,7 +808,7 @@ export function useEventEditor({
       operationRef.current = false;
       setIsSaving(false);
     }
-  }, [expectedDefinitionFor, recoverTemporalConflict, updatingPolicy,allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
+  }, [preservingSourceRule,canInheritSource,inheritedRule,expectedDefinitionFor, recoverTemporalConflict, updatingPolicy,allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
     getTimeZoneId, isAllDay, location, newEventId, noteDocument, now, recurrenceDraft, reminders, reminderDefaults.status,
     definitions, holidayProvider, occurrenceDate, occurrenceEditData, relativeResolution, relativeDateError, selectedDefinitionId,
     startDate, startTime, status, title]);
@@ -933,7 +964,8 @@ export function useEventEditor({
     isDateEditable: !isRelativeDefinition,
     isRecurrenceEditable: !isRelativeDefinition || selectedDefinition!==null,
     relativeDatePreview,
-    ...(isRelativeDefinition&&selectedDefinition?{relativeRecurrence:{frequency:selectedDefinition.granularity==='month'?'monthly' as const:'weekly' as const,periodAnchorDate:relativeContext?.periodAnchorDate??startDate,label:`${recurrenceDraft.preset==='none'?'繰り返しなし':recurrenceDraft.preset==='custom'?`${recurrenceDraft.intervalText}${selectedDefinition.granularity==='week'?'週':'か月'}ごと`:selectedDefinition.granularity==='week'?'毎週':'毎月'}・${selectedDefinition.label}`,preview:relativePreview,notice:relativeSelectionNotice,policyDescription:selectedDefinition.key==='this_week'&&relativeContext?`締切：${relativeContext.parameterSnapshot.thisWeekDeadlineWeekday===7?'日曜日':relativeContext.parameterSnapshot.thisWeekDeadlineWeekday===6?'土曜日':'金曜日'}、${relativeContext.parameterSnapshot.deadlineAdjustment?'土日を考慮'+(relativeContext.parameterSnapshot.deadlineAdjustment.calendarId==='jp'?'・日本の祝日を考慮':''):'休日調整なし'}（保存する条件）`:null,updatePolicy:async()=>{
+    occurrenceRecurrenceNotice,
+    ...(isRelativeDefinition&&selectedDefinition?{relativeRecurrence:{frequency:selectedDefinition.granularity==='month'?'monthly' as const:'weekly' as const,periodAnchorDate:relativeContext?.periodAnchorDate??startDate,label:`${recurrenceDisplayDraft.preset==='none'?'繰り返しなし':recurrenceDisplayDraft.preset==='custom'?`${recurrenceDisplayDraft.intervalText}${selectedDefinition.granularity==='week'?'週':'か月'}ごと`:selectedDefinition.granularity==='week'?'毎週':'毎月'}・${selectedDefinition.label}`,preview:relativePreview,notice:relativeSelectionNotice,policyDescription:selectedDefinition.key==='this_week'&&relativeContext?`締切：${relativeContext.parameterSnapshot.thisWeekDeadlineWeekday===7?'日曜日':relativeContext.parameterSnapshot.thisWeekDeadlineWeekday===6?'土曜日':'金曜日'}、${relativeContext.parameterSnapshot.deadlineAdjustment?'土日を考慮'+(relativeContext.parameterSnapshot.deadlineAdjustment.calendarId==='jp'?'・日本の祝日を考慮':''):'休日調整なし'}（保存する条件）`:null,updatePolicy:async()=>{
       if(operationRef.current)return;operationRef.current=true;setUpdatingPolicy(true);
       try{const [weekday,prefs]=await Promise.all([settings.getThisWeekDeadlineWeekday(),settings.getHolidayPreferences()]);if(!mountedRef.current)return;setThisWeekDeadlineWeekday(weekday);setHolidayPreferences(prefs);setDeadlinePolicyUpdated(true);setTemporalReselected(true);setRelativeSelectionNotice('締切条件を現在の設定に更新しました。期間と変更範囲を確認して保存してください。');}catch{if(mountedRef.current)setSaveError('締切条件を読み込めませんでした。入力内容を保持しています。');}finally{operationRef.current=false;if(mountedRef.current)setUpdatingPolicy(false);}
     }}}:{}),
@@ -955,7 +987,7 @@ export function useEventEditor({
     noteSummary: projectEventNoteToPlainText(noteDocument) ?? '',
     isNoteEditorOpen,
     noteLinkError,
-    recurrenceDraft,
+    recurrenceDraft:recurrenceDisplayDraft,
     reminders,
     titleError,
     dateError: dateError ?? relativeDateError,

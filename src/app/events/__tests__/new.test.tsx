@@ -10,10 +10,12 @@ import {
 } from '@/features/events/hooks/use-event-editor';
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('expo-router/react-navigation',()=>({usePreventRemove:jest.fn()}));
 jest.mock('expo-router', () => ({
   Stack: { Screen: jest.fn(() => null) },
   useLocalSearchParams: jest.fn(),
   useRouter: jest.fn(),
+  useNavigation: jest.fn().mockReturnValue({dispatch:jest.fn()}),
 }));
 jest.mock('@/data/sqlite/app-database-provider', () => ({ useRepositories: jest.fn() }));
 jest.mock('@/features/calendar/calendar-refresh-context', () => ({ useCalendarRefresh: jest.fn() }));
@@ -196,6 +198,7 @@ describe('予定作成ルート', () => {
     } as ReturnType<typeof useRepositories>);
     jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged: jest.fn() });
     jest.mocked(useEventEditor).mockReturnValue({
+      isBusy: true,
       isSaving: true,
       isDeleting: false,
       save: jest.fn(),

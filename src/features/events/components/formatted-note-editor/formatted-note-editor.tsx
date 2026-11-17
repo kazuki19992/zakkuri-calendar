@@ -1,5 +1,5 @@
 import type {NoteUpdate,NoteResponse} from '../../event-note/inline-note-session';
-import { useState, type RefObject } from 'react';
+import { useState, type Ref } from 'react';
 import { Platform, View, StyleSheet } from 'react-native';
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
 import { createDOMNavigationPolicy } from './dom-navigation-policy';
@@ -10,12 +10,11 @@ import FormattedNoteEditorDOM, {
 } from './formatted-note-editor.dom';
 
 type Props = Readonly<{
-  editorRef: RefObject<FormattedNoteEditorDOMRef | null>;
+  editorRef: Ref<FormattedNoteEditorDOMRef>;
   initialDocument: EventNoteDocumentV1 | null;
   theme: EditorTheme;
   onReady(): Promise<void>;
   onStateChange(state: EditorSelectionState): Promise<void>;
-  onComplete(document: EventNoteDocumentV1): Promise<void>;
   onConversionFailure(): Promise<void>;
   onFailure(): Promise<void>;
   sessionId?:number;disabled?:boolean;fontScale?:number;
@@ -32,7 +31,6 @@ export function FormattedNoteEditor({
   theme,
   onReady,
   onStateChange,
-  onComplete,
   onConversionFailure,
   onFailure,sessionId,disabled,fontScale,onSnapshot,onSnapshotFailure,onDocumentChange,onFocusChange,onContentHeight,
 }: Props) {
@@ -44,7 +42,7 @@ export function FormattedNoteEditor({
       <FormattedNoteEditorDOM ref={editorRef} initialDocument={initialDocument}
         sessionId={sessionId} disabled={disabled} fontScale={fontScale} onSnapshot={onSnapshot} onSnapshotFailure={onSnapshotFailure} onDocumentChange={onDocumentChange} onFocusChange={onFocusChange} onContentHeight={onContentHeight}
         theme={theme} onReady={onReady} onStateChange={onStateChange}
-        onComplete={onComplete} onConversionFailure={onConversionFailure} onFailure={onFailure}
+        onConversionFailure={onConversionFailure} onFailure={onFailure}
         dom={{
           containerStyle: styles.editor,
           scrollEnabled: true,

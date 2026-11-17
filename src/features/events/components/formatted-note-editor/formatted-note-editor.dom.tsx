@@ -1,7 +1,6 @@
 'use dom';
 
-import { useCallback, useEffect, useRef, useState, type Ref } from 'react';
-import type {Editor} from '@tiptap/core';
+import { useCallback, useEffect, useRef, type Ref } from 'react';
 import {InlineNoteDOMSession} from '../../event-note/inline-note-dom-session';
 import type {NoteUpdate,NoteResponse} from '../../event-note/inline-note-session';
 import { EditorContent, useEditor } from '@tiptap/react';
@@ -34,7 +33,6 @@ export interface FormattedNoteEditorDOMRef extends DOMImperativeFactory {
   toggleBulletList: () => void;
   toggleOrderedList: () => void;
   toggleTaskList: () => void;
-  requestComplete: () => void;
   requestSnapshot: DOMImperativeFactory[string];
   releaseSnapshot: DOMImperativeFactory[string];
   blur: () => void;
@@ -46,7 +44,6 @@ type Props = Readonly<{
   theme: EditorTheme;
   onReady(): Promise<void>;
   onStateChange(state: EditorSelectionState): Promise<void>;
-  onComplete(document: EventNoteDocumentV1): Promise<void>;
   onConversionFailure(): Promise<void>;
   onFailure(): Promise<void>;
   sessionId?:number;
@@ -66,36 +63,19 @@ export default function FormattedNoteEditorDOM({
   theme,
   onReady,
   onStateChange,
-  onComplete,
   onConversionFailure,
   onFailure, sessionId=1,disabled=false,fontScale=1,onSnapshot,onSnapshotFailure,onDocumentChange,onFocusChange,onContentHeight,
 }: Props) {
   const dirtyRef = useRef(false);
   const revision=useRef(0);
-  const editorInstance=useRef<Editor|null>(null);
-  const callbacks=useRef({sessionId,onSnapshot,onSnapshotFailure});
-  callbacks.current={sessionId,onSnapshot,onSnapshotFailure};
-  const [snapshots]=useState(()=>new InlineNoteDOMSession({
-    composing:()=>editorInstance.current?.view.composing??false,
-    blur:()=>editorInstance.current?.view.dom.blur(),
-    setEditable:value=>editorInstance.current?.setEditable(value,false),
-    read:()=>{
-      const current=editorInstance.current;if(!current)throw new Error('Editor unavailable');
-      const result=fromTiptapDocument(current.getJSON());if(!result.ok)throw new Error('Invalid document');
-      return {revision:revision.current,document:result.value};
-    },
-    respond:(requestId,value,document)=>{void callbacks.current.onSnapshot?.({sessionId:callbacks.current.sessionId,requestId,revision:value,document});},
-    fail:requestId=>{void callbacks.current.onSnapshotFailure?.(requestId);},
-  }));
+  const snapshots=useRef<InlineNoteDOMSession|null>(null);
   const editor = useEditor({
     extensions: createEventNoteExtensions(),
     content: toTiptapDocument(initialDocument),
     immediatelyRender: false,
     editable: false,
-    onCreate: ({ editor: createdEditor }) => {
-      void onReady();
-      editorInstance.current=createdEditor;
-    },
+    editorProps:{attributes:{role:'textbox','aria-label':'メモ本文','aria-multiline':'true'}},
+
     onUpdate: ({ editor: updatedEditor }) => {
       dirtyRef.current = true;
       revision.current+=1;
@@ -106,9 +86,21 @@ export default function FormattedNoteEditorDOM({
     },
   });
 
-  editorInstance.current=editor;
-  useEffect(()=>{snapshots.setDisabled(disabled||editor===null);},[disabled,editor,snapshots]);
-  useEffect(()=>()=>snapshots.dispose(),[snapshots]);
+  useEffect(()=>{
+    if(!editor)return;
+    const controller=new InlineNoteDOMSession({
+      composing:()=>editor.view.composing,
+      blur:()=>editor.view.dom.blur(),
+      setEditable:value=>editor.setEditable(value,false),
+      read:()=>{const result=fromTiptapDocument(editor.getJSON());if(!result.ok)throw new Error('Invalid document');return {revision:revision.current,document:result.value};},
+      respond:(requestId,value,document)=>{void onSnapshot?.({sessionId,requestId,revision:value,document});},
+      fail:requestId=>{void onSnapshotFailure?.(requestId);},
+    });
+    snapshots.current=controller;
+    void onReady();
+    return ()=>{controller.dispose();if(snapshots.current===controller)snapshots.current=null;};
+  },[editor,sessionId,onReady,onSnapshot,onSnapshotFailure]);
+  useEffect(()=>{snapshots.current?.setDisabled(disabled||editor===null);},[disabled,editor]);
   const contentRef=useRef<HTMLElement|null>(null);
   useEffect(()=>{
     const element=contentRef.current;if(!element)return;
@@ -134,33 +126,21 @@ export default function FormattedNoteEditorDOM({
 
   // useDOMImperativeHandleはExpo DOM Componentsが定めるnative bridge用ref境界。
   useDOMImperativeHandle(ref, () => ({
-    toggleBold: () => { editor?.chain().focus().toggleBold().run(); },
-    toggleItalic: () => { editor?.chain().focus().toggleItalic().run(); },
-    toggleBulletList: () => { editor?.chain().focus().toggleBulletList().run(); },
-    toggleOrderedList: () => { editor?.chain().focus().toggleOrderedList().run(); },
-    toggleTaskList: () => { editor?.chain().focus().toggleTaskList().run(); },
-    requestSnapshot:requestId=>{if(typeof requestId==='number')snapshots.request(requestId);},
-    releaseSnapshot:requestId=>{if(typeof requestId==='number')snapshots.release(requestId);},
+    toggleBold: () => { if(editor?.isEditable)editor.chain().focus().toggleBold().run(); },
+    toggleItalic: () => { if(editor?.isEditable)editor.chain().focus().toggleItalic().run(); },
+    toggleBulletList: () => { if(editor?.isEditable)editor.chain().focus().toggleBulletList().run(); },
+    toggleOrderedList: () => { if(editor?.isEditable)editor.chain().focus().toggleOrderedList().run(); },
+    toggleTaskList: () => { if(editor?.isEditable)editor.chain().focus().toggleTaskList().run(); },
+    requestSnapshot:requestId=>{if(typeof requestId==='number')snapshots.current?.request(requestId);},
+    releaseSnapshot:requestId=>{if(typeof requestId==='number')snapshots.current?.release(requestId);},
     blur:()=>editor?.view.dom.blur(),
-    requestComplete: () => {
-      if (editor === null) {
-        void onFailure();
-        return;
-      }
-      const result = fromTiptapDocument(editor.getJSON());
-      if (!result.ok) {
-        void onConversionFailure();
-        return;
-      }
-      void onComplete(result.value);
-    },
-  }), [editor, onComplete, onConversionFailure, onFailure,snapshots]);
+  }), [editor,snapshots]);
 
   return (
     <main ref={contentRef} style={{ background: theme.background, color: theme.text }}
       onFocusCapture={()=>{void onFocusChange?.(true);}}
       onBlurCapture={()=>{void onFocusChange?.(false);}}
-      onCompositionEnd={()=>snapshots.compositionEnd()}>
+      onCompositionEnd={()=>snapshots.current?.compositionEnd()}>
       <style>{`
         html, body, #root { background: ${theme.background}; margin: 0; }
         .event-note-editor { box-sizing: border-box; font: ${17*fontScale}px/1.55 system-ui, sans-serif;

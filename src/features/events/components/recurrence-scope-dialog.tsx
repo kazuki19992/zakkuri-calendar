@@ -35,6 +35,7 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Rea
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
             {confirmationScope === null ? title : resetNeeded?'個別変更のリセット':'変更内容の確認'}
           </Text>
+          {request.operation==='delete'?<Text style={[styles.warning,{color:theme.textSecondary}]}>保存していないメモの変更も破棄されます。</Text>:null}
           {confirmationScope === null && request.needsExceptionResetConfirmation && !request.options.some(option=>option.scope==='occurrence') ? (
             <Text style={[styles.warning, { color: theme.textSecondary }]}>
               1件だけの予定には繰り返し設定を適用できません

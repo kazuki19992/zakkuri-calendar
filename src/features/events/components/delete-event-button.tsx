@@ -7,7 +7,7 @@ export function DeleteEventButton({ title, disabled, isRecurring = false, usesSc
   const message = isRecurring
     ? `「${title || 'この予定'}」の繰り返しシリーズ全体を削除しますか？`
     : `「${title || 'この予定'}」を削除しますか？`;
-  const handlePress = usesScopeSelection ? onDelete : () => Alert.alert(label, message, [
+  const handlePress = usesScopeSelection ? onDelete : () => Alert.alert(label, message+'\n保存していないメモの変更も破棄されます。', [
     { text: 'キャンセル', style: 'cancel' }, { text: '削除', style: 'destructive', onPress: onDelete },
   ]);
   return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled}

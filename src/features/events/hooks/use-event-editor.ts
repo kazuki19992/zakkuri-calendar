@@ -16,7 +16,6 @@ import { openBrowserAsync } from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EventColorId } from '@/domain/calendar/event-color';
 import {
-  normalizeEventNoteDocument,
   areEventNotesEqual,
   parseSafeEventNoteUrl,
   projectEventNoteToPlainText,
@@ -114,7 +113,6 @@ export type EventEditorState = Readonly<{
   confirmLeave(): Promise<boolean>;
   canLeave(): boolean;
   noteSummary: string;
-  isNoteEditorOpen: boolean;
   noteLinkError: string | null;
   recurrenceDraft: RecurrenceDraft;
   reminders: readonly ReminderDraft[];
@@ -139,9 +137,6 @@ export type EventEditorState = Readonly<{
   selectDefinition(id: string): void;
   setColorId(value: EventColorId | null): void;
   setLocation(value: string): void;
-  openNoteEditor(): void;
-  cancelNoteEditor(): void;
-  completeNoteEditor(value: EventNoteDocumentV1 | null): void;
   openNoteLink(value: string): Promise<void>;
   setRecurrencePreset(value: RecurrencePreset): void;
   setRecurrenceFrequency(value: RecurrenceRuleV1['frequency']): void;
@@ -275,7 +270,6 @@ export function useEventEditor({
   const loadedNoteRef=useRef<EventNoteDocumentV1|null>(null);
   const completedRef=useRef(false);
   const [isCheckingLeave,setIsCheckingLeave]=useState(false);
-  const [isNoteEditorOpen, setNoteEditorOpen] = useState(false);
   const [noteLinkError, setNoteLinkError] = useState<string | null>(null);
   const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrenceDraft>(() =>
     getRecurrenceDraft(null, initialValues.date));
@@ -296,6 +290,11 @@ export function useEventEditor({
   const [isDeleting, setIsDeleting] = useState(false);
   const [loadRevision, setLoadRevision] = useState(0);
   const operationRef = useRef(false);
+  const scopeActiveRef=useRef(false);
+  const updateScopeRequest=useCallback((request:ScopeRequest|null)=>{
+    scopeActiveRef.current=request!==null;setScopeRequest(request);
+    if(request===null)noteSession.release();
+  },[noteSession]);
 
   useEffect(() => {
     let active = true;
@@ -519,16 +518,6 @@ export function useEventEditor({
   }, [clearErrors, selectedDefinitionId,definitions,existingAggregate,temporalReselected,relativeReference,startDate,thisWeekDeadlineWeekday,recurrenceDraft,recurrenceEdited]);
   const setColorId = useCallback((value: EventColorId | null) => { setColorIdValue(value); clearErrors(); }, [clearErrors]);
   const setLocation = useCallback((value: string) => { setLocationValue(value); clearErrors(); }, [clearErrors]);
-  const openNoteEditor = useCallback(() => {
-    setNoteLinkError(null);
-    setNoteEditorOpen(true);
-  }, []);
-  const cancelNoteEditor = useCallback(() => { setNoteEditorOpen(false); }, []);
-  const completeNoteEditor = useCallback((value: EventNoteDocumentV1 | null) => {
-    noteSession.reset(value === null ? null : normalizeEventNoteDocument(value));
-    setNoteEditorOpen(false);
-    clearErrors();
-  }, [clearErrors,noteSession]);
   const openNoteLink = useCallback(async (value: string): Promise<void> => {
     const safeUrl = parseSafeEventNoteUrl(value);
     if (safeUrl === null) {
@@ -690,12 +679,12 @@ export function useEventEditor({
       setDefinitions(latest);
       if (aggregate) setExistingAggregate(aggregate);
       if(occurrence)setOccurrenceEditData(occurrence);
-      setPendingAggregate(null); setScopeRequest(null);
+      setPendingAggregate(null); updateScopeRequest(null);
       setSaveError('時間表現が更新されました。入力内容は保持しています。期間を再確認して保存してください。');
     } catch {
       if (mountedRef.current) setSaveError('時間表現を再読み込みできませんでした。入力内容を保持しています。再度保存してお試しください。');
     }
-  }, [calendarId, eventId, events, occurrenceDate, selectedDefinitionId, temporalDefinitions]);
+  }, [calendarId, eventId, events, occurrenceDate, selectedDefinitionId, temporalDefinitions,updateScopeRequest]);
 
   const savePrepared = useCallback(async (capturedNote:EventNoteDocumentV1|null): Promise<boolean> => {
     if (status !== 'ready' || durationBlocked || updatingPolicy) return false;
@@ -785,7 +774,7 @@ export function useEventEditor({
       else if (occurrenceEditData !== null && existingAggregate !== null) {
         if(preservingSourceRule&&!canInheritSource){
           setPendingAggregate(aggregate);
-          setScopeRequest({operation:'save',options:[{scope:'occurrence',label:'この予定'}],needsExceptionResetConfirmation:false});
+          updateScopeRequest({operation:'save',options:[{scope:'occurrence',label:'この予定'}],needsExceptionResetConfirmation:false});
           return false;
         }
         const scopedCandidate=preservingSourceRule&&inheritedRule?.ok?{...aggregate,event:{...aggregate.event,recurrenceRule:inheritedRule.value}}:aggregate;
@@ -808,8 +797,8 @@ export function useEventEditor({
             }}else lines.push(`初回: ${formatEditorDate(next.anchorDate)}${next.temporalType!=='exact'?`〜${formatEditorDate(next.endDate)}`:''}`);
             lines.push(relativeEndDescription(next.recurrenceRule));previews[scope]=lines;
           }
-          setScopeRequest({...request,relativePreviews:previews});
-        }else setScopeRequest(request);
+          updateScopeRequest({...request,relativePreviews:previews});
+        }else updateScopeRequest(request);
         return false;
       } else {
         const expected = expectedDefinitionFor(aggregate.event);
@@ -821,13 +810,13 @@ export function useEventEditor({
       setSaveError('保存できませんでした。もう一度お試しください。');
       return false;
     }
-  }, [preservingSourceRule,canInheritSource,inheritedRule,expectedDefinitionFor, recoverTemporalConflict, updatingPolicy,allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
+  }, [updateScopeRequest,preservingSourceRule,canInheritSource,inheritedRule,expectedDefinitionFor, recoverTemporalConflict, updatingPolicy,allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
     getTimeZoneId, isAllDay, location, newEventId, now, recurrenceDraft, reminders, reminderDefaults.status,
     definitions, holidayProvider, occurrenceDate, occurrenceEditData, relativeResolution, relativeDateError, selectedDefinitionId,
     startDate, startTime, status, title]);
 
   const save=useCallback(async():Promise<boolean>=>{
-    if(operationRef.current||status!=='ready'||updatingPolicy)return false;
+    if(operationRef.current||scopeActiveRef.current||noteSession.getSnapshot().pending||status!=='ready'||updatingPolicy)return false;
     operationRef.current=true;setIsSaving(true);
     try{
       const document=await noteSession.capture();
@@ -836,11 +825,12 @@ export function useEventEditor({
       if(saved)completedRef.current=true;
       return saved;
     }catch{if(mountedRef.current)setSaveError('メモの内容を確認できませんでした。再度保存をお試しください。');return false;}
-    finally{noteSession.release();operationRef.current=false;if(mountedRef.current)setIsSaving(false);}
+    finally{if(!scopeActiveRef.current)noteSession.release();operationRef.current=false;if(mountedRef.current)setIsSaving(false);}
   },[noteSession,savePrepared,status,updatingPolicy]);
 
   const confirmLeave=useCallback(async():Promise<boolean>=>{
     if(completedRef.current)return true;
+    if(scopeActiveRef.current)return false;
     if(operationRef.current)return false;
     operationRef.current=true;setIsCheckingLeave(true);
     try{
@@ -859,7 +849,7 @@ export function useEventEditor({
   const remove = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || existingAggregate === null) return false;
     if (occurrenceEditData !== null) {
-      setScopeRequest(createScopeRequest('delete', false));
+      updateScopeRequest(createScopeRequest('delete', false));
       return false;
     }
     operationRef.current = true;
@@ -876,12 +866,12 @@ export function useEventEditor({
       operationRef.current = false;
       setIsDeleting(false);
     }
-  }, [events, existingAggregate, occurrenceEditData]);
+  }, [events, existingAggregate, occurrenceEditData,updateScopeRequest]);
 
   const cancelScope = useCallback(() => {
-    setScopeRequest(null);
+    updateScopeRequest(null);
     setPendingAggregate(null);
-  }, []);
+  }, [updateScopeRequest]);
 
   const selectScope = useCallback(async (scope: RecurrenceEditScope): Promise<boolean> => {
     if (operationRef.current || scopeRequest === null || occurrenceEditData === null
@@ -982,7 +972,7 @@ export function useEventEditor({
           ...(!deleting && pendingAggregate ? { expectedDefinition: expectedDefinitionFor(pendingAggregate.event) } : {}),
         });
       }
-      setScopeRequest(null);
+      updateScopeRequest(null);
       setPendingAggregate(null);
       completedRef.current=true;
       return true;
@@ -997,7 +987,7 @@ export function useEventEditor({
       setIsSaving(false);
       setIsDeleting(false);
     }
-  }, [definitions,holidayProvider,expectedDefinitionFor, recoverTemporalConflict, createId, events, existingAggregate, newEventId, now, occurrenceDate,
+  }, [updateScopeRequest,definitions,holidayProvider,expectedDefinitionFor, recoverTemporalConflict, createId, events, existingAggregate, newEventId, now, occurrenceDate,
     occurrenceEditData, pendingAggregate, scopeRequest]);
 
   return {
@@ -1030,11 +1020,10 @@ export function useEventEditor({
     location,
     noteDocument,
     noteSession,
-    isBusy:isSaving||isDeleting||isCheckingLeave,
+    isBusy:isSaving||isDeleting||isCheckingLeave||noteSnapshot.pending,
     confirmLeave,
     canLeave:()=>completedRef.current,
     noteSummary: projectEventNoteToPlainText(noteDocument) ?? '',
-    isNoteEditorOpen,
     noteLinkError,
     recurrenceDraft:recurrenceDisplayDraft,
     reminders,
@@ -1065,9 +1054,6 @@ export function useEventEditor({
     selectDefinition,
     setColorId,
     setLocation,
-    openNoteEditor,
-    cancelNoteEditor,
-    completeNoteEditor,
     openNoteLink,
     setRecurrencePreset,
     setRecurrenceFrequency,

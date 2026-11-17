@@ -10,13 +10,13 @@ Issue #62。全画面Modalを予定フォーム内のエディタへ置き換え
 
 - `npm run typecheck`: 成功。
 - `npm run lint`: 成功、警告なし。
-- `npm test -- --runInBand`: 114 suites・981 tests成功。既存のTZ条件付き1 suite・2 testsはskip。
+- `npm test -- --runInBand`: 115 suites・984 tests成功。既存のTZ条件付き1 suite・2 testsはskip。
 - `TZ=America/New_York npx jest --runInBand --runTestsByPath src/domain/notifications/__tests__/dst.test.ts`: 上記のDST 2 testsが成功。
 - `git diff --check`: 成功。
-- `npx expo export --platform ios --output-dir /tmp/zakkuri-inline-ios --clear`: 成功。DOM bundleを含む。
-- `npx expo export --platform android --output-dir /tmp/zakkuri-inline-android`: 成功。DOM bundleを含む。
+- `npx expo export --platform ios --output-dir /tmp/zakkuri-inline-final-ios --clear`: 成功。DOM bundleを含む。
+- `npx expo export --platform android --output-dir /tmp/zakkuri-inline-final-android`: 成功。DOM bundleを含む。
 
-独立レビューはこれから実施する。native build・実機操作は実行していない。
+独立レビューを実施し、Important 2件を修正した。native build・実機操作は実行していない。
 
 ## 回帰確認
 
@@ -30,6 +30,15 @@ Issue #62。全画面Modalを予定フォーム内のエディタへ置き換え
 新規機能のテストは未実装で失敗することを確認してから実装した。追加で、範囲確認中に固定を解除する問題と、メモ側の再試行へ保存が重なる問題を失敗テストで確認し、修正後の全体成功を確認した。
 
 DOM editorとOSのWebViewはcomponent/hookテストで境界をmockしている。IMEの確定待ちは注入したDOM controllerの状態・イベント順で検証したものであり、実際の日本語キーボードの確定を確認した結果ではない。
+
+## 独立レビューの修正
+
+head `b892a58`に対して一度の独立レビューを行い、Important 2件を検証・修正した。修正前に3 testsの失敗、修正後にその成功と全体984 testsの成功を確認した。Minorの保留指摘はない。
+
+1. Expo DOMはnative props受信ごとにcallback proxyを生成するため、callback依存のeffectがcontroller・購読を再作成し、readyと選択通知の通信ループやIME待機要求の消失を起こす。最新callbackをlayout effectでrefへ反映し、controller・購読はeditor/session単位の寿命へ固定するhookへ分離した。高さ通知もstable callbackへ分けた。proxyだけの更新で初期通知を再送せず、保留したIME要求は最新callbackへ返信することを確認した。
+2. 保存成功直後、busy解除の再描画前に戻る操作が走ると古いbusy値が成功済みのrefより先に評価される。成功済みの同期判定を先にし、busyがtrueのrenderでも保存・削除成功後は戻れることを確認した。
+
+レビュー対象外の実際のIME・スクロール・読み上げ・native buildは、次項の未確認事項として維持する。自動検証を実機の証拠へ読み替えず、端末固有の差があれば別途修正する。
 
 ## 実機未確認
 

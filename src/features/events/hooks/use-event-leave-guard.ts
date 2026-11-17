@@ -7,8 +7,8 @@ type State=Readonly<{isBusy:boolean;canLeave?():boolean;confirmLeave():Promise<b
 export function useEventLeaveGuard(state:State){
   const navigation=useNavigation();
   usePreventRemove(true,({data})=>{
-    if(state.isBusy)return;
     if(state.canLeave?.()){navigation.dispatch(data.action);return;}
+    if(state.isBusy)return;
     void state.confirmLeave().then(allowed=>{if(allowed)navigation.dispatch(data.action);});
   });
   useEffect(()=>{

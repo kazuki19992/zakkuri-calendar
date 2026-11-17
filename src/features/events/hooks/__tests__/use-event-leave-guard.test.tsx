@@ -19,3 +19,8 @@ it('保存・削除成功後は文書の確認を繰り返さず戻れる',async
  const action={type:'GO_BACK'};await act(async()=>{jest.mocked(usePreventRemove).mock.calls.at(-1)![1]({data:{action}});});
  expect(dispatch).toHaveBeenCalledWith(action);expect(confirmLeave).not.toHaveBeenCalled();
 });
+it('保存成功refがtrueならbusy解除の再描画を待たず戻れる',async()=>{
+ const dispatch=jest.fn();jest.mocked(useNavigation).mockReturnValue({dispatch} as unknown as ReturnType<typeof useNavigation>);
+ const confirmLeave=jest.fn();await renderHook(()=>useEventLeaveGuard({isBusy:true,canLeave:()=>true,confirmLeave,noteSession:{blur:jest.fn()}}));
+ const action={type:'GO_BACK'};await act(async()=>{jest.mocked(usePreventRemove).mock.calls.at(-1)![1]({data:{action}});});expect(dispatch).toHaveBeenCalledWith(action);expect(confirmLeave).not.toHaveBeenCalled();
+});

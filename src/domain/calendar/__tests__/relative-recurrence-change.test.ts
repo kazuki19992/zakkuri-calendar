@@ -50,3 +50,17 @@ it('保存済みの祝日調整結果を全体の単発化で再計算しない'
   const plan=planSeriesMutation({series:{event:current,reminders:[]},boundaryDate:'2026-11-16',submitted:{event:{...current,recurrenceRule:null},reminders:[]},exceptions:[],now:'new',environment});
   expect(plan.nextSeries?.event).toMatchObject({anchorDate:'2026-11-18',endDate:'2026-11-19',resolutionContext:current.temporalType==='fuzzy'?current.resolutionContext:null,recurrenceRule:null});
 });
+
+it('初回の期間だけを全体変更すると保存し、後の例外は維持する', () => {
+  const definition = definitions.find(d => d.key === 'this_week')!;
+  const current: CalendarEvent = {...event, temporalType:'fuzzy', temporalDefinitionId:definition.id,
+    anchorDate:'2027-01-18', endDate:'2027-01-22', resolutionContext:{version:1, referenceDate:'2027-01-18', periodAnchorDate:'2027-01-18', parameterSnapshot:{thisWeekDeadlineWeekday:5}},
+    recurrenceRule:{version:2,kind:'relativePeriod',frequency:'weekly',interval:1,end:{type:'never'},deadlinePolicy:{version:1,weekday:5,adjustNonWorkingDays:false,holidayCalendarId:'none'}}};
+  const changed = {...current, anchorDate:'2027-01-20', resolutionContext:{...current.resolutionContext!, referenceDate:'2027-01-20'}};
+  const future = {...exception, originalOccurrenceDate:'2027-01-25'};
+  const plan = planSeriesMutation({series:{event:current,reminders:[]},boundaryDate:'2027-01-18', submitted:{event:changed,reminders:[]},exceptions:[future],now:'new',environment});
+  expect(plan.nextSeries?.event).toMatchObject({anchorDate:'2027-01-20',endDate:'2027-01-22',resolutionContext:changed.resolutionContext});
+  expect(plan.upsertExceptions).toEqual([future]);
+  expect(plan.deleteExceptionIdentities).toEqual([]);
+  expect(plan.deleteReplacementEventIds).toEqual([]);
+});

@@ -738,3 +738,52 @@ it('保存済み単発から毎週へ変換するときもタブ往復では締�
   await act(async()=>{expect(await result.current.save()).toBe(true);});
   expect(repositories.events.update.mock.calls[0][0].event).toMatchObject({endDate:'2026-11-20',recurrenceRule:{deadlinePolicy:{weekday:5}}});
 });
+
+it.each(['fuzzy', 'exact'] as const)('未訪問の%sタブへ繰り返し入力を混ぜず、戻ると復元する', async tab => {
+  const repositories = createRepositories();
+  const first = tab === 'fuzzy' ? 'exact' : 'fuzzy';
+  const {result} = await renderHook(() => useEventEditor({...repositories, initial, initialTab:first}));
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  await act(async () => result.current.setRecurrencePreset('daily'));
+  await act(async () => result.current.setEditorTab(tab));
+  expect(result.current.recurrenceDraft.preset).toBe('none');
+  await act(async () => result.current.setEditorTab(first));
+  expect(result.current.recurrenceDraft.preset).toBe('daily');
+});
+it('週から来月を経て週へ切り替えてもoffsetを再適用しない', async () => {
+  const repositories = createRepositories();
+  const month:TemporalDefinition = {...nextWeek, id:'next-month-offset',key:'next_month',granularity:'month',label:'来月',resolverConfig:{kind:'monthDays',selectionMonthOffset:1,startDay:1,endDay:'last'}};
+  repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning,nextWeek,month]);
+  const {result} = await renderHook(() => useEventEditor({...repositories, initial:{...initial,date:'2026-09-30'}}));
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  await act(async () => result.current.selectDefinition(nextWeek.id));
+  expect(result.current.relativeDatePreview).toContain('10月5日');
+  await act(async () => result.current.selectDefinition(month.id));
+  expect(result.current.relativeDatePreview).toContain('10月1日');
+  await act(async () => result.current.selectDefinition(nextWeek.id));
+  expect(result.current.relativeDatePreview).toBe('9月28日（月）〜9月30日（水）');
+});
+it.each(['noBusinessDay','unsupportedHolidayRange'] as const)('休日調整が%sのプレビューは調整済みと誤表示しない', async reason => {
+  const repositories = createRepositories();
+  const definition:TemporalDefinition = {...nextWeek,id:'warning-preview',key:'this_week',resolverConfig:{kind:'weekRemainder',selectionWeekOffset:0}};
+  repositories.temporalDefinitions.listEnabled.mockResolvedValue([definition]);
+  repositories.settings.getHolidayPreferences.mockResolvedValue({version:1,calendarId:'jp',adjustThisWeekDeadline:true});
+  const holidayProvider = {list:jest.fn().mockReturnValue(reason === 'noBusinessDay' ? {status:'available',holidays:[{date:'2026-03-20',name:'祝日'}]} : {status:'unsupported'})};
+  const {result} = await renderHook(() => useEventEditor({...repositories,initial:{...initial,date:'2026-03-20'},holidayProvider}));
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  await act(async () => result.current.setRecurrencePreset('weekly'));
+  expect(result.current.relativeDatePreview).toContain('締切を要確認');
+  expect(result.current.relativeDatePreview).not.toContain('考慮した締切');
+});
+it('開催読込後に定義一覧が更新されても保存には開催読込時のtokenを使う', async () => {
+  const f = relativeOccurrenceFixture();
+  const expected = {id:f.definition.id,token:temporalDefinitionToken(f.definition)};
+  f.repositories.events.getOccurrenceEditData.mockResolvedValue({...f.data,definitionExpectations:[expected]});
+  f.repositories.temporalDefinitions.listEnabled.mockResolvedValue([{...f.definition,fadeInRatio:0.1,updatedAt:'2026-11-18T00:00:00Z'}]);
+  const {result} = await renderHook(() => useEventEditor({...f.repositories,initial,eventId:f.series.id,occurrenceDate:'2027-02-01'}));
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  await act(async () => result.current.setTitle('保持する本文'));
+  await act(async () => {await result.current.save();});
+  await act(async () => {expect(await result.current.selectScope('occurrence')).toBe(true);});
+  expect(f.repositories.events.saveOccurrenceException).toHaveBeenCalledWith(expect.objectContaining({expectedDefinition:expected,expectedDefinitions:[expected]}));
+});

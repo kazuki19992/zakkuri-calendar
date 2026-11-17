@@ -171,3 +171,12 @@ describe('row mappers', () => {
     expect(map).not.toThrow(/歯医者/);
   });
 });
+
+it('終了対象が初回より前のV2行を単発や空の予定として受理しない', () => {
+  const row = {...eventRow, temporal_type: 'fuzzy', temporal_definition_id: 'month-end',
+    anchor_date: '2026-11-26', end_date: '2026-11-30',
+    fuzzy_resolution_context_json: JSON.stringify({version:1, referenceDate:'2026-11-18', periodAnchorDate:'2026-11-01', parameterSnapshot:{}}),
+    recurrence_rule_json: JSON.stringify({version:2, kind:'relativePeriod', frequency:'monthly', interval:1,
+      end:{type:'untilPeriod',periodAnchorDate:'2026-10-01'},deadlinePolicy:null})};
+  expect(() => mapEventRow(row)).toThrow(CorruptDatabaseRowError);
+});

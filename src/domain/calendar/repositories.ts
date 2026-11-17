@@ -19,6 +19,8 @@ import type { RecurrenceMutationPlan } from './recurrence-change';
 
 export type OccurrenceEditData = Readonly<{
   resolvedOccurrence?: CalendarEvent;
+  /** 開催データと同じ読込snapshotに属する定義の検証値。 */
+  definitionExpectations?: readonly DefinitionExpectation[];
   series: EventAggregate;
   exception: RecurrenceException | null;
   replacement: EventAggregate | null;

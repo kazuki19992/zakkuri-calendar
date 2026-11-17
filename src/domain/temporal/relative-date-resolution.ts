@@ -81,3 +81,11 @@ export function resolveRelativeDateRange(
 
   return fail('definition is not a relative date definition');
 }
+
+/** 表示済み期間を基準に再選択する際、来週・来月をもう一度加算しない。 */
+export function withoutRelativeSelectionOffset(definition: TemporalDefinition): TemporalDefinition {
+  const config = definition.resolverConfig;
+  return {...definition, resolverConfig: 'selectionWeekOffset' in config
+    ? {...config, selectionWeekOffset: 0}
+    : 'selectionMonthOffset' in config ? {...config, selectionMonthOffset: 0} : config};
+}

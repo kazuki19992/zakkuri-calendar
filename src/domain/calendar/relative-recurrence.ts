@@ -3,7 +3,7 @@ import type {CalendarEvent} from './event';
 import {isCalendarDate} from './month';
 import type {HolidayProvider} from './holiday';
 import type {TemporalDefinition} from '@/domain/temporal/temporal-definition';
-import {resolveRelativeDateRange} from '@/domain/temporal/relative-date-resolution';
+import {resolveRelativeDateRange,withoutRelativeSelectionOffset} from '@/domain/temporal/relative-date-resolution';
 import {adjustThisWeekDeadline} from '@/domain/temporal/adjust-this-week-deadline';
 import type {RelativeRecurrenceRuleV2} from './recurrence';
 export type RelativeRecurrenceEnvironment = Readonly<{definitions: readonly TemporalDefinition[]; holidayProvider?: HolidayProvider}>;
@@ -62,8 +62,7 @@ export function rebaseRelativeSeries(series:CalendarEvent,referenceDate:string,e
 function resolveAt(event: Extract<CalendarEvent,{temporalType:'fuzzy'}>,period:string,referenceDate:string,definition:TemporalDefinition,environment:RelativeRecurrenceEnvironment):CalendarEvent {
   const rule=event.recurrenceRule;
   if(rule?.version!==2)throw new Error('Invalid relative series');
-  const config=definition.resolverConfig;
-  const anchored={...definition,resolverConfig:'selectionWeekOffset' in config?{...config,selectionWeekOffset:0 as const}:'selectionMonthOffset' in config?{...config,selectionMonthOffset:0 as const}:config};
+  const anchored=withoutRelativeSelectionOffset(definition);
   const result=resolveRelativeDateRange(referenceDate,anchored,rule.deadlinePolicy?.weekday??5);
   if(!result.ok)throw new Error('Unable to resolve relative period');
   let resolved=result.value;

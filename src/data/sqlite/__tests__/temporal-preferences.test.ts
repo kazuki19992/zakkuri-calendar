@@ -164,3 +164,24 @@ it('初回範囲が同じでも元定義が変わったV2変更計画を保存�
   await expect(repos.events.applyRecurrenceMutation({seriesId:event.id,expectedSeriesUpdatedAt:now,expectedDefinition:{id:target.id,token:temporalDefinitionToken(target)},expectedDefinitions:[{id:before.id,token:temporalDefinitionToken(before)}],plan:{removePreviousSeries:false,previousSeries:null,nextSeries:{event:{...source,title:'変更',temporalType:'fuzzy',temporalDefinitionId:target.id},reminders:[]},upsertExceptions:[],deleteExceptionIdentities:[],deleteReplacementEventIds:[]}})).rejects.toBeInstanceOf(TemporalConflictError);
   expect((await repos.events.getById(event.id))?.event.title).toBe('月末');
 });
+
+it('開催解決と同じtransactionで元予定と置換予定の定義tokenを読み、後の更新を拒否する', async () => {
+  const {event,definition} = await relativeSeriesFixture();
+  const identity = {seriesEventId:event.id,originalOccurrenceDate:'2027-02-01'};
+  const data = await repos.events.getOccurrenceEditData(identity);
+  if (!data?.resolvedOccurrence) throw new Error('fixture');
+  const morning = (await repos.temporalDefinitions.listEnabled(event.calendarId)).find(d => d.key === 'morning')!;
+  const replacement = {...data.resolvedOccurrence,temporalType:'fuzzy' as const,id:'snapshot-replacement',temporalDefinitionId:morning.id,anchorDate:'2027-02-24',endDate:'2027-02-24',resolutionContext:null};
+  await repos.events.saveOccurrenceException({identity,replacement:{event:replacement,reminders:[]},overrideFields:['temporal'],expectedSeriesUpdatedAt:now,now});
+  const loaded = await repos.events.getOccurrenceEditData(identity);
+  expect(loaded?.definitionExpectations).toEqual([
+    {id:definition.id,token:temporalDefinitionToken(definition)},
+    {id:morning.id,token:temporalDefinitionToken(morning)},
+  ]);
+  const patch = {fadeInRatio:0.1};
+  const preview = await repos.temporalDefinitions.previewUpdate(definition.id,patch);
+  await repos.temporalDefinitions.updateDefinition({id:definition.id,patch,token:preview.token,now:'2026-11-18T00:00:00Z'});
+  expect((await repos.events.getById(event.id))?.event.updatedAt).toBe(now);
+  await expect(repos.events.saveOccurrenceException({identity,replacement:{event:{...replacement,title:'古い表示から変更'},reminders:[]},overrideFields:['temporal','title'],expectedDefinitions:loaded?.definitionExpectations,expectedSeriesUpdatedAt:now,now})).rejects.toBeInstanceOf(TemporalConflictError);
+  expect((await repos.events.getById(replacement.id))?.event.title).toBe(event.title);
+});

@@ -62,7 +62,9 @@ export function planRelativeSeriesMutation(input:PlanSeriesMutationInput):Recurr
   let next:CalendarEvent;
   if(!changed){
     const candidate=input.submitted.event;
-    next={...source,title:candidate.title,location:candidate.location,noteDocument:candidate.noteDocument,colorId:candidate.colorId};
+    // 初回の解決範囲だけの変更は未来回の規則を変えないため、既存例外を維持する。
+    const initialIdentity=source.temporalType==='fuzzy'?source.resolutionContext?.periodAnchorDate:source.anchorDate;
+    next=input.boundaryDate===initialIdentity?candidate:{...source,title:candidate.title,location:candidate.location,noteDocument:candidate.noteDocument,colorId:candidate.colorId};
   }else if(input.boundaryDate===(source.temporalType==='fuzzy'?source.resolutionContext?.periodAnchorDate:source.anchorDate)){
     // 初回を変更する場合、提出された解決済み期間を再度selection offset前へ戻さない。
     next=input.submitted.event;

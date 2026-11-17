@@ -53,6 +53,7 @@ import { createFixedDurationFromDateTimes, toMinutesOfDay } from '@/domain/calen
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   resolveRelativeDateRange,
+  withoutRelativeSelectionOffset,
   type RelativeDateResolution,
   type ThisWeekDeadlineWeekday,
 } from '@/domain/temporal/relative-date-resolution';
@@ -436,12 +437,13 @@ export function useEventEditor({
     if (value === editorTab) return;
     recurrenceTabCache.current[editorTab]=recurrenceDraft;
     recurrenceTabIntent.current[editorTab]=recurrenceEdited;
-    const cached=recurrenceTabCache.current[value];if(cached)setRecurrenceDraft(cached);
+    const cached=recurrenceTabCache.current[value];
+    setRecurrenceDraft(cached??getRecurrenceDraft(null,startDate));
     setRecurrenceEdited(recurrenceTabIntent.current[value]??false);
     setEditorTabValue(value);
     clearErrors();
     if (status === 'ready') void settings.setLastEventEditorTab(value, now()).catch(() => {});
-  }, [clearErrors, editorTab, now, settings, status,recurrenceDraft,recurrenceEdited]);
+  }, [clearErrors, editorTab, now, settings, status,recurrenceDraft,recurrenceEdited,startDate]);
   const setAllDay = useCallback((value: boolean) => {
     if (value && !allDayDraftInitialized.current) {
       setAllDayEndDate(endDate);
@@ -487,7 +489,7 @@ export function useEventEditor({
     if(previous&&next&&previous.granularity!==next.granularity){
       const current=existingAggregate?.event;
       const visible=current?.temporalType==='fuzzy'&&current.temporalDefinitionId===selectedDefinitionId&&!temporalReselected?current.anchorDate:null;
-      const oldRange=previous.granularity!=='day'?resolveRelativeDateRange(relativeReference??startDate,previous,thisWeekDeadlineWeekday):null;
+      const oldRange=previous.granularity!=='day'?resolveRelativeDateRange(relativeReference??startDate,relativeReference===null?previous:withoutRelativeSelectionOffset(previous),thisWeekDeadlineWeekday):null;
       setRelativeReference(previous.granularity!=='day'&&next.granularity!=='day'?(visible??(oldRange?.ok?oldRange.value.startDate:startDate)):null);
       recurrenceGranularityCache.current[previous.granularity]=recurrenceDraft;
       recurrenceGranularityIntent.current[previous.granularity]=recurrenceEdited;
@@ -607,8 +609,7 @@ export function useEventEditor({
         parameterSnapshot: context.parameterSnapshot,
       };
     } else if (selectedDefinition !== null) {
-      const config=selectedDefinition.resolverConfig;
-      const selection=relativeReference===null?selectedDefinition:{...selectedDefinition,resolverConfig:'selectionWeekOffset' in config?{...config,selectionWeekOffset:0 as const}:'selectionMonthOffset' in config?{...config,selectionMonthOffset:0 as const}:config};
+      const selection=relativeReference===null?selectedDefinition:withoutRelativeSelectionOffset(selectedDefinition);
       const resolution = resolveRelativeDateRange(relativeReference??startDate, selection, thisWeekDeadlineWeekday);
       if (resolution.ok) {
         if (selectedDefinition.resolverConfig.kind === 'weekRemainder' && holidayPreferences.adjustThisWeekDeadline) {
@@ -626,7 +627,7 @@ export function useEventEditor({
   }
   const relativeDatePreview = relativeResolution === null
     ? null
-    : `${formatEditorDate(relativeResolution.startDate)}〜${formatEditorDate(relativeResolution.endDate)}${relativeResolution.parameterSnapshot.deadlineAdjustment === undefined ? '' : relativeResolution.parameterSnapshot.deadlineAdjustment.calendarId === 'none' ? '（土日を考慮した締切）' : '（土日祝を考慮した締切）'}`;
+    : `${formatEditorDate(relativeResolution.startDate)}〜${formatEditorDate(relativeResolution.endDate)}${relativeResolution.parameterSnapshot.deadlineWarning ? '（締切を要確認）' : relativeResolution.parameterSnapshot.deadlineAdjustment === undefined ? '' : relativeResolution.parameterSnapshot.deadlineAdjustment.calendarId === 'none' ? '（土日を考慮した締切）' : '（土日祝を考慮した締切）'}`;
 
   const relativeEnvironment:RelativeRecurrenceEnvironment={definitions,holidayProvider};
   const relativeContext=relativeResolution?{version:1 as const,referenceDate:relativeResolution.referenceDate,periodAnchorDate:relativeResolution.periodAnchorDate,parameterSnapshot:relativeResolution.parameterSnapshot}:null;
@@ -653,9 +654,11 @@ export function useEventEditor({
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const expectedDefinitionFor = useCallback((event: EventAggregate['event']): DefinitionExpectation | undefined => {
     if (event.temporalType !== 'fuzzy') return undefined;
+    const expected = occurrenceEditData?.definitionExpectations?.find(item => item.id === event.temporalDefinitionId);
+    if (expected) return expected;
     const definition = definitions.find(item => item.id === event.temporalDefinitionId);
     return definition ? { id: definition.id, token: temporalDefinitionToken(definition) } : undefined;
-  }, [definitions]);
+  }, [definitions, occurrenceEditData]);
   const recoverTemporalConflict = useCallback(async () => {
     try {
       const occurrence=eventId&&occurrenceDate?await events.getOccurrenceEditData({seriesEventId:eventId,originalOccurrenceDate:occurrenceDate}):null;

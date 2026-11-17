@@ -1,3 +1,4 @@
+import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import type { HolidayProvider } from '@/domain/calendar/holiday';
 import {resolveRelativeOccurrence,validateRelativeSeries} from '@/domain/calendar/relative-recurrence';
 import { TemporalConflictError, temporalDefinitionToken, reResolveTemporalEvent, type DefinitionExpectation } from '@/domain/temporal/temporal-preferences';
@@ -369,13 +370,21 @@ export class SqliteEventRepository implements EventRepository {
     const replacement = exception?.replacementEventId === null || exception === null
       ? null
       : await loadAggregate(this.database, exception.replacementEventId);
-    let resolvedOccurrence:CalendarEvent|undefined;
-    if(series.event.recurrenceRule?.version===2&&series.event.temporalType==='fuzzy'){
-      const definition=await new SqliteTemporalDefinitionRepository(this.database).getById(series.event.temporalDefinitionId);
-      if(!definition)throw new Error('Missing relative definition');
-      resolvedOccurrence=resolveRelativeOccurrence(series.event,identity.originalOccurrenceDate,{definitions:[definition],holidayProvider:this.holidayProvider});
+    // 解決結果と保存用tokenを同じtransactionで取得し、後から読んだ定義と混ぜない。
+    const definitions = new SqliteTemporalDefinitionRepository(this.database);
+    const referencedDefinitions: TemporalDefinition[] = [];
+    for (const event of [series.event, replacement?.event]) {
+      if (event?.temporalType !== 'fuzzy' || referencedDefinitions.some(item => item.id === event.temporalDefinitionId)) continue;
+      const definition = await definitions.getById(event.temporalDefinitionId);
+      if (!definition) throw new Error('Missing temporal definition');
+      referencedDefinitions.push(definition);
     }
-    return { series, exception, replacement, exceptions,...(resolvedOccurrence?{resolvedOccurrence}:{}) };
+    const definitionExpectations = referencedDefinitions.map(definition => ({id:definition.id,token:temporalDefinitionToken(definition)}));
+    let resolvedOccurrence:CalendarEvent|undefined;
+    if(series.event.recurrenceRule?.version===2){
+      resolvedOccurrence=resolveRelativeOccurrence(series.event,identity.originalOccurrenceDate,{definitions:referencedDefinitions,holidayProvider:this.holidayProvider});
+    }
+    return { series, exception, replacement, exceptions, definitionExpectations,...(resolvedOccurrence?{resolvedOccurrence}:{}) };
   }
 
   async saveOccurrenceException(command: SaveOccurrenceExceptionCommand): Promise<void> {

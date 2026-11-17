@@ -10,8 +10,8 @@ Issue #61。週8種類・月6種類の相対表現を毎週・毎月・任意間
 
 - `npm run typecheck`: 成功。
 - `npm run lint`: 成功、警告なし。
-- `npm test -- --runInBand`: 109 suites・942 tests成功。既存のTZ条件付き1 suite・2 testsは通常環境でskip。
-- `TZ=America/New_York npx jest --runInBand --runTestsByPath src/domain/notifications/__tests__/dst.test.ts src/domain/calendar/__tests__/relative-recurrence.test.ts`: 2 suites・26 tests成功。通常環境でskipしたDST 2 testsを含む。
+- `npm test -- --runInBand`: 109 suites・954 tests成功。既存のTZ条件付き1 suite・2 testsは通常環境でskip。
+- `TZ=America/New_York npx jest --runInBand --runTestsByPath src/domain/notifications/__tests__/dst.test.ts src/domain/calendar/__tests__/relative-recurrence.test.ts`: 2 suites・29 tests成功。通常環境でskipしたDST 2 testsを含む。
 - `git diff --check`: 成功。
 - `npx expo export --platform ios --output-dir /tmp/zakkuri-relative-final-ios --clear`: 成功。
 - `npx expo export --platform android --output-dir /tmp/zakkuri-relative-final-android`: 成功。
@@ -40,6 +40,19 @@ Issue #61。週8種類・月6種類の相対表現を毎週・毎月・任意間
 4. ざっくり／きっちりのタブ往復だけで保存済み締切snapshotを現在設定へ置換しないよう修正。
 
 Minorの保留指摘はない。実機の描画・アクセシビリティ・OS通知・native buildはレビュー対象外とし、次項の未確認事項として明示する。自動検証をそれらの証拠へ読み替えない。
+
+## PR #65のレビューコメント対応
+
+6件の指摘を検証し、次を修正した。新しい回帰テスト12件のうち、不具合を再現する10件の修正前の失敗と、終了対象が初回以降なら受理する2件を確認した。
+
+- 開催の解決結果と同じtransactionから元予定・置換予定の定義tokenを返し、後で読んだ定義一覧より優先する。実SQLiteで、初回日付・シリーズrevisionが変わらないフェード更新後も古いtokenでの保存を拒否することを確認した。
+- 初回より前のV2終了対象をdomain parserとrow mappingで拒否する。初回と同じ／後の対象期間は受理する。
+- 初回の期間だけの全体変更を保存し、未来回の規則が同じなら既存例外を維持する。後の回から本文だけを全体変更する既存テストも維持する。
+- 初めて開くタブの繰り返しdraftを初期化し、既訪問タブのdraftは復元する。
+- 週↔月の再選択と表示で選択offsetの正規化を共有し、来月を二重に加算しない。
+- 休日調整失敗時の編集プレビューを「締切を要確認」とし、調整済みと誤表示しない。
+
+修正後の型チェック・lint・全体954 tests・専用TZの29 tests・diff checkを再実行し、すべて成功した。iOS export（`/tmp/zakkuri-65-review-ios`、`--clear`）とAndroid export（`/tmp/zakkuri-65-review-android`）も成功。native build・実機未確認の範囲は変わらない。
 
 ## 実機未確認
 

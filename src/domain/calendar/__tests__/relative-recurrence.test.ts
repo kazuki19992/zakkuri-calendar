@@ -78,3 +78,12 @@ it('遠い移動例外があっても表示期間の回とその例外だけを�
   expect(result.ok&&result.value).toHaveLength(2);
   expect(lookup.mock.calls.length).toBeLessThanOrEqual(2);lookup.mockRestore();
 });
+
+it.each([
+  ['2026-10-01', false], ['2026-11-01', true], ['2026-12-01', true],
+])('V2の終了対象%sを初回対象と比較する', (periodAnchorDate, accepted) => {
+  const event = series('month_end', '2026-11-18');
+  if (event.recurrenceRule?.version !== 2) throw new Error('fixture');
+  expect(parseCalendarEvent({...event, recurrenceRule: {...event.recurrenceRule,
+    end: {type: 'untilPeriod', periodAnchorDate}}}).ok).toBe(accepted);
+});

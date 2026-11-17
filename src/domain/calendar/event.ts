@@ -152,6 +152,10 @@ export function parseEventDraft(input: unknown): Result<EventDraft, EventValidat
     if ((resolutionContext !== null && base.recurrenceRule?.version === 1) || (resolutionContext === null && base.recurrenceRule?.version === 2)) {
       return fail('recurrenceRule', 'resolved relative events cannot recur');
     }
+    if (base.recurrenceRule?.version === 2 && base.recurrenceRule.end.type === 'untilPeriod' &&
+        resolutionContext !== null && base.recurrenceRule.end.periodAnchorDate < resolutionContext.periodAnchorDate) {
+      return fail('recurrenceRule', 'final relative period must not be before initial period');
+    }
     return { ok: true, value: {
       ...base,
       temporalType: 'fuzzy',

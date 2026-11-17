@@ -444,3 +444,10 @@ build・export成功、unit test成功、実機操作、アクセシビリティ
 6. 繰り返し例外の比較・materialize、回帰テスト、文書更新。
 
 各段階でdomain、data、featureの境界を保ち、Tiptap JSONをdomainやRepository APIへ漏らさない。実装計画は本設計の承認後に別文書として作成する。
+
+
+## 2026-11-17 後続実装（#62）
+
+全画面Modalの初期導線を、`2026-11-17-inline-event-notes-design.md`の承認に沿った予定画面内の編集へ変更する。メモ専用の完了・キャンセルは廃止し、予定全体の保存・取消へ統合する。アプリ所有の文書形式、adapter、対応書式、URL制限、予定保存前のインメモリ境界と既存SQLiteの形式を維持する。
+
+最新本文は要求ID・セッションID付きのDOM応答から取得し、IME確定・timeout・旧応答を扱う。nativeのcheckpointだけを保存の正とはしない。旧Modal wrapperを削除し、既存の専用テストは文書セッション・DOM境界・画面内編集・予定全体の保存／破棄のテストへ置き換えた。検証と実機未確認事項は`docs/verification/2026-11-17-inline-event-notes.md`を参照する。

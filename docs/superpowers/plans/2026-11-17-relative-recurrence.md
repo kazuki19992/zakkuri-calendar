@@ -75,10 +75,12 @@
 - [x] README、既存の相対予定/例外/設定設計、検証記録を実装に合わせて更新する。
 - [x] typecheck / lint / 全Jest / diff check、iOS/Android exportを実行し、DSTは専用TZでも検証する。
 - [x] 一度の独立した全差分レビューを行い、重要指摘を再現テスト→修正→全体検証で解消する。
-- [ ] develop向け通常Open PRを作成し、`Closes #61`、設計判断、検証結果と実機未確認項目を日本語で記載する。Issue進捗も更新し、Botの再レビューは待たない。
+- [x] develop向け通常Open PRを作成し、`Closes #61`、設計判断、検証結果と実機未確認項目を日本語で記載する。Issue進捗も更新し、Botの再レビューは待たない。
 
 ## 実行記録
 
 - 2026-11-17: 設計承認済み。SDK 57 SQLite公式資料を確認。既存の専用worktreeを継続し、担当内で実装後に一度の独立レビューを行う。
 
 - 2026-11-17: Tasks 1〜4完了。独立レビューの重要4件を12件の追加回帰テストで修正。全体942 testsと専用TZの26 tests成功。PR作成を残す。
+
+- 2026-11-17: [PR #65](https://github.com/kazuki19992/zakkuri-calendar/pull/65)をdevelop向けOpen PRとして作成。Issue #61の受け入れ条件と検証状況を更新。実機未確認事項は検証記録とPRへ記載。

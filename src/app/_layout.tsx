@@ -10,6 +10,10 @@ import { CalendarRefreshProvider } from '@/features/calendar/calendar-refresh-co
 
 SplashScreen.preventAutoHideAsync();
 
+export const unstable_settings = {
+  anchor: 'index',
+};
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (

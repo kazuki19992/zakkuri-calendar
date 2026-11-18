@@ -31,7 +31,7 @@ export function InlineFormattedNoteEditor({model,linkError}:{model:InlineNoteEdi
 export function InlineNoteToolbar({model,onOpenLink}:{model:InlineNoteEditorModel;onOpenLink(url:string):void}){
   const {focused,disabled,snapshot,selection,onToolbarTouchStart,onToolbarTouchEnd,toggleBold,toggleItalic,toggleBulletList,toggleOrderedList,toggleTaskList}=model;
   if(!focused)return null;
-  return <View onTouchStart={onToolbarTouchStart} onTouchEnd={onToolbarTouchEnd}>
+  return <View onTouchStart={onToolbarTouchStart} onTouchEnd={onToolbarTouchEnd} onTouchCancel={onToolbarTouchEnd}>
     <FormattedNoteToolbar disabled={disabled||!snapshot.ready} state={selection}
       onToggleBold={toggleBold} onToggleItalic={toggleItalic}
       onToggleBulletList={toggleBulletList} onToggleOrderedList={toggleOrderedList}

@@ -20,6 +20,7 @@ export function useInlineNoteEditor(session:InlineNoteSession,disabled:boolean){
   const setFocused=useCallback((value:boolean)=>setFocus({sessionId:snapshot.sessionId,value}),[snapshot.sessionId]);
   const [selection,setSelection]=useState(EMPTY_SELECTION);
   const toolbarHolding=useRef(false),scrollY=useRef(0);
+  const deferredBlur=useRef(false);
   const blurTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const sessionId=snapshot.sessionId;
   const current=useCallback(()=>session.getSnapshot().sessionId===sessionId,[session,sessionId]);
@@ -47,16 +48,25 @@ export function useInlineNoteEditor(session:InlineNoteSession,disabled:boolean){
     }),0);
     return ()=>clearTimeout(timer);
   },[focused,keyboardTop,frame,reduceMotion,height]);
-  const endEditing=useCallback(()=>{clearTimeout(blurTimer.current);setFocused(false);session.blur();},[session,setFocused]);
+  const endEditing=useCallback(()=>{clearTimeout(blurTimer.current);deferredBlur.current=false;toolbarHolding.current=false;setFocused(false);session.blur();},[session,setFocused]);
   const onFocusChange=useCallback(async(value:boolean)=>{
     if(!current())return;
     clearTimeout(blurTimer.current);
+    deferredBlur.current=false;
     if(value)setFocused(true);
-    else blurTimer.current=setTimeout(()=>{if(!toolbarHolding.current)setFocused(false);},150);
+    else blurTimer.current=setTimeout(()=>{
+      if(!current())return;
+      if(toolbarHolding.current)deferredBlur.current=true;
+      else setFocused(false);
+    },150);
+  },[current,setFocused]);
+  const onToolbarTouchEnd=useCallback(()=>{
+    toolbarHolding.current=false;
+    if(current()&&deferredBlur.current){deferredBlur.current=false;setFocused(false);}
   },[current,setFocused]);
   const retry=useCallback(()=>{
     if(disabled||session.getSnapshot().pending)return;
-    if(snapshot.ready){void session.capture().catch(()=>{}).finally(()=>session.release());return;}
+    if(snapshot.ready&&snapshot.error!=='timeout'){void session.capture().catch(()=>{}).finally(()=>session.release());return;}
     if(snapshot.everReady){
       Alert.alert('最後に取得できた内容から再読み込みしますか？','取得できていない文字は失われる可能性があります。',[
         {text:'編集を続ける',style:'cancel'},
@@ -70,7 +80,7 @@ export function useInlineNoteEditor(session:InlineNoteSession,disabled:boolean){
     bindField:useCallback((value:View|null)=>{fieldRef.current=value;},[]),
     bindScroll:useCallback((value:ScrollView|null)=>{scrollRef.current=value;},[]),
     onToolbarTouchStart:useCallback(()=>{toolbarHolding.current=true;},[]),
-    onToolbarTouchEnd:useCallback(()=>{toolbarHolding.current=false;},[]),
+    onToolbarTouchEnd,
     toggleBold:useCallback(()=>editorRef.current?.toggleBold(),[]),
     toggleItalic:useCallback(()=>editorRef.current?.toggleItalic(),[]),
     toggleBulletList:useCallback(()=>editorRef.current?.toggleBulletList(),[]),

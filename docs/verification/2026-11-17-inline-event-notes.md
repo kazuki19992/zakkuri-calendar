@@ -2,7 +2,7 @@
 
 ## 対象
 
-Issue #62、[PR #66](https://github.com/kazuki19992/zakkuri-calendar/pull/66)。対象コードcommit `cc178c2`（以降の文書だけの更新を除く）。全画面Modalを予定フォーム内のエディタへ置き換え、予定全体の保存・取消へ統合する。DBの文書JSON・テキスト投影・schema version 7・既存の対応書式とURL制限は維持する。依存追加・migrationはない。
+Issue #62、[PR #66](https://github.com/kazuki19992/zakkuri-calendar/pull/66)。対象コードは本書と同じcommit（以降の文書だけの更新を除く）。全画面Modalを予定フォーム内のエディタへ置き換え、予定全体の保存・取消へ統合する。DBの文書JSON・テキスト投影・schema version 7・既存の対応書式とURL制限は維持する。依存追加・migrationはない。
 
 設計: `docs/superpowers/specs/2026-11-17-inline-event-notes-design.md`。計画: `docs/superpowers/plans/2026-11-17-inline-event-notes.md`。
 
@@ -10,11 +10,11 @@ Issue #62、[PR #66](https://github.com/kazuki19992/zakkuri-calendar/pull/66)。
 
 - `npm run typecheck`: 成功。
 - `npm run lint`: 成功、警告なし。
-- `npm test -- --runInBand`: 115 suites・984 tests成功。既存のTZ条件付き1 suite・2 testsはskip。
+- `npm test -- --runInBand`: 115 suites・993 tests成功。既存のTZ条件付き1 suite・2 testsはskip。
 - `TZ=America/New_York npx jest --runInBand --runTestsByPath src/domain/notifications/__tests__/dst.test.ts`: 上記のDST 2 testsが成功。
 - `git diff --check`: 成功。
-- `npx expo export --platform ios --output-dir /tmp/zakkuri-inline-final-ios --clear`: 成功。DOM bundleを含む。
-- `npx expo export --platform android --output-dir /tmp/zakkuri-inline-final-android`: 成功。DOM bundleを含む。
+- `npx expo export --platform ios --output-dir /tmp/zakkuri-66-review-ios --clear`: 成功。DOM bundleを含む。
+- `npx expo export --platform android --output-dir /tmp/zakkuri-66-review-android`: 成功。DOM bundleを含む。
 
 独立レビューを実施し、Important 2件を修正した。native build・実機操作は実行していない。
 
@@ -40,6 +40,16 @@ head `b892a58`に対して一度の独立レビューを行い、Important 2件�
 
 レビュー対象外の実際のIME・スクロール・読み上げ・native buildは、次項の未確認事項として維持する。自動検証を実機の証拠へ読み替えず、端末固有の差があれば別途修正する。
 
+## PRレビューへの対応（2026-11-18）
+
+head `01575c4`への3件を検証し、以下を修正した。修正前に5 testsの期待した失敗を確認し、修正後は関連テストと全体993 testsが成功した。
+
+1. ディープリンクで予定画面を直接開いた場合にも、Stackのanchorで`index`を戻り先として保持する。Expo Routerの実際のルート設定生成・パス解析を使い、新規・既存予定の両方でカレンダーが背後に含まれることを確認した。既存の離脱ガードの確認・busy・保存成功時のテストも維持した。
+2. 本文取得が5000ms無応答でタイムアウトした後の「再試行」は、再要求を繰り返さず確認付き再読み込みへ進める。確認前にDOMを破棄せず、確認後は最新の検証済み本文を投入する。変換失敗時の同一DOMへの再取得も確認した。
+3. ツールバーへの長いタッチ中に保留したblurを、タッチ終了・キャンセル時に反映する。再focus済みの場合と、短い書式タップで本文へ戻る場合にはツールバーを維持する。
+
+Androidの実際のディープリンク起動・ハードウェア戻る、OSのWebView停止、指でのツールバースクロールは実機未確認。上記はRouterの状態計算とmockしたDOM/OS境界の回帰検証である。
+
 ## 実機未確認
 
 - iOS／Androidの小画面・横向き・文字拡大・ライト／ダークで本文とtoolbarへ到達できること。
@@ -54,6 +64,7 @@ OSのWebView自体が失われた場合、最後にnativeが検証した文書�
 ## 参照した公式資料
 
 - [Expo SDK 57 Router](https://docs.expo.dev/versions/v57.0.0/sdk/router/)
+- [Expo RouterのディープリンクされたModalとanchor](https://docs.expo.dev/router/advanced/modals/#handle-deep-linked-modals)
 - [Expo SDK 57のDOM型](https://github.com/expo/expo/blob/sdk-57/packages/expo/src/dom/dom.types.ts): void commandと非同期JSON callbackの境界。
 - [Expo DOM Components](https://docs.expo.dev/guides/dom-components/): SDK 57の実ソースとも照合する。
 - [Tiptap 3 Editor](https://tiptap.dev/docs/editor/api/editor): 既存のgetJSON/setEditableを利用。

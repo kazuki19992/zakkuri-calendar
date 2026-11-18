@@ -2,6 +2,9 @@ import { render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import RootLayout from '../_layout';
+import * as rootLayout from '../_layout';
+import { getMockConfig } from 'expo-router/build/testing-library/mock-config';
+import { getStateFromPath } from 'expo-router/build/fork/getStateFromPath';
 
 jest.mock('@/features/notifications/notification-context', () => {
   const React = jest.requireActual<typeof import('react')>('react');
@@ -71,6 +74,19 @@ jest.mock('@/features/calendar/calendar-refresh-context', () => {
 });
 
 describe('ルートレイアウト', () => {
+  it.each(['/events/new', '/events/event-1'])('直接起動した%sにもカレンダーへの戻り先を保持する', (path) => {
+    const config = getMockConfig({
+      _layout: rootLayout,
+      index: () => null,
+      'events/new': () => null,
+      'events/[id]': () => null,
+    });
+    const state = getStateFromPath(path, config);
+    expect(state?.routes[0].state?.routes.map(route => route.name)).toEqual([
+      'index', path === '/events/new' ? 'events/new' : 'events/[id]',
+    ]);
+  });
+
   it('データベースと再読み込みproviderの内側に通常のStackを置く', async () => {
     await render(<RootLayout />);
 

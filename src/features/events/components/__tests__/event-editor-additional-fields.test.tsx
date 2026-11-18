@@ -2,7 +2,7 @@ import { fireEvent, render, userEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { EventColorPicker } from '../event-color-picker';
-import { EventMetadataFields, EventNoteField } from '../event-metadata-fields';
+import { EventMetadataFields } from '../event-metadata-fields';
 import { EventReminderEditor } from '../event-reminder-editor';
 import { RecurrenceEditor } from '../recurrence-editor';
 
@@ -93,15 +93,7 @@ describe('予定編集の追加項目', () => {
     expect(view.queryByText('赤')).toBeNull();
   });
 
-  it('場所とメモeditorへの導線を表示する', async () => {
-    const view = await render(<>
-      <EventMetadataFields location="" disabled={false} onLocationChange={jest.fn()} />
-      <EventNoteField summary="買い物リスト" disabled={false} error={null} onPress={jest.fn()} />
-    </>);
-    expect(view.getByLabelText('場所')).toBeOnTheScreen();
-    expect(view.getByLabelText('メモを編集')).toBeOnTheScreen();
-    expect(view.getByText('買い物リスト')).toBeOnTheScreen();
-  });
+  it('場所の入力欄を表示する',async()=>{const view=await render(<EventMetadataFields location="" disabled={false} onLocationChange={jest.fn()}/>);expect(view.getByLabelText('場所')).toBeOnTheScreen();});
 
   it('旧通知の開始基準を表示し複数通知を並べ替え・削除できる', async () => {
     const onMove=jest.fn(),onRemove=jest.fn();

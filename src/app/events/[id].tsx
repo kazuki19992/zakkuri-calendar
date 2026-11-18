@@ -1,6 +1,6 @@
+import {useEventLeaveGuard} from '@/features/events/hooks/use-event-leave-guard';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect } from 'react';
-import { BackHandler } from 'react-native';
+import { useCallback } from 'react';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { JapaneseHolidayProvider } from '@/data/holidays/japanese-holiday-provider';
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
@@ -18,10 +18,7 @@ export default function EditEventRoute() {
     eventId: id, occurrenceDate,
     initial: { date: '2000-01-01', startTime: '09:00', endTime: '10:00', temporalType: 'exact' } });
   const complete = useCallback(async (operation: () => Promise<boolean>) => { if (await operation()) { notifyChanged(); router.back(); } }, [notifyChanged, router]);
-  useEffect(() => {
-    if (!state.isSaving && !state.isDeleting) return;
-    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
-    return () => subscription.remove();
-  }, [state.isDeleting, state.isSaving]);
-  return <><Stack.Screen options={{ gestureEnabled: !(state.isSaving || state.isDeleting) }} /><EventEditorScreen state={state} onSave={() => void complete(state.save)} onDelete={() => void complete(state.remove)} onSelectScope={(scope) => void complete(() => state.selectScope(scope))} onCancel={router.back} /></>;
+  useEventLeaveGuard(state);
+
+  return <><Stack.Screen options={{ gestureEnabled: !state.isBusy }} /><EventEditorScreen state={state} onSave={() => void complete(state.save)} onDelete={() => void complete(state.remove)} onSelectScope={(scope) => void complete(() => state.selectScope(scope))} onCancel={router.back} /></>;
 }

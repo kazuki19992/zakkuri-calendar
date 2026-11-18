@@ -1,3 +1,5 @@
+import {useInlineNoteEditor} from '../hooks/use-inline-note-editor';
+import {InlineFormattedNoteEditor,InlineNoteToolbar} from '../components/formatted-note-editor/inline-formatted-note-editor';
 import { ExactDurationTypeField } from '../components/exact-duration-type-field';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,8 +10,7 @@ import { EventDateTimeFields } from '../components/event-date-time-fields';
 import { EventEditorHeader } from '../components/event-editor-header';
 import { EventEditorTabContent } from '../components/event-editor-tab-content';
 import { EventEditorTabs } from '../components/event-editor-tabs';
-import { EventMetadataFields, EventNoteField } from '../components/event-metadata-fields';
-import { FormattedNoteEditorModal } from '../components/formatted-note-editor/formatted-note-editor-modal';
+import { EventMetadataFields } from '../components/event-metadata-fields';
 import { EventReminderEditor } from '../components/event-reminder-editor';
 import { RecurrenceEditor } from '../components/recurrence-editor';
 import { RecurrenceScopeDialog } from '../components/recurrence-scope-dialog';
@@ -29,7 +30,9 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
   onCancel(): void;
 }>) {
   const theme = useTheme();
-  const busy = state.isSaving || state.isDeleting;
+  const busy = state.isBusy;
+  const note=useInlineNoteEditor(state.noteSession,busy||state.scopeRequest!==null);
+  const {bindRoot,bindScroll,onRootLayout,onScroll,endEditing}=note;
   const section = (title: string, child: React.ReactNode) => (
     <View style={[styles.section, { borderBottomColor: theme.calendarBorder }]}>
       <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>{title}</Text>
@@ -39,14 +42,15 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
+        <View ref={bindRoot} onLayout={onRootLayout} style={styles.screen}>
         <EventEditorHeader mode={state.mode} busy={busy} ready={state.status === 'ready' && !state.isSaveDisabled} onCancel={onCancel} onSave={onSave} />
         {state.status === 'loading' ? <View style={styles.center}><ActivityIndicator /></View> : null}
         {state.status === 'error' ? <View style={styles.center}>
           <Text style={{ color: theme.text }}>予定を読み込めませんでした</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="再試行" onPress={state.retry} style={styles.retry}><Text style={{ color: theme.calendarAccent }}>再試行</Text></Pressable>
         </View> : null}
-        {state.status === 'ready' ? <ScrollView contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-          <TextInput accessibilityLabel="タイトル" placeholder="タイトルを追加" placeholderTextColor={theme.textSecondary} value={state.title} onChangeText={state.setTitle} editable={!busy} style={[styles.titleInput, { color: theme.text, borderBottomColor: theme.calendarBorder }]} />
+        {state.status === 'ready' ? <ScrollView ref={bindScroll} onScroll={onScroll} scrollEventThrottle={16} onTouchStart={endEditing} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
+          <TextInput accessibilityLabel="タイトル" placeholder="タイトルを追加" placeholderTextColor={theme.textSecondary} value={state.title} onFocus={endEditing} onChangeText={state.setTitle} editable={!busy} style={[styles.titleInput, { color: theme.text, borderBottomColor: theme.calendarBorder }]} />
           {state.titleError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.titleError}</Text> : null}
           <EventEditorTabs value={state.editorTab} disabled={busy} onChange={state.setEditorTab} />
           <EventEditorTabContent tab={state.editorTab}>
@@ -77,21 +81,18 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
           {section('場所', <EventMetadataFields location={state.location} disabled={busy}
             onLocationChange={state.setLocation} />)}
           {section('通知', <EventReminderEditor reminders={state.reminders} disabled={busy} error={state.reminderError} onAdd={state.addReminder} onRemove={state.removeReminder} onMove={state.moveReminder} onUpdate={state.updateReminder} category={state.reminderCategory} allowEnd={state.allowReminderEnd} defaultStatus={state.notificationDefaultStatus} onRetry={state.retryNotificationDefaults} onReset={state.resetReminderDefaults} />)}
-          {section('メモ', <EventNoteField summary={state.noteSummary} disabled={busy}
-            error={state.noteLinkError} onPress={state.openNoteEditor} />)}
+          {section('メモ', <InlineFormattedNoteEditor model={note} linkError={state.noteLinkError}/>)}
           {state.saveError ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{state.saveError}</Text> : null}
           {state.mode === 'edit' ? <DeleteEventButton title={state.title} disabled={busy}
             isRecurring={state.recurrenceDraft.preset !== 'none'}
             usesScopeSelection={state.usesRecurrenceScope} onDelete={onDelete} /> : null}
           </EventEditorTabContent>
         </ScrollView> : null}
+        <InlineNoteToolbar model={note} onOpenLink={url=>{void state.openNoteLink(url);}}/>
+        </View>
       </KeyboardAvoidingView>
       <RecurrenceScopeDialog request={state.scopeRequest} busy={busy}
         onSelect={(scope) => onSelectScope?.(scope)} onCancel={state.cancelScope} />
-      <FormattedNoteEditorModal visible={state.isNoteEditorOpen}
-        initialDocument={state.noteDocument} disabled={busy} linkError={state.noteLinkError}
-        onCancel={state.cancelNoteEditor} onComplete={state.completeNoteEditor}
-        onOpenLink={(url) => { void state.openNoteLink(url); }} />
     </SafeAreaView>
   );
 }

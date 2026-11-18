@@ -1,6 +1,8 @@
 'use dom';
 
 import { useCallback, useEffect, useRef, type Ref } from 'react';
+import {useDOMNoteBridge} from '../../hooks/use-dom-note-bridge';
+import type {NoteUpdate,NoteResponse} from '../../event-note/inline-note-session';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { useDOMImperativeHandle, type DOMImperativeFactory } from 'expo/dom';
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
@@ -31,7 +33,9 @@ export interface FormattedNoteEditorDOMRef extends DOMImperativeFactory {
   toggleBulletList: () => void;
   toggleOrderedList: () => void;
   toggleTaskList: () => void;
-  requestComplete: () => void;
+  requestSnapshot: DOMImperativeFactory[string];
+  releaseSnapshot: DOMImperativeFactory[string];
+  blur: () => void;
 }
 
 type Props = Readonly<{
@@ -40,9 +44,16 @@ type Props = Readonly<{
   theme: EditorTheme;
   onReady(): Promise<void>;
   onStateChange(state: EditorSelectionState): Promise<void>;
-  onComplete(document: EventNoteDocumentV1): Promise<void>;
   onConversionFailure(): Promise<void>;
   onFailure(): Promise<void>;
+  sessionId?:number;
+  disabled?:boolean;
+  fontScale?:number;
+  onSnapshot?(response:NoteResponse):Promise<void>;
+  onSnapshotFailure?(requestId:number):Promise<void>;
+  onDocumentChange?(update:NoteUpdate):Promise<void>;
+  onFocusChange?(focused:boolean):Promise<void>;
+  onContentHeight?(height:number):Promise<void>;
   dom?: import('expo/dom').DOMProps;
 }>;
 
@@ -52,68 +63,64 @@ export default function FormattedNoteEditorDOM({
   theme,
   onReady,
   onStateChange,
-  onComplete,
   onConversionFailure,
-  onFailure,
+  sessionId=1,disabled=false,fontScale=1,onSnapshot,onSnapshotFailure,onDocumentChange,onFocusChange,onContentHeight,
 }: Props) {
   const dirtyRef = useRef(false);
+  const revision=useRef(0);
+
   const editor = useEditor({
     extensions: createEventNoteExtensions(),
     content: toTiptapDocument(initialDocument),
     immediatelyRender: false,
-    onCreate: ({ editor: createdEditor }) => {
-      void onReady();
-      createdEditor.commands.focus('end');
-    },
+    editable: false,
+    editorProps:{attributes:{role:'textbox','aria-label':'メモ本文','aria-multiline':'true'}},
+
     onUpdate: ({ editor: updatedEditor }) => {
       dirtyRef.current = true;
+      revision.current+=1;
+      const result=fromTiptapDocument(updatedEditor.getJSON());
+      if(result.ok)void onDocumentChange?.({sessionId,revision:revision.current,document:result.value});
+      else void onConversionFailure();
       void onStateChange(createEditorSelectionState(updatedEditor, true));
     },
   });
 
-  const reportState = useCallback((): void => {
-    if (editor === null) return;
-    void onStateChange(createEditorSelectionState(editor, dirtyRef.current));
-  }, [editor, onStateChange]);
-
-  useEffect(() => {
-    if (editor === null) return;
-    editor.on('selectionUpdate', reportState);
-    editor.on('transaction', reportState);
-    reportState();
-    return () => {
-      editor.off('selectionUpdate', reportState);
-      editor.off('transaction', reportState);
-    };
-  }, [editor, reportState]);
-
+  const getRevision=useCallback(()=>revision.current,[]);
+  const getDirty=useCallback(()=>dirtyRef.current,[]);
+  const {requestSnapshot,releaseSnapshot,compositionEnd,reportHeight}=useDOMNoteBridge({
+    editor,sessionId,disabled,getRevision,getDirty,
+    events:{onReady,onSnapshot,onSnapshotFailure,onStateChange,onContentHeight},
+  });
+  const contentRef=useRef<HTMLElement|null>(null);
+  useEffect(()=>{
+    const element=contentRef.current;if(!element)return;
+    const report=()=>reportHeight(element.scrollHeight);
+    const observer=new ResizeObserver(report);observer.observe(element);report();
+    return ()=>observer.disconnect();
+  },[reportHeight]);
   // useDOMImperativeHandleはExpo DOM Componentsが定めるnative bridge用ref境界。
   useDOMImperativeHandle(ref, () => ({
-    toggleBold: () => { editor?.chain().focus().toggleBold().run(); },
-    toggleItalic: () => { editor?.chain().focus().toggleItalic().run(); },
-    toggleBulletList: () => { editor?.chain().focus().toggleBulletList().run(); },
-    toggleOrderedList: () => { editor?.chain().focus().toggleOrderedList().run(); },
-    toggleTaskList: () => { editor?.chain().focus().toggleTaskList().run(); },
-    requestComplete: () => {
-      if (editor === null) {
-        void onFailure();
-        return;
-      }
-      const result = fromTiptapDocument(editor.getJSON());
-      if (!result.ok) {
-        void onConversionFailure();
-        return;
-      }
-      void onComplete(result.value);
-    },
-  }), [editor, onComplete, onConversionFailure, onFailure]);
+    toggleBold: () => { if(editor?.isEditable)editor.chain().focus().toggleBold().run(); },
+    toggleItalic: () => { if(editor?.isEditable)editor.chain().focus().toggleItalic().run(); },
+    toggleBulletList: () => { if(editor?.isEditable)editor.chain().focus().toggleBulletList().run(); },
+    toggleOrderedList: () => { if(editor?.isEditable)editor.chain().focus().toggleOrderedList().run(); },
+    toggleTaskList: () => { if(editor?.isEditable)editor.chain().focus().toggleTaskList().run(); },
+    requestSnapshot:requestId=>{if(typeof requestId==='number')requestSnapshot(requestId);},
+    releaseSnapshot:requestId=>{if(typeof requestId==='number')releaseSnapshot(requestId);},
+    blur:()=>editor?.view.dom.blur(),
+  }), [editor,requestSnapshot,releaseSnapshot]);
 
   return (
-    <main style={{ background: theme.background, color: theme.text, minHeight: '100vh' }}>
+    <main ref={contentRef} style={{ background: theme.background, color: theme.text }}
+      onFocusCapture={()=>{void onFocusChange?.(true);}}
+      onBlurCapture={()=>{void onFocusChange?.(false);}}
+      onCompositionEnd={compositionEnd}>
       <style>{`
-        html, body, #root { background: ${theme.background}; margin: 0; min-height: 100%; }
-        .event-note-editor { box-sizing: border-box; font: 17px/1.55 system-ui, sans-serif;
-          min-height: 100vh; outline: none; padding: 16px; }
+        html, body, #root { background: ${theme.background}; margin: 0; }
+        .event-note-editor { box-sizing: border-box; font: ${17*fontScale}px/1.55 system-ui, sans-serif;
+          min-height: 100px; outline: none; padding: 8px; }
+        .event-note-editor .tiptap { outline: none; min-height: 80px; }
         .event-note-editor p { margin: 0 0 0.75em; }
         .event-note-editor ul, .event-note-editor ol { padding-left: 1.6em; }
         .event-note-editor ul[data-type="taskList"] { list-style: none; padding-left: 0; }

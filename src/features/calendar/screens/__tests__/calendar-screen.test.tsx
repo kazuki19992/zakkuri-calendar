@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import type { ReactElement, ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, type Metrics } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import type { CalendarViewState } from '../../hooks/use-calendar-view';
@@ -17,6 +18,7 @@ const safeAreaMetrics: Metrics = {
 function renderWithSafeArea(element: ReactElement) {
   return render(
     <SafeAreaProvider initialMetrics={safeAreaMetrics}>{element}</SafeAreaProvider>,
+    { wrapper: GestureHandlerRootView },
   );
 }
 

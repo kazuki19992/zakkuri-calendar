@@ -1,5 +1,7 @@
-import { fireEvent, render, userEvent, waitFor, within } from '@testing-library/react-native';
-import { Animated, PixelRatio, StyleSheet } from 'react-native';
+import { act, fireEvent, render as renderComponent, userEvent, waitFor, within } from '@testing-library/react-native';
+import type { ReactElement } from 'react';
+import { Animated, PanResponder, PixelRatio, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Colors } from '@/constants/theme';
 import {
   HOUR_HEIGHT,
@@ -19,6 +21,12 @@ jest.mock('expo-linear-gradient', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { LinearGradient: (props: React.ComponentProps<typeof View>) => React.createElement(View, props) };
 });
+
+const defaultPanHandlers = PanResponder.create({}).panHandlers;
+
+function render(element: ReactElement) {
+  return renderComponent(element, { wrapper: GestureHandlerRootView });
+}
 
 const timelineItem = {
   id: 'event-1', eventId: 'event-1', colorId: 'red', title: '歯医者', temporalLabel: '14:30・30分',
@@ -96,7 +104,7 @@ function renderTwoDayView(overrides: Partial<{
       bufferDays={overrides.bufferDays ?? BUFFER_DAYS}
       columnWidth={overrides.columnWidth ?? COLUMN_WIDTH}
       translateX={new Animated.Value(-(overrides.bufferDays ?? BUFFER_DAYS) * (overrides.columnWidth ?? COLUMN_WIDTH))}
-      panHandlers={{}}
+      panHandlers={defaultPanHandlers}
       onCarouselLayout={jest.fn()}
       onEditEvent={overrides.onEditEvent}
       onCreateExactAt={overrides.onCreateExactAt}
@@ -112,9 +120,9 @@ describe('2日カレンダー表示コンポーネント', () => {
     const root = view.getByTestId('two-day-calendar');
     const [first, second] = view.getAllByTestId('two-day-calendar.timeline-column').slice(1, 3);
     await fireEvent(first, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
-    await fireEvent(root, 'touchStart', { nativeEvent: { touches: [{}, {}] } });
+    await act(() => root.props.onTouchStart({ nativeEvent: { touches: [{}, {}] } }));
     await fireEvent(second, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
-    await fireEvent(root, 'touchStart', { nativeEvent: { touches: [{}] } });
+    await act(() => root.props.onTouchStart({ nativeEvent: { touches: [{}] } }));
     await fireEvent(first, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
     expect(onCreateExactAt).not.toHaveBeenCalled();
   });
@@ -136,7 +144,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const weekStrip = Array.from({ length: 21 }, (_, index) => ({ ...day1, date: `2026-09-${String(index + 1).padStart(2, '0')}`,
       timelineItems: [timelineItem, { ...timelineItem, id: 'second' }], allDayItems: [] }));
     const view = await render(<TwoDayView visibleDayCount={7} strip={weekStrip} selectedDate="2026-09-08" bufferDays={7}
-      columnWidth={342 / 7} translateX={new Animated.Value(-342)} panHandlers={{}} onCarouselLayout={jest.fn()} onOpenDay={onOpenDay} />);
+      columnWidth={342 / 7} translateX={new Animated.Value(-342)} panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()} onOpenDay={onOpenDay} />);
     expect(view.getByTestId('week-calendar')).toBeOnTheScreen();
     expect(view.getAllByText('他1件')).toHaveLength(7);
     await userEvent.setup().press(within(view.getByTestId('week-day-header.2026-09-08')).getByRole('button'));
@@ -145,7 +153,7 @@ describe('2日カレンダー表示コンポーネント', () => {
   });
   it('1日表示は予備列を含む3列で当日の件数と日付を表示する', async () => {
     const view = await render(<TwoDayView visibleDayCount={1} strip={[prevBuffer, { ...day1, allDayItems: [allDayItem] }, day2]}
-      bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={{}} onCarouselLayout={jest.fn()} />);
+      bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()} />);
     expect(view.getByTestId('single-day-calendar')).toBeOnTheScreen();
     expect(view.getByText('9月8日（火）')).toBeOnTheScreen();
     expect(view.getByText('終日欄 1件')).toBeOnTheScreen();
@@ -156,8 +164,9 @@ describe('2日カレンダー表示コンポーネント', () => {
     const items = Array.from({ length: 12 }, (_, index) => ({ ...allDayItem, id: `series:${index}`, eventId: 'series',
       originalOccurrenceDate: '2026-09-08', title: `予定${index}`, accessibilityLabel: `予定${index}、終日` }));
     const view = await render(<TwoDayView visibleDayCount={1} strip={[prevBuffer, { ...day1, allDayItems: items }, day2]}
-      bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={{}} onCarouselLayout={jest.fn()} onEditEvent={onEditEvent} />);
-    await fireEvent(view.getByTestId('single-day-calendar'), 'layout', { nativeEvent: { layout: { width: 390, height: 420 } } });
+      bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()} onEditEvent={onEditEvent} />);
+    const root = view.getByTestId('single-day-calendar');
+    await act(() => root.props.onLayout({ nativeEvent: { layout: { width: 390, height: 420 } } }));
     expect(StyleSheet.flatten(view.getByTestId('single-day.all-day.2026-09-08').props.style).height).toBeLessThanOrEqual(140);
     const region = within(view.getByTestId('single-day.all-day.2026-09-08'));
     expect(region.getAllByRole('button')).toHaveLength(12);
@@ -346,7 +355,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const translateX = new Animated.Value(-195);
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH} translateX={translateX}
-        panHandlers={{}} onCarouselLayout={jest.fn()} />,
+        panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()} />,
     );
 
     const stripStyle = StyleSheet.flatten(view.getByTestId('two-day-calendar.summary-strip').props.style);
@@ -358,7 +367,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const onCarouselLayout = jest.fn();
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH}
-        translateX={new Animated.Value(-195)} panHandlers={{}} onCarouselLayout={onCarouselLayout}
+        translateX={new Animated.Value(-195)} panHandlers={defaultPanHandlers} onCarouselLayout={onCarouselLayout}
         />,
     );
 
@@ -373,7 +382,7 @@ describe('2日カレンダー表示コンポーネント', () => {
   });
 
   it('画面のどこからでも横スワイプを受け付けられるよう、受付領域全体へpanHandlersを適用する', async () => {
-    const panHandlers = { onStartShouldSetResponder: () => true };
+    const panHandlers = { ...defaultPanHandlers, onStartShouldSetResponder: () => true };
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH}
         translateX={new Animated.Value(-195)} panHandlers={panHandlers} onCarouselLayout={jest.fn()}

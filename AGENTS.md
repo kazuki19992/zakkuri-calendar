@@ -18,7 +18,7 @@
 1. `git status --short --branch`でユーザーや他エージェントの変更を確認する。
 2. 関連するIssue、仕様書、実装計画、既存コード、テストを読む。
 3. 該当する`.agents/skills/<skill-name>/SKILL.md`または`.claude/skills/<skill-name>/SKILL.md`を読む。
-4. Expo APIや依存パッケージを扱う場合は、実装前にExpo SDK 57のバージョン固定ドキュメント`https://docs.expo.dev/versions/v57.0.0/`と対象パッケージの公式資料を確認する。
+4. Expo APIや依存パッケージを扱う場合は、実装前にExpo SDK 58のバージョン固定ドキュメント`https://docs.expo.dev/versions/v58.0.0/`と対象パッケージの公式資料を確認する。
 5. 依存追加時は、Expo SDKとの互換性があるメンテナンス中のライブラリを優先し、独自実装とのトレードオフを説明する。
 
 古い会話、過去のPR、ローカルブランチの状態だけを現在の事実として扱わない。変更され得る情報は、コード、Git、GitHub、公式資料から再確認する。

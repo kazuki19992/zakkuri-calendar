@@ -62,7 +62,7 @@
 
 ## 3. 設計原則
 
-- React NativeとExpo SDK 57を使用する。
+- React NativeとExpo SDK 58を使用する。iOS 27向けのUIScene設定はExpo Prebuildで生成する。
 - 個人予定は端末内だけに保存し、外部へ送信しない。
 - UI、状態調整、時間計算、永続化を分離する。
 - UIはSQLiteを直接呼ばず、機能単位のカスタムhookを経由する。

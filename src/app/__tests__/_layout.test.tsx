@@ -3,8 +3,7 @@ import { StyleSheet } from 'react-native';
 
 import RootLayout from '../_layout';
 import * as rootLayout from '../_layout';
-import { getMockConfig } from 'expo-router/build/testing-library/mock-config';
-import { getStateFromPath } from 'expo-router/build/fork/getStateFromPath';
+import { renderRouter, testRouter } from 'expo-router/testing-library';
 
 jest.mock('@/features/notifications/notification-context', () => {
   const React = jest.requireActual<typeof import('react')>('react');
@@ -74,17 +73,19 @@ jest.mock('@/features/calendar/calendar-refresh-context', () => {
 });
 
 describe('ルートレイアウト', () => {
-  it.each(['/events/new', '/events/event-1'])('直接起動した%sにもカレンダーへの戻り先を保持する', (path) => {
-    const config = getMockConfig({
-      _layout: rootLayout,
+  it.each(['/events/new', '/events/event-1'])('直接起動した%sにもカレンダーへの戻り先を保持する', async (path) => {
+    const { Stack: RouterStack } = jest.requireActual<typeof import('expo-router')>('expo-router');
+    const view = await renderRouter({
+      _layout: { default: () => <RouterStack />, unstable_settings: rootLayout.unstable_settings },
       index: () => null,
       'events/new': () => null,
       'events/[id]': () => null,
-    });
-    const state = getStateFromPath(path, config);
-    expect(state?.routes[0].state?.routes.map(route => route.name)).toEqual([
-      'index', path === '/events/new' ? 'events/new' : 'events/[id]',
-    ]);
+    }, { initialUrl: path });
+
+    expect(view.getPathname()).toBe(path);
+    expect(testRouter.canGoBack()).toBe(true);
+    await testRouter.back();
+    expect(view.getPathname()).toBe('/');
   });
 
   it('データベースと再読み込みproviderの内側に通常のStackを置く', async () => {

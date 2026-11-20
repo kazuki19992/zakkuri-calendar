@@ -63,7 +63,7 @@ describe('2日ビューの予備列付きスワイプカルーセル', () => {
       reduceMotion: true, bufferDays: 1, leadingDate: '2026-09-07', visibleDayCount: 1 }));
     const handlers = create.mock.calls[0][0];
     const event = {} as GestureResponderEvent;
-    const gesture: PanResponderGestureState = { stateID: 1, moveX: 0, moveY: 0, x0: 0, y0: 0, dx: -100, dy: 0, vx: -1, vy: 0, numberActiveTouches: 1, _accountsForMovesUpTo: 0 };
+    const gesture: PanResponderGestureState = { stateID: 1, moveX: 0, moveY: 0, x0: 0, y0: 0, dx: -100, dy: 0, vx: -1, vy: 0, numberActiveTouches: 1 };
     await act(() => {
       handlers.onPanResponderGrant?.(event, gesture);
       handlers.onPanResponderStart?.(event, { ...gesture, numberActiveTouches: 2 });

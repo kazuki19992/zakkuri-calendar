@@ -23,6 +23,8 @@ const closeActions: readonly [string, (view: RenderResult) => void][] = [
   )],
 ];
 
+type AnimationCallback = Parameters<ReturnType<typeof Animated.timing>['start']>[0];
+
 describe('共通の単一選択シート', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -119,7 +121,7 @@ describe('共通の単一選択シート', () => {
   it('背景はフェードし、シートだけを短い距離で上下させる', async () => {
     const onClose = jest.fn();
     const timing = jest.spyOn(Animated, 'timing').mockImplementation((_value, config) => ({
-      start: (callback?: Animated.EndCallback) => callback?.({ finished: true }),
+      start: (callback?: AnimationCallback) => callback?.({ finished: true }),
       stop: jest.fn(),
       reset: jest.fn(),
       _config: config,
@@ -179,9 +181,9 @@ describe('共通の単一選択シート', () => {
   });
 
   it('閉じる遷移中の連続選択は最初の一回だけ受け付ける', async () => {
-    const animationCallbacks: (Animated.EndCallback | undefined)[] = [];
+    const animationCallbacks: (AnimationCallback | undefined)[] = [];
     jest.spyOn(Animated, 'parallel').mockImplementation(() => ({
-      start: (callback?: Animated.EndCallback) => animationCallbacks.push(callback),
+      start: (callback?: AnimationCallback) => animationCallbacks.push(callback),
       stop: jest.fn(),
       reset: jest.fn(),
     }) as unknown as Animated.CompositeAnimation);
@@ -205,9 +207,9 @@ describe('共通の単一選択シート', () => {
   it('閉じる遷移中にReduce Motionが有効になっても閉じる要求を完了する', async () => {
     let reduceMotion = false;
     jest.mocked(useReduceMotion).mockImplementation(() => reduceMotion);
-    const animationCallbacks: (Animated.EndCallback | undefined)[] = [];
+    const animationCallbacks: (AnimationCallback | undefined)[] = [];
     jest.spyOn(Animated, 'parallel').mockImplementation(() => ({
-      start: (callback?: Animated.EndCallback) => animationCallbacks.push(callback),
+      start: (callback?: AnimationCallback) => animationCallbacks.push(callback),
       stop: jest.fn(),
       reset: jest.fn(),
     }) as unknown as Animated.CompositeAnimation);

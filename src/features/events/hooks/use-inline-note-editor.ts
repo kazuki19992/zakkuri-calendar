@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {useCallback,useEffect,useRef,useState,useSyncExternalStore,type ComponentRef} from 'react';
 import {Alert,Keyboard,ScrollView,View,useWindowDimensions,type NativeSyntheticEvent,type NativeScrollEvent} from 'react-native';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {computeInlineNoteHeight} from '../event-note/inline-note-layout';
@@ -10,7 +10,9 @@ const EMPTY_SELECTION:EditorSelectionState={bold:false,italic:false,bulletList:f
 export function useInlineNoteEditor(session:InlineNoteSession,disabled:boolean){
   const snapshot=useSyncExternalStore(session.subscribe,session.getSnapshot,session.getSnapshot);
   const editorRef=useRef<FormattedNoteEditorDOMRef>(null);
-  const rootRef=useRef<View>(null),fieldRef=useRef<View>(null),scrollRef=useRef<ScrollView>(null);
+  const rootRef=useRef<ComponentRef<typeof View>>(null);
+  const fieldRef=useRef<ComponentRef<typeof View>>(null);
+  const scrollRef=useRef<ComponentRef<typeof ScrollView>>(null);
   const window=useWindowDimensions(),reduceMotion=useReduceMotion();
   const [frame,setFrame]=useState({y:0,height:window.height});
   const [keyboardTop,setKeyboardTop]=useState<number|null>(null);
@@ -76,9 +78,9 @@ export function useInlineNoteEditor(session:InlineNoteSession,disabled:boolean){
   },[disabled,session,snapshot]);
   return {session,snapshot,
     bindEditor:useCallback((value:FormattedNoteEditorDOMRef|null)=>{editorRef.current=value;},[]),
-    bindRoot:useCallback((value:View|null)=>{rootRef.current=value;},[]),
-    bindField:useCallback((value:View|null)=>{fieldRef.current=value;},[]),
-    bindScroll:useCallback((value:ScrollView|null)=>{scrollRef.current=value;},[]),
+    bindRoot:useCallback((value:ComponentRef<typeof View>|null)=>{rootRef.current=value;},[]),
+    bindField:useCallback((value:ComponentRef<typeof View>|null)=>{fieldRef.current=value;},[]),
+    bindScroll:useCallback((value:ComponentRef<typeof ScrollView>|null)=>{scrollRef.current=value;},[]),
     onToolbarTouchStart:useCallback(()=>{toolbarHolding.current=true;},[]),
     onToolbarTouchEnd,
     toggleBold:useCallback(()=>editorRef.current?.toggleBold(),[]),

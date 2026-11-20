@@ -32,6 +32,8 @@ MVPの実装／自動検証／端末未確認の対応表と実機確認手順�
 
 iOSのアプリアイコンは [Icon Composerプロジェクト](assets/zakkuri-calendar.icon) を使用します。変更する場合はIcon Composerでこのプロジェクトを編集し、新しいiOSビルドをインストールしてホーム画面で確認します。
 
+Androidのアプリアイコンは [完成画像のPNG](assets/images/icon-android.png) を使用します。変更後は新しいAndroidビルドをインストールし、ランチャーで見え方を確認します。
+
 ## ローカルEAS Build
 
 EASのdevelopment profileでiOSとAndroidを順番にローカルビルドします。

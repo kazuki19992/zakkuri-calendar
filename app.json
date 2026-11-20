@@ -8,7 +8,7 @@
     "scheme": "zakkuricalendar",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/zakkuri-calendar.icon",
       "bundleIdentifier": "com.kazuki19992.zakkuri-calendar",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false

@@ -1,24 +1,21 @@
 {
   "fill" : {
-    "automatic-gradient" : "extended-srgb:0.00000,0.47843,1.00000,1.00000"
+    "solid" : "display-p3:0.96493,1.00000,0.99347,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
-          "image-name" : "expo-symbol 2.svg",
-          "name" : "expo-symbol 2",
+          "glass" : false,
+          "image-name" : "icon 2.svg",
+          "name" : "icon 2",
           "position" : {
-            "scale" : 1,
+            "scale" : 0.78,
             "translation-in-points" : [
-              1.1008400065293245e-05,
-              -16.046875
+              0,
+              0
             ]
           }
-        },
-        {
-          "image-name" : "grid.png",
-          "name" : "grid"
         }
       ],
       "shadow" : {

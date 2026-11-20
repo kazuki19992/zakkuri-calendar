@@ -28,6 +28,12 @@ npm run lint
 
 MVPの実装／自動検証／端末未確認の対応表と実機確認手順は[安定化の検証記録](docs/verification/2026-11-12-mvp-stabilization.md)を参照してください。実機確認が残るため、MVP全体の受け入れは未完了です。
 
+## アプリアイコン
+
+iOSのアプリアイコンは [Icon Composerプロジェクト](assets/zakkuri-calendar.icon) を使用します。変更する場合はIcon Composerでこのプロジェクトを編集し、新しいiOSビルドをインストールしてホーム画面で確認します。
+
+Androidのアプリアイコンは [完成画像のPNG](assets/images/icon-android.png) を使用します。変更後は新しいAndroidビルドをインストールし、ランチャーで見え方を確認します。
+
 ## ローカルEAS Build
 
 EASのdevelopment profileでiOSとAndroidを順番にローカルビルドします。

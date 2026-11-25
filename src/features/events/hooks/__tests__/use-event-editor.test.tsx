@@ -298,6 +298,19 @@ describe('予定編集の主要状態', () => {
       }),
     }));
   });
+  it('タイムラインから時刻を指定された新規作成は、読込後もきっちりで開く', async () => {
+    const repositories = createRepositories();
+    repositories.settings.getDefaultExactDuration.mockResolvedValue({ type: 'fixed', minutes: 60 });
+    const { result } = await renderHook(() => useEventEditor({ ...repositories,
+      initial: { temporalType: 'exact', date: '2026-11-26', startTime: '20:00' },
+    }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() => expect(result.current.exactDurationStatus).toBe('ready'));
+    expect(result.current).toMatchObject({
+      editorTab: 'exact', startDate: '2026-11-26', startTime: '20:00', endTime: '21:00',
+    });
+  });
+
   it('新規作成はざっくりで開き、タブ往復では入力を保持する', async () => {
     const repositories = createRepositories();
     const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));
@@ -384,16 +397,19 @@ describe('予定編集の主要状態', () => {
     expect(result.current).toMatchObject({ startTime: '07:15', endTime: '07:45' });
   });
 
-  it.each(['exact', 'allDay'] as const)('時刻枠の%sからでもざっくりで開き、切替時は指定値を使う', async (temporalType) => {
-    const repositories = createRepositories();
-    const { result } = await renderHook(() => useEventEditor({
-      ...repositories, initial: { ...initial, temporalType, startTime: '14:00' },
-    }));
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    expect(result.current.editorTab).toBe('fuzzy');
-    await act(() => result.current.setEditorTab('exact'));
-    expect(result.current).toMatchObject({ startTime: '14:00', isAllDay: temporalType === 'allDay' });
-  });
+  it.each([['exact', 'exact'], ['allDay', 'fuzzy']] as const)(
+    '新規作成に%sを指定すると%sで開き、入力は指定値を引き継ぐ',
+    async (temporalType, editorTab) => {
+      const repositories = createRepositories();
+      const { result } = await renderHook(() => useEventEditor({
+        ...repositories, initial: { ...initial, temporalType, startTime: '14:00' },
+      }));
+      await waitFor(() => expect(result.current.status).toBe('ready'));
+      expect(result.current.editorTab).toBe(editorTab);
+      await act(() => result.current.setEditorTab('exact'));
+      expect(result.current).toMatchObject({ startTime: '14:00', isAllDay: temporalType === 'allDay' });
+    },
+  );
 
   it('ざっくりの終日を日付・通常の繰り返し・終日通知と一緒に保存する', async () => {
     const repositories = createRepositories();

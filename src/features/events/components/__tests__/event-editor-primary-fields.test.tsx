@@ -1,6 +1,8 @@
 import { act, fireEvent, render, userEvent } from '@testing-library/react-native';
 import { useState } from 'react';
 import { Animated, Keyboard, StyleSheet, Text } from 'react-native';
+import { Colors } from '@/constants/theme';
+import { CalendarAppearanceContext } from '@/hooks/calendar-appearance-context';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { EventDateTimeFields } from '../event-date-time-fields';
 import { EventEditorHeader } from '../event-editor-header';
@@ -191,6 +193,53 @@ describe('予定編集の基本項目', () => {
     expect(setValue).toHaveBeenCalledWith(0);
     expect(setValue).toHaveBeenCalledWith(1);
     expect(timing).not.toHaveBeenCalled();
+  });
+
+  it('タップした時刻の行直下でドラムを回すと時刻を更新し、別の時刻行で開き直せる', async () => {
+    function TimeFields() {
+      const [startTime, setStartTime] = useState('09:07');
+      const [endTime, setEndTime] = useState('11:45');
+      return <EventDateTimeFields editorTab="exact" isAllDay={false} isDateEditable disabled={false}
+        startDate="2026-09-25" startTime={startTime} endDate="2026-09-25" endTime={endTime}
+        onAllDayChange={jest.fn()} onStartDateChange={jest.fn()} onStartTimeChange={setStartTime}
+        onEndDateChange={jest.fn()} onEndTimeChange={setEndTime} />;
+    }
+    const view = await render(<TimeFields />);
+    const startRow = view.getByRole('button', { name: '開始時刻 09:07' });
+    await fireEvent.press(startRow);
+    const start = view.getByTestId('event-editor.start-time-picker');
+    expect(startRow.parent).toBe(start.parent);
+    expect(view.getByRole('button', { name: '7分' })).toBeSelected();
+    await fireEvent(view.getByTestId('duration-wheel.hours'), 'momentumScrollEnd', {
+      nativeEvent: { contentOffset: { y: 10 * 44 } },
+    });
+    expect(view.getByRole('button', { name: '開始時刻 10:07' })).toBeOnTheScreen();
+    await fireEvent.press(view.getByRole('button', { name: '30分' }));
+    expect(view.getByRole('button', { name: '開始時刻 10:30' })).toBeOnTheScreen();
+
+    const endRow = view.getByRole('button', { name: '終了時刻 11:45' });
+    await fireEvent.press(endRow);
+    expect(view.queryByTestId('event-editor.start-time-picker')).toBeNull();
+    expect(endRow.parent).toBe(view.getByTestId('event-editor.end-time-picker').parent);
+    await fireEvent.press(view.getByRole('button', { name: '0分' }));
+    const updatedEndRow = view.getByRole('button', { name: '終了時刻 11:00' });
+    await fireEvent.press(updatedEndRow);
+    expect(view.queryByTestId('event-editor.end-time-picker')).toBeNull();
+  });
+
+  it('終日のトグルはアプリのアクセント変更に追随する', async () => {
+    const fields = <EventDateTimeFields editorTab="fuzzy" isAllDay isDateEditable disabled={false}
+      startDate="2026-09-25" startTime="09:00" endDate="2026-09-25" endTime="10:00"
+      onAllDayChange={jest.fn()} onStartDateChange={jest.fn()} onStartTimeChange={jest.fn()}
+      onEndDateChange={jest.fn()} onEndTimeChange={jest.fn()} />;
+    const view = await render(fields);
+    expect(view.getByLabelText('終日').props).toMatchObject({
+      tintColor: Colors.light.calendarBorder, onTintColor: Colors.light.calendarAccent,
+    });
+    await view.rerender(<CalendarAppearanceContext.Provider value={{
+      colorId: 'umi', isBusy: false, error: null, setColor: jest.fn(),
+    }}>{fields}</CalendarAppearanceContext.Provider>);
+    expect(view.getByLabelText('終日').props.onTintColor).toBe('#1060a0');
   });
 
   it('日本語の日付表示にcompact pickerを重ねて直接選択できる', async () => {

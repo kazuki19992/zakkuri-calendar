@@ -214,6 +214,7 @@ export function useEventEditor({
   openBrowser = openBrowserAsync,
 }: UseEventEditorInput): EventEditorState {
   const [initialValues] = useState(initial);
+  const initialEditorTab = initialValues.temporalType === 'exact' ? 'exact' : 'fuzzy';
   const [newEventId] = useState(() => createId());
   const [status, setStatus] = useState<EditorStatus>('loading');
   const [existingAggregate, setExistingAggregate] = useState<EventAggregate | null>(null);
@@ -224,7 +225,7 @@ export function useEventEditor({
   const [calendarName, setCalendarName] = useState('');
   const [calendarColorId, setCalendarColorId] = useState<EventColorId>('blue');
   const [title, setTitleValue] = useState('');
-  const [editorTab, setEditorTabValue] = useState<EventEditorTab>('fuzzy');
+  const [editorTab, setEditorTabValue] = useState<EventEditorTab>(initialEditorTab);
   const [isAllDay, setAllDayValue] = useState(initialValues.temporalType === 'allDay');
   const [startDate, setStartDateValue] = useState(initialValues.date);
   const [startTime, setStartTimeValue] = useState(initialValues.startTime);
@@ -371,7 +372,7 @@ export function useEventEditor({
         );
 
         if (loadedAggregate === null) {
-          setEditorTabValue('fuzzy');
+          setEditorTabValue(initialEditorTab);
         } else {
           const event = loadedAggregate.event;
           setExistingAggregate(loadedAggregate);
@@ -434,7 +435,7 @@ export function useEventEditor({
     };
     void load();
     return () => { active = false; };
-  }, [calendars, eventId, events, loadRevision,
+  }, [calendars, eventId, events, initialEditorTab, loadRevision,
     occurrenceDate, settings, temporalDefinitions,noteSession]);
 
   type RecurrenceDraftKey = EventEditorTab | 'allDay';

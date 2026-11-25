@@ -346,7 +346,7 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 
 - `default_exact_duration`: 明示選択は`{ "version": 1, "duration": { "type": "fixed", "minutes": 60 } }`形式。論理初期値は1時間。旧instant seedは変更せず未選択として1時間に解釈し、明示instant・旧fixed／undeterminedは保持する。詳細は`2026-11-12-default-exact-duration-design.md`を参照。
 - `undetermined_fade_minutes`: `120`
-- `last_event_editor_tab`: 旧バージョンが保存した行が残る場合がある。現在は読み書きせず、新規作成は「ざっくり」で開く。
+- `last_event_editor_tab`: 旧バージョンが保存した行が残る場合がある。現在は読み書きしない。「予定を追加」は「ざっくり」、時間軸のダブルタップは「きっちり」で開く。
 - `this_week_deadline_weekday`: `5`、`6`、`7`のいずれか（schema version 3、既定値は金曜日の`5`）
 - `primary_calendar_color`: メインカレンダーで選んだ12色のプリセットIDをJSON文字列として保存する。既定は `"matcha"`（まっちゃ）。未登録・不正値は未選択として扱う。旧プレビューのIDは対応するプリセットに読み替え、ティールの既定値と灰は「まっちゃ」とする。旧シードの青と旧プレビューで明示選択した青は区別する。
 

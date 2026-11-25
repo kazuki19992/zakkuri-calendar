@@ -1,5 +1,5 @@
 import { Radii, Spacing, Typography } from '@/constants/theme';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
   Modal,
   Pressable,
@@ -35,12 +35,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function getInitialSelection(initialMinutes: number, maxHours: number, minuteStep: number) {
-  const maximum = maxHours * 60 + (60 - minuteStep);
-  const totalMinutes = clamp(Math.round(initialMinutes / minuteStep) * minuteStep, 0, maximum);
-  return { hours: Math.floor(totalMinutes / 60), minutes: totalMinutes % 60 };
-}
-
 function selectionLabel(hours: number, minutes: number): string {
   return hours === 0 && minutes === 0 ? '予定時刻' : `${hours}時間${minutes}分前`;
 }
@@ -71,69 +65,11 @@ function DurationWheelPickerContent({
 }: DurationWheelPickerProps) {
   const theme = useTheme();
   const reduceMotion = useReduceMotion();
-  const safeMaxHours = maxHours;
-  const initialSelection = getInitialSelection(initialMinutes, safeMaxHours, minuteStep);
-  const [hours, setHours] = useState(initialSelection.hours);
-  const [minutes, setMinutes] = useState(initialSelection.minutes);
-  const total = hours * 60 + minutes;
+  const [total, setTotal] = useState(() => clamp(
+    Math.round(initialMinutes / minuteStep) * minuteStep, 0, maxHours * 60 + 60 - minuteStep,
+  ));
   const valid = total >= minimumMinutes && total <= maximumMinutes;
-  const valueLabel = formatValue ? formatValue(total) : selectionLabel(hours, minutes);
-  const hourOptions = useMemo(
-    () => Array.from({ length: safeMaxHours + 1 }, (_, value) => value),
-    [safeMaxHours],
-  );
-  const minuteOptions = useMemo(() => Array.from({ length: 60 / minuteStep }, (_, index) => index * minuteStep), [minuteStep]);
-
-  const updateSelectionFromScroll = (
-    event: NativeSyntheticEvent<NativeScrollEvent>,
-    data: readonly number[],
-    setValue: (value: number) => void,
-  ) => {
-    const index = Math.round(event.nativeEvent.contentOffset.y / ITEM_HEIGHT);
-    setValue(data[clamp(index, 0, data.length - 1)]);
-  };
-
-  const renderWheel = (
-    kind: 'hours' | 'minutes',
-    data: readonly number[],
-    selected: number,
-    setSelected: (value: number) => void,
-  ) => (
-    <View style={styles.wheelColumn}>
-      <ScrollView key={`${kind}-${initialMinutes}-${safeMaxHours}-${visible}`}
-        testID={`duration-wheel.${kind}`}
-        nestedScrollEnabled snapToInterval={ITEM_HEIGHT} decelerationRate="fast" showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.wheelContent}
-        contentOffset={{ x: 0, y: data.indexOf(selected) * ITEM_HEIGHT }}
-        onScrollEndDrag={(event) => updateSelectionFromScroll(
-          event,
-          data,
-          setSelected,
-        )}
-        onMomentumScrollEnd={(event) => updateSelectionFromScroll(
-          event,
-          data,
-          setSelected,
-        )}>
-        {data.map((item) => (
-          <Pressable testID={`duration-wheel.${kind}-option-${item}`}
-            key={item}
-            accessibilityRole="button"
-            accessibilityLabel={`${item}${kind === 'hours' ? hourUnit : '分'}`}
-            accessibilityState={{ selected: item === selected }}
-            onPress={() => setSelected(item)} style={styles.wheelItem}>
-            <Text style={[styles.wheelValue, {
-              color: item === selected ? theme.calendarAccentText : theme.textSecondary,
-              fontWeight: item === selected ? '700' : '400',
-            }]}>{item}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-      <Text pointerEvents="none" style={[styles.unit, { color: theme.text }]}>
-        {kind === 'hours' ? hourUnit : '分'}
-      </Text>
-    </View>
-  );
+  const valueLabel = formatValue ? formatValue(total) : selectionLabel(Math.floor(total / 60), total % 60);
 
   return (
     <Modal testID="duration-wheel.modal" transparent visible={visible}
@@ -152,10 +88,8 @@ function DurationWheelPickerContent({
               style={styles.summary}>
               <Text style={[styles.summaryText, { color: theme.text }]}>{valueLabel}</Text>
             </View>
-            <View style={styles.wheels}>
-              {renderWheel('hours', hourOptions, hours, setHours)}
-              {renderWheel('minutes', minuteOptions, minutes, setMinutes)}
-            </View>
+            <HoursAndMinutesWheels value={total} maxHours={maxHours} minuteStep={minuteStep} hourUnit={hourUnit}
+              onChange={setTotal} />
           </ScrollView>
           <View style={[styles.actions, { borderTopColor: theme.calendarBorder }]}>
             <Pressable accessibilityRole="button" accessibilityLabel="キャンセル" onPress={onClose}
@@ -163,13 +97,93 @@ function DurationWheelPickerContent({
               <Text style={{ color: theme.textSecondary }}>キャンセル</Text>
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={`${title}を確定`} disabled={!valid} accessibilityState={{ disabled: !valid }}
-              onPress={() => { onConfirm(hours * 60 + minutes); onClose(); }} style={styles.action}>
+              onPress={() => { onConfirm(total); onClose(); }} style={styles.action}>
               <Text style={{ color: theme.calendarAccentText, fontWeight: '600' }}>確定</Text>
             </Pressable>
           </View>
         </SafeAreaView>
       </SafeAreaView>
     </Modal>
+  );
+}
+
+export function HoursAndMinutesWheels({
+  value,
+  maxHours,
+  minuteStep,
+  hourUnit,
+  testID,
+  onChange,
+}: Readonly<{
+  value: number;
+  maxHours: number;
+  minuteStep: 1 | 15;
+  hourUnit: '時間' | '時';
+  testID?: string;
+  onChange(value: number): void;
+}>) {
+  const hours = Math.floor(value / 60);
+  const minutes = value % 60;
+  const [initialMinute] = useState(minutes);
+  const hourOptions = useMemo(() => Array.from({ length: maxHours + 1 }, (_, hour) => hour), [maxHours]);
+  const minuteOptions = useMemo(() => {
+    const steps = Array.from({ length: 60 / minuteStep }, (_, index) => index * minuteStep);
+    // 保存済みの時刻が15分刻みでなくても、開くだけで値を丸めない。
+    if (initialMinute % minuteStep !== 0) steps.push(initialMinute);
+    return steps.sort((first, second) => first - second);
+  }, [initialMinute, minuteStep]);
+
+  return (
+    <View testID={testID} style={styles.wheels}>
+      <WheelColumn kind="hours" unit={hourUnit} options={hourOptions} selected={hours}
+        onSelect={(hour) => onChange(hour * 60 + minutes)} />
+      <WheelColumn kind="minutes" unit="分" options={minuteOptions} selected={minutes}
+        onSelect={(minute) => onChange(hours * 60 + minute)} />
+    </View>
+  );
+}
+
+function WheelColumn({ kind, unit, options, selected, onSelect }: Readonly<{
+  kind: 'hours' | 'minutes';
+  unit: string;
+  options: readonly number[];
+  selected: number;
+  onSelect(value: number): void;
+}>) {
+  const theme = useTheme();
+  const scrollView = useRef<ComponentRef<typeof ScrollView>>(null);
+  const [initialOffset] = useState(() => ({ x: 0, y: options.indexOf(selected) * ITEM_HEIGHT }));
+
+  const selectAtOffset = (offset: number) => {
+    const index = clamp(Math.round(offset / ITEM_HEIGHT), 0, options.length - 1);
+    if (options[index] !== selected) onSelect(options[index]);
+  };
+
+  return (
+    <View style={styles.wheelColumn}>
+      <ScrollView ref={scrollView} testID={`duration-wheel.${kind}`}
+        nestedScrollEnabled snapToInterval={ITEM_HEIGHT} decelerationRate="fast" showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.wheelContent} contentOffset={initialOffset}
+        onScrollEndDrag={({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+          selectAtOffset(nativeEvent.targetContentOffset?.y ?? nativeEvent.contentOffset.y);
+        }}
+        onMomentumScrollEnd={(event) => selectAtOffset(event.nativeEvent.contentOffset.y)}>
+        {options.map((item, index) => (
+          <Pressable key={item} testID={`duration-wheel.${kind}-option-${item}`} accessibilityRole="button"
+            accessibilityLabel={`${item}${unit}`} accessibilityState={{ selected: item === selected }}
+            onPress={() => {
+              scrollView.current?.scrollTo({ y: index * ITEM_HEIGHT, animated: false });
+              if (item !== selected) onSelect(item);
+            }} style={styles.wheelItem}>
+            <Text style={[styles.wheelValue, {
+              color: item === selected ? theme.calendarAccentText : theme.textSecondary,
+              fontWeight: item === selected ? '700' : '400',
+            }]}>{item}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+      <Text pointerEvents="none" style={[styles.unit, { color: theme.text }]}>{unit}</Text>
+    </View>
   );
 }
 

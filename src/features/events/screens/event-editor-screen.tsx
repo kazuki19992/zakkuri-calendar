@@ -54,7 +54,7 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
           <Text style={{ color: theme.text }}>予定を読み込めませんでした</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="再試行" onPress={state.retry} style={styles.retry}><Text style={{ color: theme.calendarAccentText }}>再試行</Text></Pressable>
         </View> : null}
-        {state.status === 'ready' ? <ScrollView ref={bindScroll} onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.form} keyboardShouldPersistTaps="always">
+        {state.status === 'ready' ? <ScrollView ref={bindScroll} onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.form} keyboardShouldPersistTaps="always" nestedScrollEnabled>
           <View onTouchStart={endEditing}>
             <TextInput autoFocus={state.mode === 'create'} accessibilityLabel="タイトル" placeholder="タイトルを追加" placeholderTextColor={theme.textSecondary} value={state.title} onFocus={endEditing} onChangeText={state.setTitle} editable={!busy} style={[styles.titleInput, { color: theme.text, borderBottomColor: theme.calendarBorder }]} />
             {state.titleError ? <Text accessibilityRole="alert" style={{ color: theme.danger }}>{state.titleError}</Text> : null}

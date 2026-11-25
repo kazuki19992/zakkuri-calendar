@@ -59,6 +59,24 @@ describe('実SQLiteによるMVP保存回帰', () => {
     expect(await database.first('PRAGMA integrity_check')).toEqual({ integrity_check: 'ok' });
   });
 
+  it.each(['blue', 'default-teal'] as const)('メインカレンダー色 %s を再接続後に復元する', async (colorId) => {
+    await migrateDatabase(database, environment);
+    const repositories = createRepositoryContainer(database);
+    await repositories.calendars.setColor('personal-default', 'teal', now);
+    expect(await repositories.settings.getPrimaryCalendarColor()).toBeNull();
+
+    await repositories.settings.setPrimaryCalendarColor('red', now);
+    await repositories.settings.setPrimaryCalendarColor(colorId, now);
+    await connection.close();
+    connection = await openNodeSqliteDatabase(join(directory, 'synthetic.db'));
+    database = connection.database;
+    await migrateDatabase(database, environment);
+
+    const reopened = createRepositoryContainer(database);
+    expect(await reopened.settings.getPrimaryCalendarColor()).toBe(colorId);
+    expect(await reopened.calendars.getDefault()).toMatchObject({ colorId: 'teal' });
+  });
+
   it('再接続後も予定・書式付きメモ・通知・表示設定を復元し編集と削除ができる', async () => {
     await migrateDatabase(database, environment);
     let repositories = createRepositoryContainer(database);

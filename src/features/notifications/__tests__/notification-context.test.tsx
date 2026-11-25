@@ -1,3 +1,4 @@
+import { usePathname } from 'expo-router';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import { NotificationProvider } from '../notification-context';
@@ -17,6 +18,7 @@ jest.mock('@/features/calendar/calendar-refresh-context', () => ({
   useCalendarRefresh: jest.fn(),
 }));
 jest.mock('expo-router', () => ({
+  usePathname: jest.fn(),
   useRootNavigationState: () => ({ key: 'root' }),
   useRouter: () => mockRouter,
 }));
@@ -105,6 +107,10 @@ const content = () => (
   </NotificationProvider>
 );
 describe('保存済み通知の許可案内', () => {
+  beforeEach(() => {
+    jest.mocked(usePathname).mockReturnValue('/');
+  });
+
   test('起動時にOS許可を要求せず、案内のボタン操作後だけ要求する', async () => {
     const e = setup(),
       v = await render(content());
@@ -113,19 +119,40 @@ describe('保存済み通知の許可案内', () => {
         v.getByRole('button', { name: '通知を許可する' }),
       ).toBeOnTheScreen(),
     );
+    expect(v.getByText('通知はオフ')).toBeOnTheScreen();
     expect(e.device.requestPermission).not.toHaveBeenCalled();
     await fireEvent.press(v.getByRole('button', { name: '通知を許可する' }));
     await waitFor(() =>
       expect(e.device.requestPermission).toHaveBeenCalledTimes(1),
     );
   });
+  test.each(['/settings/notifications', '/events/new', '/calendar/day/2030-11-13'])(
+    '%sへ移動すると許可案内が消えカレンダーへ戻ると表示する',
+    async (pathname) => {
+      setup();
+      const v = await render(content());
+      await v.findByRole('button', { name: '通知を許可する' });
+
+      jest.mocked(usePathname).mockReturnValue(pathname);
+      await v.rerender(content());
+      expect(v.queryByRole('button', { name: '通知を許可する' })).toBeNull();
+
+      jest.mocked(usePathname).mockReturnValue('/');
+      await v.rerender(content());
+      expect(v.getByRole('button', { name: '通知を許可する' })).toBeOnTheScreen();
+    },
+  );
   test('許可案内を閉じても後の同期失敗は再表示し別の失敗も隠さない', async () => {
     const e = setup(),
       v = await render(content());
     await waitFor(() =>
       expect(v.getByRole('button', { name: '後で' })).toBeOnTheScreen(),
     );
+    expect(v.getByTestId('notification-notice').props.edges).toMatchObject({
+      top: 'off', left: 'additive', bottom: 'maximum', right: 'additive',
+    });
     await fireEvent.press(v.getByRole('button', { name: '後で' }));
+    jest.mocked(usePathname).mockReturnValue('/settings');
     e.fail();
     e.refresh(1);
     await v.rerender(content());

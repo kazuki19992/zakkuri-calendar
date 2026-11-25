@@ -1,3 +1,4 @@
+import { Spacing } from '@/constants/theme';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { DayCalendarState } from '../hooks/use-day-calendar';
 import { SelectedDayAgenda } from '../components/selected-day-agenda';
@@ -12,7 +13,9 @@ export function DayCalendarScreen({ date, state, onEditEvent, isPreview = false 
   const theme = useTheme();
   if (state.status === 'loading') return <View style={styles.center}><ActivityIndicator /></View>;
   if (state.status === 'error') return <View style={styles.center}><Text style={{ color: theme.text }}>予定を読み込めませんでした</Text>{isPreview ? null : <Pressable accessibilityRole="button" accessibilityLabel="再試行" onPress={state.retry}><Text style={{ color: theme.calendarAccent }}>再試行</Text></Pressable>}</View>;
-  return <ScrollView contentContainerStyle={styles.content}><SelectedDayAgenda selectedDate={date} holidayName={state.holidayName} holidaySupport={state.holidaySupport} items={state.items}
-    onEditEvent={isPreview ? undefined : onEditEvent} /></ScrollView>;
+  const agenda = <SelectedDayAgenda selectedDate={date} holidayName={state.holidayName}
+    holidaySupport={state.holidaySupport} items={state.items} isPreview={isPreview}
+    onEditEvent={onEditEvent} />;
+  return isPreview ? agenda : <ScrollView contentContainerStyle={styles.content}>{agenda}</ScrollView>;
 }
-const styles = StyleSheet.create({ center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }, content: { flexGrow: 1 } });
+const styles = StyleSheet.create({ center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.twelve }, content: { flexGrow: 1 } });

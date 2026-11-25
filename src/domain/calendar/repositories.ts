@@ -6,7 +6,7 @@ import type { CalendarViewMode } from './calendar-view-mode';
 import type { WeekStartsOn } from './month';
 import type { HolidayPreferencesV1 } from './holiday-preferences';
 import type { CalendarEvent, EventEditorTab, ExactDuration } from './event';
-import type { EventColorId } from './event-color';
+import type { EventColorId, PrimaryCalendarColorId } from './event-color';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
 import type { EventAggregate } from './event-reminder';
 import type {
@@ -95,6 +95,8 @@ export interface SettingsRepository {
   setDefaultExactDuration(value: ExactDuration, updatedAt: string): Promise<void>;
   getUndeterminedFadeMinutes(): Promise<number>;
   setUndeterminedFadeMinutes(value: number, updatedAt: string): Promise<void>;
+  getPrimaryCalendarColor(): Promise<PrimaryCalendarColorId | null>;
+  setPrimaryCalendarColor(colorId: PrimaryCalendarColorId, updatedAt: string): Promise<void>;
   getCalendarVisible(calendarId: string): Promise<boolean>;
   setCalendarVisible(calendarId: string, visible: boolean, updatedAt: string): Promise<void>;
   getLastEventEditorTab(): Promise<EventEditorTab>;

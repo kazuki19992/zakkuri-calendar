@@ -14,6 +14,14 @@ export const EVENT_COLOR_IDS = [
 export type EventColorId = (typeof EVENT_COLOR_IDS)[number];
 
 export const DEFAULT_EVENT_COLOR_ID: EventColorId = 'blue';
+export const DEFAULT_CALENDAR_TEAL = 'default-teal';
+export type PrimaryCalendarColorId = EventColorId | typeof DEFAULT_CALENDAR_TEAL;
+
+export function parsePrimaryCalendarColorId(value: unknown): PrimaryCalendarColorId | null {
+  if (value === DEFAULT_CALENDAR_TEAL) return DEFAULT_CALENDAR_TEAL;
+  const parsed = parseEventColorId(value);
+  return parsed.ok ? parsed.value : null;
+}
 
 export function parseEventColorId(
   value: unknown,

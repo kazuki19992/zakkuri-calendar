@@ -32,12 +32,12 @@ describe('書式付きメモtoolbar', () => {
     expect(view.getByLabelText('斜体').props.accessibilityState)
       .toEqual({ disabled: false, selected: false });
     await user.press(view.getByLabelText('太字'));
-    await user.press(view.getByLabelText('リンクを開く'));
+    await user.press(view.getByLabelText('選択したリンクを開く'));
     expect(onToggleBold).toHaveBeenCalledTimes(1);
     expect(onOpenLink).toHaveBeenCalledWith('https://example.com/');
   });
 
-  test('linkが選択されていないときはlink操作を無効にし44pt以上を確保する', async () => {
+  test('画面幅に合わせて操作を折り返し、リンク未選択時も44pt以上のボタンを表示する', async () => {
     const view = await render(<FormattedNoteToolbar
       disabled={false}
       state={{
@@ -57,7 +57,13 @@ describe('書式付きメモtoolbar', () => {
       onOpenLink={jest.fn()}
     />);
 
-    expect(view.getByLabelText('リンクを開く')).toBeDisabled();
-    expect(view.getByLabelText('太字')).toHaveStyle({ minHeight: 44, minWidth: 44 });
+    const linkButton = view.getByLabelText('選択したリンクを開く');
+    expect(linkButton).toBeDisabled();
+    expect(view.getByText('リンクを閲覧')).toBeOnTheScreen();
+    expect(linkButton.parent).toHaveStyle({ flexDirection: 'row', flexWrap: 'wrap' });
+    expect(view.getAllByRole('button')).toHaveLength(6);
+    for (const button of view.getAllByRole('button')) {
+      expect(button).toHaveStyle({ minHeight: 44, minWidth: 44, maxWidth: '100%' });
+    }
   });
 });

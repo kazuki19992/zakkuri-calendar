@@ -1,4 +1,5 @@
 import type {TemporalDefinition} from '@/domain/temporal/temporal-definition';
+export const ROUGH_TIME_SETTINGS_TITLE = 'ざっくり時間のカスタム';
 export const WEEKDAYS=['月曜日','火曜日','水曜日','木曜日','金曜日','土曜日','日曜日'] as const;
 export const formatClock=(minute:number)=>`${Math.floor(minute/60)}:${String(minute%60).padStart(2,'0')}`;
 export function formatMinutes(value:number):string {

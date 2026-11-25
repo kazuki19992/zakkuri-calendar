@@ -1,6 +1,7 @@
+import { Typography } from '@/constants/theme';
 import NativeDateTimePicker from '@expo/ui/community/datetime-picker';
-import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Keyboard, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import type { EventEditorTab } from '@/domain/calendar/event';
 import { useTheme } from '@/hooks/use-theme';
 import { formatEditorDate } from '../event-editor-model';
@@ -35,6 +36,7 @@ export function EventDateTimeFields({
   endTime,
   disabled,
   showEnd = true,
+  durationControl,
   timeInputDisabled = false,
   onAllDayChange,
   onStartDateChange,
@@ -51,6 +53,7 @@ export function EventDateTimeFields({
   endTime: string;
   disabled: boolean;
   showEnd?: boolean;
+  durationControl?: ReactNode;
   timeInputDisabled?: boolean;
   onAllDayChange(value: boolean): void;
   onStartDateChange(value: string): void;
@@ -59,7 +62,9 @@ export function EventDateTimeFields({
   onEndTimeChange(value: string): void;
 }>) {
   const theme = useTheme();
-  const dateTimeDisabled = disabled || (editorTab === 'exact' && !isAllDay && timeInputDisabled);
+  const showTimes = editorTab === 'exact' && !isAllDay;
+  const showEndDate = isAllDay || (showTimes && showEnd);
+  const dateTimeDisabled = disabled || (showTimes && timeInputDisabled);
   const [picker, setPicker] = useState<PickerField>(null);
   const timeRow = (field: 'startTime' | 'endTime', label: string, value: string) => (
     <Pressable
@@ -67,7 +72,7 @@ export function EventDateTimeFields({
       accessibilityLabel={`${label} ${value}`}
       accessibilityState={{ disabled: dateTimeDisabled }}
       disabled={dateTimeDisabled}
-      onPress={() => setPicker(field)}
+      onPress={() => { Keyboard.dismiss(); setPicker(field); }}
       style={[styles.row, { borderBottomColor: theme.calendarBorder }]}
     >
       <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>{label}</Text>
@@ -97,7 +102,7 @@ export function EventDateTimeFields({
         ) : (
           <Pressable accessibilityRole="button" accessibilityLabel={`${label} ${formattedValue}`}
             accessibilityState={{ disabled: dateDisabled }} disabled={dateDisabled}
-            onPress={() => setPicker(field)} style={styles.dateControl}>
+            onPress={() => { Keyboard.dismiss(); setPicker(field); }} style={styles.dateControl}>
             <Text style={[styles.rowValue, { color: theme.text }]}>{formattedValue}</Text>
           </Pressable>
         )}
@@ -110,30 +115,33 @@ export function EventDateTimeFields({
 
   return (
     <View style={styles.container}>
-      {editorTab === 'exact' ? (
-        <View style={[styles.row, { borderBottomColor: theme.calendarBorder }]}>
-          <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>終日</Text>
-          <Switch accessibilityLabel="終日" accessibilityState={{ checked: isAllDay, disabled }} disabled={disabled} value={isAllDay} onValueChange={onAllDayChange} />
-        </View>
-      ) : null}
-      {dateRow('startDate', editorTab === 'fuzzy' ? '日付' : '開始日', startDate,
-        onStartDateChange)}
-      {editorTab === 'exact' && !isAllDay ? timeRow('startTime', '開始時刻', startTime) : null}
-      {editorTab === 'exact' && (isAllDay || showEnd) ? dateRow('endDate', '終了日', endDate, onEndDateChange) : null}
-      {editorTab === 'exact' && !isAllDay && showEnd ? timeRow('endTime', '終了時刻', endTime) : null}
+      <View style={[styles.row, { borderBottomColor: theme.calendarBorder }]}>
+        <Text style={[styles.rowLabel, { color: theme.textSecondary }]}>終日</Text>
+        <Switch accessibilityLabel="終日" accessibilityState={{ checked: isAllDay, disabled }}
+          disabled={disabled} value={isAllDay} onValueChange={(value) => {
+            Keyboard.dismiss();
+            setPicker(null);
+            onAllDayChange(value);
+          }} />
+      </View>
+      {dateRow('startDate', isAllDay || showTimes ? '開始日' : '日付', startDate, onStartDateChange)}
+      {showTimes ? timeRow('startTime', '開始時刻', startTime) : null}
+      {showTimes ? durationControl : null}
+      {showEndDate ? dateRow('endDate', '終了日', endDate, onEndDateChange) : null}
+      {showTimes && showEnd ? timeRow('endTime', '終了時刻', endTime) : null}
 
       {Platform.OS !== 'ios' && picker === 'startDate' ? <NativeDateTimePicker
         {...pickerProps} testID="event-editor.start-date-picker" mode="date"
         value={toDate(startDate)} disabled={dateTimeDisabled}
         onDismiss={() => setPicker(null)}
         onValueChange={(_, value) => { onStartDateChange(dateValue(value)); setPicker(null); }} /> : null}
-      {Platform.OS !== 'ios' && picker === 'endDate' && (isAllDay || showEnd) ? <NativeDateTimePicker
+      {Platform.OS !== 'ios' && picker === 'endDate' && showEndDate ? <NativeDateTimePicker
         {...pickerProps} testID="event-editor.end-date-picker" mode="date"
         value={toDate(endDate)} disabled={dateTimeDisabled}
         onDismiss={() => setPicker(null)}
         onValueChange={(_, value) => { onEndDateChange(dateValue(value)); setPicker(null); }} /> : null}
-      {picker === 'startTime' ? <NativeDateTimePicker {...pickerProps} testID="event-editor.start-time-picker" mode="time" value={toDate(startDate, startTime)} disabled={dateTimeDisabled} is24Hour onValueChange={(_, value) => { onStartTimeChange(timeValue(value)); setPicker(null); }} /> : null}
-      {picker === 'endTime' && showEnd ? <NativeDateTimePicker {...pickerProps} testID="event-editor.end-time-picker" mode="time" value={toDate(endDate, endTime)} disabled={dateTimeDisabled} is24Hour onValueChange={(_, value) => { onEndTimeChange(timeValue(value)); setPicker(null); }} /> : null}
+      {showTimes && picker === 'startTime' ? <NativeDateTimePicker {...pickerProps} testID="event-editor.start-time-picker" mode="time" value={toDate(startDate, startTime)} disabled={dateTimeDisabled} is24Hour onValueChange={(_, value) => { onStartTimeChange(timeValue(value)); setPicker(null); }} /> : null}
+      {showTimes && picker === 'endTime' && showEnd ? <NativeDateTimePicker {...pickerProps} testID="event-editor.end-time-picker" mode="time" value={toDate(endDate, endTime)} disabled={dateTimeDisabled} is24Hour onValueChange={(_, value) => { onEndTimeChange(timeValue(value)); setPicker(null); }} /> : null}
     </View>
   );
 }
@@ -141,8 +149,8 @@ export function EventDateTimeFields({
 const styles = StyleSheet.create({
   container: { gap: 0 },
   row: { alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', justifyContent: 'space-between', minHeight: 52, paddingHorizontal: 0 },
-  rowLabel: { fontSize: 15 },
-  rowValue: { fontSize: 16 },
+  rowLabel: { fontSize: Typography.row },
+  rowValue: { fontSize: Typography.row },
   dateControl: { alignItems: 'flex-end', justifyContent: 'center', minHeight: 44,
     minWidth: 136, position: 'relative' },
   compactPickerOverlay: { bottom: 0, left: 0, opacity: 0.01, position: 'absolute',

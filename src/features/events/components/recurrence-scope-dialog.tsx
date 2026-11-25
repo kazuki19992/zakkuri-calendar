@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 import type { RecurrenceEditScope, ScopeRequest } from '../recurrence-edit-model';
 
-export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Readonly<{
+export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel, showUnsavedWarning = true }: Readonly<{
   request: ScopeRequest | null;
   busy: boolean;
+  showUnsavedWarning?: boolean;
   onSelect(scope: RecurrenceEditScope): void;
   onCancel(): void;
 }>) {
@@ -22,20 +25,17 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Rea
     ? 'これ以降の個別変更をリセットします'
     : '現在のシリーズ全体の個別変更をリセットします';
   return (
-    <Modal transparent visible animationType={reduceMotion ? 'none' : 'fade'}
+    <Modal transparent visible statusBarTranslucent navigationBarTranslucent animationType={reduceMotion ? 'none' : 'fade'}
       onRequestClose={() => { setConfirmationScope(null); onCancel(); }}>
-      <View style={styles.overlay}>
+      <SafeAreaView style={[styles.overlay, { backgroundColor: theme.calendarBackdrop }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="範囲選択をキャンセル"
           disabled={busy} onPress={() => { setConfirmationScope(null); onCancel(); }}
           style={StyleSheet.absoluteFill} />
-        <ScrollView accessibilityViewIsModal style={[styles.dialog, {
-          backgroundColor: theme.background,
-          borderColor: theme.calendarBorder,
-        }]}>
+        <ScrollView accessibilityViewIsModal style={[styles.dialog, { backgroundColor: theme.background }]}>
           <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
             {confirmationScope === null ? title : resetNeeded?'個別変更のリセット':'変更内容の確認'}
           </Text>
-          {request.operation==='delete'?<Text style={[styles.warning,{color:theme.textSecondary}]}>保存していないメモの変更も破棄されます。</Text>:null}
+          {request.operation==='delete' && showUnsavedWarning?<Text style={[styles.warning,{color:theme.textSecondary}]}>保存していないメモの変更も破棄されます。</Text>:null}
           {confirmationScope === null && request.needsExceptionResetConfirmation && !request.options.some(option=>option.scope==='occurrence') ? (
             <Text style={[styles.warning, { color: theme.textSecondary }]}>
               1件だけの予定には繰り返し設定を適用できません
@@ -59,9 +59,7 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Rea
                 ? setConfirmationScope(option.scope)
                 : onSelect(option.scope)}
               style={[styles.option, { borderTopColor: theme.calendarBorder }]}>
-              <Text style={{ color: request.operation === 'delete'
-                ? theme.calendarHoliday
-                : theme.calendarAccent }}>{option.label}</Text>
+              <Text style={{ color: request.operation === 'delete' ? theme.danger : theme.text }}>{option.label}</Text>
             </Pressable>
           ))}
           <Pressable accessibilityRole="button" accessibilityLabel="キャンセル"
@@ -73,7 +71,7 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Rea
             <Text style={{ color: theme.textSecondary }}>キャンセル</Text>
           </Pressable>
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -81,13 +79,12 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel }: Rea
 const styles = StyleSheet.create({
   overlay: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
     flex: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: Spacing.four,
   },
-  dialog: { maxHeight:'85%',flexGrow:0,borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, maxWidth: 420, width: '100%' },
-  title: { fontSize: 18, fontWeight: '600', paddingHorizontal: 18, paddingTop: 18 },
-  warning: { fontSize: 13, paddingHorizontal: 18, paddingBottom: 10, paddingTop: 6 },
+  dialog: { maxHeight:'85%',flexGrow:0,borderRadius: Radii.large, maxWidth: 420, width: '100%' },
+  title: { fontSize: Typography.title, fontWeight: '600', paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
+  warning: { fontSize: Typography.caption, paddingHorizontal: Spacing.three, paddingBottom: Spacing.twelve, paddingTop: Spacing.two },
   option: { alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, justifyContent: 'center', minHeight: 52 },
 });

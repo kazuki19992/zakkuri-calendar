@@ -1,51 +1,71 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import '@/global.css';
 
 import { Platform } from 'react-native';
-import { DEFAULT_EVENT_COLOR_ID, getEventColor } from './event-colors';
+import { getEventColor, MAIN_CALENDAR_COLOR, type EventColorId } from './event-colors';
 
 export const Colors = {
   light: {
-    text: '#202124',
+    text: '#202624',
     background: '#FFFFFF',
-    backgroundElement: '#F8F9FA',
-    backgroundSelected: '#E8F0FE',
-    textSecondary: '#5F6368',
+    backgroundElement: '#F3F6F4',
+    backgroundSelected: '#DDEDE7',
+    textSecondary: '#53625C',
+    textDisabled: '#7B8882',
+    controlBorder: '#D9E2DC',
     calendarSaturday: '#1967D2',
     calendarHoliday: '#B3261E',
-    calendarAccent: '#1A73E8',
-    calendarBorder: '#DADCE0',
-    calendarEvent: getEventColor(DEFAULT_EVENT_COLOR_ID, 'light'),
+    danger: '#B3261E',
+    calendarAccent: MAIN_CALENDAR_COLOR.light,
+    calendarBorder: '#D9E2DC',
+    calendarEvent: MAIN_CALENDAR_COLOR.light,
     calendarEventText: '#FFFFFF',
-    calendarEventBorder: '#0D47A1',
-    calendarHolidayBackground: '#FCE8E6',
+    calendarEventBorder: MAIN_CALENDAR_COLOR.light,
+    calendarHolidayBackground: '#F3F6F4',
     calendarNowIndicator: '#EA4335',
     calendarOverlay: '#FFFFFF',
     calendarBackdrop: 'rgba(32, 33, 36, 0.32)',
   },
   dark: {
-    text: '#E8EAED',
+    text: '#E8EFEA',
     background: '#202124',
-    backgroundElement: '#292A2D',
-    backgroundSelected: '#3C4043',
-    textSecondary: '#9AA0A6',
+    backgroundElement: '#292F2C',
+    backgroundSelected: '#29423A',
+    textSecondary: '#ACBBB3',
+    textDisabled: '#85928A',
+    controlBorder: '#3B4B43',
     calendarSaturday: '#8AB4F8',
     calendarHoliday: '#F28B82',
-    calendarAccent: '#8AB4F8',
-    calendarBorder: '#3C4043',
-    calendarEvent: getEventColor(DEFAULT_EVENT_COLOR_ID, 'dark'),
+    danger: '#F28B82',
+    calendarAccent: MAIN_CALENDAR_COLOR.dark,
+    calendarBorder: '#3B4B43',
+    calendarEvent: MAIN_CALENDAR_COLOR.dark,
     calendarEventText: '#202124',
-    calendarEventBorder: '#8AB4F8',
-    calendarHolidayBackground: '#5C1A1A',
+    calendarEventBorder: MAIN_CALENDAR_COLOR.dark,
+    calendarHolidayBackground: '#292F2C',
     calendarNowIndicator: '#F28B82',
-    calendarOverlay: '#292A2D',
+    calendarOverlay: '#292F2C',
     calendarBackdrop: 'rgba(0, 0, 0, 0.56)',
   },
 } as const;
+
+export function resolveCalendarTheme(scheme: keyof typeof Colors, colorId: EventColorId | null) {
+  const base = Colors[scheme];
+  if (colorId === null) return base;
+  const accent = getEventColor(colorId, scheme);
+  const fraction = scheme === 'dark' ? 0.18 : 0.08;
+  const channels = [1, 3, 5].map((index) => {
+    const background = Number.parseInt(base.background.slice(index, index + 2), 16);
+    const foreground = Number.parseInt(accent.slice(index, index + 2), 16);
+    return Math.round(background + (foreground - background) * fraction).toString(16).padStart(2, '0');
+  });
+  return {
+    ...base,
+    calendarAccent: accent,
+    calendarEvent: accent,
+    calendarEventBorder: accent,
+    backgroundSelected: `#${channels.join('')}`,
+  };
+}
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
@@ -78,10 +98,25 @@ export const Spacing = {
   half: 2,
   one: 4,
   two: 8,
+  twelve: 12,
   three: 16,
   four: 24,
   five: 32,
   six: 64,
+} as const;
+
+export const Radii = {
+  small: 8,
+  large: 12,
+  full: 999,
+} as const;
+
+export const Typography = {
+  caption: 12,
+  body: 14,
+  row: 16,
+  title: 20,
+  display: 28,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;

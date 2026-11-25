@@ -1,6 +1,7 @@
 import { DEFAULT_UNDETERMINED_MINUTES, parseUndeterminedMinutes } from '@/domain/temporal/temporal-preferences';
 import { defaultReminderTiming, defaultTimingIsValid, parseReminderTiming, type NotificationCategory, type ReminderTiming } from '@/domain/notifications/reminder-timing';
 import { parseExactDuration, type EventEditorTab, type ExactDuration } from '@/domain/calendar/event';
+import { parsePrimaryCalendarColorId, type PrimaryCalendarColorId } from '@/domain/calendar/event-color';
 import {
   DEFAULT_CALENDAR_VIEW_MODE,
   parseCalendarViewMode,
@@ -19,6 +20,7 @@ type SettingRow = Readonly<{ value_json: string }>;
 const DEFAULT_FADE_MINUTES = DEFAULT_UNDETERMINED_MINUTES;
 const DEFAULT_EVENT_EDITOR_TAB: EventEditorTab = 'fuzzy';
 const DEFAULT_THIS_WEEK_DEADLINE: ThisWeekDeadlineWeekday = 5;
+const PRIMARY_CALENDAR_COLOR_KEY = 'primary_calendar_color';
 
 function parseJson(value: string): unknown {
   try {
@@ -149,6 +151,25 @@ export class SqliteSettingsRepository implements SettingsRepository {
       `INSERT INTO app_settings(key,value_json,updated_at) VALUES($key,$valueJson,$updatedAt)
        ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at`,
       { $key: 'undetermined_fade_minutes', $valueJson: JSON.stringify(value), $updatedAt: updatedAt },
+    );
+  }
+
+  async getPrimaryCalendarColor(): Promise<PrimaryCalendarColorId | null> {
+    const row = await this.database.first<SettingRow>(
+      'SELECT value_json FROM app_settings WHERE key = $key',
+      { $key: PRIMARY_CALENDAR_COLOR_KEY },
+    );
+    return parsePrimaryCalendarColorId(row ? parseJson(row.value_json) : undefined);
+  }
+
+  async setPrimaryCalendarColor(colorId: PrimaryCalendarColorId, updatedAt: string): Promise<void> {
+    const parsed = parsePrimaryCalendarColorId(colorId);
+    if (parsed === null) throw new Error('カレンダーの色を確認してください');
+    await this.database.run(
+      `INSERT INTO app_settings (key, value_json, updated_at)
+       VALUES ($key, $valueJson, $updatedAt)
+       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
+      { $key: PRIMARY_CALENDAR_COLOR_KEY, $valueJson: JSON.stringify(parsed), $updatedAt: updatedAt },
     );
   }
 

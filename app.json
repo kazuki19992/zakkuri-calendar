@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "zakkuri-calendar",
+    "name": "ざっくりカレンダー",
     "slug": "zakkuri-calendar",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon-android.png",
     "scheme": "zakkuricalendar",
     "userInterfaceStyle": "automatic",
     "ios": {

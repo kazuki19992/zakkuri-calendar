@@ -7,7 +7,7 @@ import {relativePeriodAt,resolveRelativeOccurrence,deadlineWarningLabel,type Rel
 import { TemporalConflictError, temporalDefinitionToken, type DefinitionExpectation } from '@/domain/temporal/temporal-preferences';
 import { useNewReminderDefaults } from './use-new-reminder-defaults';
 import { getReminderTiming } from '@/domain/calendar/event-reminder';
-import { parseReminderTiming, sameReminderCondition, timingIsCompatible, type ReminderTiming, type NotificationCategory } from '@/domain/notifications/reminder-timing';
+import { notificationCategory, parseReminderTiming, sameReminderCondition, timingIsCompatible, type ReminderTiming, type NotificationCategory } from '@/domain/notifications/reminder-timing';
 import { DEFAULT_EXACT_DURATION } from '@/domain/calendar/default-exact-duration';
 import { rangeForExactDuration } from '../exact-duration-draft';
 import { useNewEventDuration } from './use-new-event-duration';
@@ -40,7 +40,6 @@ import {
   planSeriesMutation,
 } from '@/domain/calendar/recurrence-change';
 import {
-  materializeOccurrenceReplacement,
   type EventOverrideField,
 } from '@/domain/calendar/recurrence-exception';
 import { offsetCalendarDate } from '@/domain/calendar/month';
@@ -52,7 +51,7 @@ import type {
   SettingsRepository,
   TemporalDefinitionRepository,
 } from '@/domain/calendar/repositories';
-import { createFixedDurationFromDateTimes, toMinutesOfDay } from '@/domain/calendar/time';
+import { createFixedDurationFromDateTimes, toMinutesOfDay, toWallClockTime } from '@/domain/calendar/time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import {
   resolveRelativeDateRange,
@@ -74,7 +73,7 @@ import {
   type RecurrencePreset,
   type ReminderDraft,
 } from '../event-editor-model';
-import {
+import { getEditableOccurrenceAggregate,
   createScopeRequest,
   type RecurrenceEditScope,
   type ScopeRequest,
@@ -91,6 +90,7 @@ export type EventEditorState = Readonly<{
   isDateEditable: boolean;
   isRecurrenceEditable: boolean;
   relativeDatePreview: string | null;
+  relativeDateRange: Readonly<{ startDate: string; endDate: string }> | null;
   occurrenceRecurrenceNotice?: string | null;
   relativeRecurrence?: Readonly<{ frequency:'weekly'|'monthly'; periodAnchorDate:string; label:string; preview:readonly string[]; policyDescription:string|null; updatePolicy?():Promise<void>; notice:string|null }>;
   startDate: string;
@@ -156,6 +156,7 @@ export type EventEditorState = Readonly<{
   moveReminder(id: string, offset: -1 | 1): void;
   retry(): void;
   save(): Promise<boolean>;
+  getSavedEventLocation?(): Readonly<{ id: string; date: string }> | null;
   remove(): Promise<boolean>;
   selectScope(scope: RecurrenceEditScope): Promise<boolean>;
   cancelScope(): void;
@@ -173,7 +174,6 @@ type UseEventEditorInput = Readonly<{
     endTime?: string;
     temporalType: EventDraft['temporalType'];
   }>;
-  initialTab?: EventEditorTab;
   eventId?: string;
   occurrenceDate?: string;
   createId?: () => string;
@@ -205,7 +205,6 @@ export function useEventEditor({
   temporalDefinitions,
   holidayProvider = unsupportedHolidayProvider,
   initial,
-  initialTab,
   eventId,
   occurrenceDate,
   createId = Crypto.randomUUID,
@@ -215,7 +214,6 @@ export function useEventEditor({
   openBrowser = openBrowserAsync,
 }: UseEventEditorInput): EventEditorState {
   const [initialValues] = useState(initial);
-  const [initialEditorTab] = useState(initialTab);
   const [newEventId] = useState(() => createId());
   const [status, setStatus] = useState<EditorStatus>('loading');
   const [existingAggregate, setExistingAggregate] = useState<EventAggregate | null>(null);
@@ -226,9 +224,7 @@ export function useEventEditor({
   const [calendarName, setCalendarName] = useState('');
   const [calendarColorId, setCalendarColorId] = useState<EventColorId>('blue');
   const [title, setTitleValue] = useState('');
-  const [editorTab, setEditorTabValue] = useState<EventEditorTab>(
-    initialEditorTab ?? (initialValues.temporalType === 'fuzzy' ? 'fuzzy' : 'exact'),
-  );
+  const [editorTab, setEditorTabValue] = useState<EventEditorTab>('fuzzy');
   const [isAllDay, setAllDayValue] = useState(initialValues.temporalType === 'allDay');
   const [startDate, setStartDateValue] = useState(initialValues.date);
   const [startTime, setStartTimeValue] = useState(initialValues.startTime);
@@ -269,14 +265,27 @@ export function useEventEditor({
   const noteDocument=noteSnapshot.document;
   const loadedNoteRef=useRef<EventNoteDocumentV1|null>(null);
   const completedRef=useRef(false);
+  const draftBaselineRef = useRef<string | null>(null);
   const [isCheckingLeave,setIsCheckingLeave]=useState(false);
   const [noteLinkError, setNoteLinkError] = useState<string | null>(null);
   const [recurrenceDraft, setRecurrenceDraft] = useState<RecurrenceDraft>(() =>
     getRecurrenceDraft(null, initialValues.date));
   const [recurrenceEdited, setRecurrenceEdited] = useState(false);
   const [reminders, setReminders] = useState<readonly ReminderDraft[]>([]);
-  const reminderCategory: NotificationCategory = editorTab === 'exact' ? isAllDay ? 'all_day' : 'exact'
-    : definitions.find(d => d.id === selectedDefinitionId)?.resolverConfig.kind === 'timeOfDay' ? 'fuzzy_day' : 'fuzzy_period';
+  const selectedDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
+  const existingRelativeEvent = (!temporalReselected || (existingAggregate?.event.recurrenceRule?.version===2 && !deadlinePolicyUpdated)) && existingAggregate?.event.temporalType === 'fuzzy' &&
+    existingAggregate.event.temporalDefinitionId === selectedDefinitionId &&
+    existingAggregate.event.resolutionContext !== null
+    ? existingAggregate.event
+    : null;
+  const hasRelativeDefinition = (selectedDefinition !== null && selectedDefinition.granularity !== 'day') ||
+    existingRelativeEvent !== null;
+  const temporalType = isAllDay ? 'allDay' : editorTab;
+  const isRelativeDefinition = temporalType === 'fuzzy' && hasRelativeDefinition;
+  const reminderCategory = notificationCategory({
+    temporalType,
+    ...(selectedDefinitionId === null ? {} : { temporalDefinitionId: selectedDefinitionId }),
+  }, definitions);
   const reminderDefaults = useNewReminderDefaults({ settings, isNew: eventId === undefined, category: reminderCategory, ready: status === 'ready', apply: setReminders, createId: createReminderId });
   const markReminderTouched = reminderDefaults.markTouched;
 
@@ -290,6 +299,8 @@ export function useEventEditor({
   const [isDeleting, setIsDeleting] = useState(false);
   const [loadRevision, setLoadRevision] = useState(0);
   const operationRef = useRef(false);
+  const savedLocation = useRef<Readonly<{ id: string; date: string }> | null>(null);
+  const getSavedEventLocation = useCallback(() => savedLocation.current, []);
   const scopeActiveRef=useRef(false);
   const updateScopeRequest=useCallback((request:ScopeRequest|null)=>{
     scopeActiveRef.current=request!==null;setScopeRequest(request);
@@ -300,7 +311,7 @@ export function useEventEditor({
     let active = true;
     const load = async (): Promise<void> => {
       try {
-        const [calendar, loadedValue, savedTab, deadlineWeekday, loadedHolidayPreferences] = await Promise.all([
+        const [calendar, loadedValue, deadlineWeekday, loadedHolidayPreferences] = await Promise.all([
           calendars.getDefault(),
           eventId === undefined
             ? Promise.resolve(null)
@@ -310,9 +321,6 @@ export function useEventEditor({
                 seriesEventId: eventId,
                 originalOccurrenceDate: occurrenceDate,
               }),
-          eventId === undefined && initialEditorTab === undefined
-            ? settings.getLastEventEditorTab()
-            : Promise.resolve(null),
           settings.getThisWeekDeadlineWeekday(),
           settings.getHolidayPreferences(),
         ]);
@@ -324,26 +332,7 @@ export function useEventEditor({
           ? loadedValue as EventAggregate | null
           : null;
         if (loadedOccurrenceData !== null && occurrenceDate !== undefined) {
-          const replacement = loadedOccurrenceData.replacement?.event
-            ?? loadedOccurrenceData.series.event;
-          const fields = loadedOccurrenceData.exception?.overrideFields ?? [];
-          const materialized = materializeOccurrenceReplacement({
-            seriesEvent: loadedOccurrenceData.series.event,
-            replacementEvent: replacement,
-            overrideFields: fields,
-            occurrenceDate,
-            resolvedOccurrence: loadedOccurrenceData.resolvedOccurrence,
-          });
-          loadedAggregate = {
-            event: {
-              ...materialized,
-              id: loadedOccurrenceData.series.event.id,
-              recurrenceRule: loadedOccurrenceData.series.event.recurrenceRule,
-            },
-            reminders: fields.includes('reminders')
-              ? loadedOccurrenceData.replacement?.reminders ?? []
-              : loadedOccurrenceData.series.reminders,
-          };
+          loadedAggregate = getEditableOccurrenceAggregate(loadedOccurrenceData, occurrenceDate);
           setOccurrenceEditData(loadedOccurrenceData);
         }
         if (eventId !== undefined && loadedAggregate === null) throw new Error('event not found');
@@ -374,6 +363,7 @@ export function useEventEditor({
         noteSession.reset(loadedAggregate?.event.noteDocument??null);
         loadedNoteRef.current=loadedAggregate?.event.noteDocument??null;
         completedRef.current=false;
+        draftBaselineRef.current = null;
         setSelectedDefinitionId(
           loadedDefinitions.find((definition) => definition.granularity === 'day')?.id
             ?? loadedDefinitions[0]?.id
@@ -381,9 +371,7 @@ export function useEventEditor({
         );
 
         if (loadedAggregate === null) {
-          const validSavedTab = savedTab === 'exact' || savedTab === 'fuzzy' ? savedTab : null;
-          const fallbackTab = initialValues.temporalType === 'fuzzy' ? 'fuzzy' : 'exact';
-          setEditorTabValue(initialEditorTab ?? validSavedTab ?? fallbackTab);
+          setEditorTabValue('fuzzy');
         } else {
           const event = loadedAggregate.event;
           setExistingAggregate(loadedAggregate);
@@ -403,11 +391,26 @@ export function useEventEditor({
           if (event.temporalType === 'fuzzy') {
             setEditorTabValue('fuzzy');
             setAllDayValue(false);
-            setStartDateValue(event.resolutionContext?.referenceDate ?? event.anchorDate);
-            currentStartDate.current = event.resolutionContext?.referenceDate ?? event.anchorDate;
+            const fuzzyStartDate = event.resolutionContext?.referenceDate ?? event.anchorDate;
+            setStartDateValue(fuzzyStartDate);
+            currentStartDate.current = fuzzyStartDate;
             setEndDateValue(event.endDate);
             setAllDayEndDate(event.endDate);
             setSelectedDefinitionId(event.temporalDefinitionId);
+            const definition = loadedDefinitions.find(({ id }) => id === event.temporalDefinitionId);
+            const config = definition?.resolverConfig;
+            if (config?.kind === 'timeOfDay') {
+              const start = toWallClockTime(config.startMinute);
+              if (start !== null) {
+                const range = rangeForExactDuration(fuzzyStartDate, start, {
+                  type: 'fixed', minutes: config.endMinute - config.startMinute,
+                });
+                setStartTimeValue(range.startTime);
+                setEndDateValue(range.endDate);
+                setEndTimeValue(range.endTime);
+                setExactDurationTypeValue('fixed');
+              }
+            }
           } else if (event.temporalType === 'allDay') {
             setEditorTabValue('exact');
             setAllDayValue(true);
@@ -431,12 +434,13 @@ export function useEventEditor({
     };
     void load();
     return () => { active = false; };
-  }, [calendars, eventId, events, initialEditorTab, initialValues, loadRevision,
+  }, [calendars, eventId, events, loadRevision,
     occurrenceDate, settings, temporalDefinitions,noteSession]);
 
-  const recurrenceTabCache=useRef<Partial<Record<EventEditorTab,RecurrenceDraft>>>({});
+  type RecurrenceDraftKey = EventEditorTab | 'allDay';
+  const recurrenceTabCache=useRef<Partial<Record<RecurrenceDraftKey,RecurrenceDraft>>>({});
   const recurrenceGranularityCache=useRef<Partial<Record<'day'|'week'|'month',RecurrenceDraft>>>({});
-  const recurrenceTabIntent=useRef<Partial<Record<EventEditorTab,boolean>>>({});
+  const recurrenceTabIntent=useRef<Partial<Record<RecurrenceDraftKey,boolean>>>({});
   const recurrenceGranularityIntent=useRef<Partial<Record<'day'|'week'|'month',boolean>>>({});
   const clearErrors = useCallback(() => {
     setTitleError(null);
@@ -447,24 +451,35 @@ export function useEventEditor({
     setSaveError(null);
   }, []);
   const setTitle = useCallback((value: string) => { setTitleValue(value); clearErrors(); }, [clearErrors]);
+  const switchRecurrenceDraft = useCallback((from: RecurrenceDraftKey, to: RecurrenceDraftKey) => {
+    recurrenceTabCache.current[from] = recurrenceDraft;
+    recurrenceTabIntent.current[from] = recurrenceEdited;
+    setRecurrenceDraft(recurrenceTabCache.current[to] ?? getRecurrenceDraft(null, startDate));
+    setRecurrenceEdited(recurrenceTabIntent.current[to] ?? false);
+  }, [recurrenceDraft, recurrenceEdited, startDate]);
   const setEditorTab = useCallback((value: EventEditorTab) => {
     if (value === editorTab) return;
-    recurrenceTabCache.current[editorTab]=recurrenceDraft;
-    recurrenceTabIntent.current[editorTab]=recurrenceEdited;
-    const cached=recurrenceTabCache.current[value];
-    setRecurrenceDraft(cached??getRecurrenceDraft(null,startDate));
-    setRecurrenceEdited(recurrenceTabIntent.current[value]??false);
+    if (!isAllDay) switchRecurrenceDraft(editorTab, value);
     setEditorTabValue(value);
     clearErrors();
-    if (status === 'ready') void settings.setLastEventEditorTab(value, now()).catch(() => {});
-  }, [clearErrors, editorTab, now, settings, status,recurrenceDraft,recurrenceEdited,startDate]);
+  }, [clearErrors, editorTab, isAllDay, switchRecurrenceDraft]);
   const setAllDay = useCallback((value: boolean) => {
+    if (value === isAllDay) return;
     if (value && !allDayDraftInitialized.current) {
-      setAllDayEndDate(endDate);
+      setAllDayEndDate(editorTab === 'fuzzy' ? startDate : endDate);
       allDayDraftInitialized.current = true;
     }
-    setAllDayValue(value); clearErrors();
-  }, [clearErrors, endDate]);
+    // 相対期間の繰り返しと通常の繰り返しは保存形式が異なるため、それぞれの入力を保持する。
+    if (editorTab === 'fuzzy' && hasRelativeDefinition) {
+      switchRecurrenceDraft(value ? 'fuzzy' : 'allDay', value ? 'allDay' : 'fuzzy');
+    } else {
+      const key = value ? editorTab : 'allDay';
+      recurrenceTabCache.current[key] = recurrenceDraft;
+      recurrenceTabIntent.current[key] = recurrenceEdited;
+    }
+    setAllDayValue(value);
+    clearErrors();
+  }, [clearErrors, editorTab, endDate, hasRelativeDefinition, isAllDay, recurrenceDraft, recurrenceEdited, startDate, switchRecurrenceDraft]);
   const setStartDate = useCallback((value: string) => {
     const moved = moveEditorRangeStart({ startDate, startTime, endDate, endTime }, value);
     const movedAllDay = moveEditorRangeStart({ startDate, startTime, endDate: allDayEndDate, endTime }, value);
@@ -499,6 +514,7 @@ export function useEventEditor({
     clearErrors();
   }, [clearErrors, endDate, endTime, exactDurationType, initialDuration.status, startDate, startTime]);
   const selectDefinition = useCallback((value: string) => {
+    if (value === selectedDefinitionId) return;
     const previous=definitions.find(d=>d.id===selectedDefinitionId),next=definitions.find(d=>d.id===value);
     if(previous&&next&&previous.granularity!==next.granularity){
       const current=existingAggregate?.event;
@@ -513,7 +529,7 @@ export function useEventEditor({
       setRelativeSelectionNotice(cached?'以前の入力内容を復元しました。期間を再確認してください。':'単位が変わったため繰り返しを未設定にしました。新しい単位で選び直してください。');
     }
     if(previous&&next&&previous.granularity!=='day'&&previous.granularity===next.granularity&&existingAggregate?.event.recurrenceRule?.version===2)setRelativeReference(existingAggregate.event.anchorDate);
-    if (value !== selectedDefinitionId) setTemporalReselected(true);
+    setTemporalReselected(true);
     setSelectedDefinitionId(value); clearErrors();
   }, [clearErrors, selectedDefinitionId,definitions,existingAggregate,temporalReselected,relativeReference,startDate,thisWeekDeadlineWeekday,recurrenceDraft,recurrenceEdited]);
   const setColorId = useCallback((value: EventColorId | null) => { setColorIdValue(value); clearErrors(); }, [clearErrors]);
@@ -532,16 +548,15 @@ export function useEventEditor({
     }
   }, [openBrowser]);
   const updateRecurrence = useCallback((update: Partial<RecurrenceDraft>) => {
-    const definition=definitions.find(item=>item.id===selectedDefinitionId);
     setRecurrenceEdited(true);
     setRecurrenceDraft((value) => {
-      const frequency:RecurrenceDraft['frequency']|null=editorTab==='fuzzy'&&definition?.granularity!=='day'&&definition
-        ? definition.granularity==='month'?'monthly':'weekly' : null;
+      const frequency: RecurrenceDraft['frequency'] | null = isRelativeDefinition && selectedDefinition
+        ? selectedDefinition.granularity === 'month' ? 'monthly' : 'weekly' : null;
       const base=frequency&&value.frequency!==frequency?{...value,preset:'none' as const,frequency,untilDate:value.endType==='until'?'':value.untilDate}:value;
       return {...base,...update,...(frequency?{frequency}:{})};
     });
     setRecurrenceError(null);
-  }, [definitions,selectedDefinitionId,editorTab]);
+  }, [isRelativeDefinition, selectedDefinition]);
   const setRecurrencePreset = useCallback((value: RecurrencePreset) => updateRecurrence({ preset: value }), [updateRecurrence]);
   const setRecurrenceFrequency = useCallback((value: RecurrenceRuleV1['frequency']) => updateRecurrence({ frequency: value }), [updateRecurrence]);
   const setRecurrenceIntervalText = useCallback((value: string) => updateRecurrence({ intervalText: value }), [updateRecurrence]);
@@ -589,16 +604,6 @@ export function useEventEditor({
   }, [markReminderTouched]);
   const retry = useCallback(() => { setStatus('loading'); setLoadRevision((value) => value + 1); }, []);
 
-  const selectedDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
-  const existingRelativeEvent = (!temporalReselected || (existingAggregate?.event.recurrenceRule?.version===2 && !deadlinePolicyUpdated)) && existingAggregate?.event.temporalType === 'fuzzy' &&
-    existingAggregate.event.temporalDefinitionId === selectedDefinitionId &&
-    existingAggregate.event.resolutionContext !== null
-    ? existingAggregate.event
-    : null;
-  const isRelativeDefinition = editorTab === 'fuzzy' && (
-    (selectedDefinition !== null && selectedDefinition.granularity !== 'day') ||
-    existingRelativeEvent !== null
-  );
   let relativeResolution: RelativeDateResolution | null = null;
   let relativeDateError: string | null = null;
   if (isRelativeDefinition) {
@@ -670,11 +675,7 @@ export function useEventEditor({
       const ids=[selectedDefinitionId,occurrence?.series.event.temporalType==='fuzzy'?occurrence.series.event.temporalDefinitionId:null];
       for(const id of ids){if(id&&!latest.some(item=>item.id===id)){const definition=await temporalDefinitions.getById(id);if(definition)latest=[...latest,definition];}}
       let aggregate = eventId && occurrenceDate === undefined ? await events.getById(eventId) : null;
-      if(occurrence&&occurrenceDate){
-        const fields=occurrence.exception?.overrideFields??[];
-        const materialized=materializeOccurrenceReplacement({seriesEvent:occurrence.series.event,replacementEvent:occurrence.replacement?.event??occurrence.series.event,overrideFields:fields,occurrenceDate,resolvedOccurrence:occurrence.resolvedOccurrence});
-        aggregate={event:{...materialized,id:occurrence.series.event.id,recurrenceRule:occurrence.series.event.recurrenceRule},reminders:fields.includes('reminders')?occurrence.replacement?.reminders??[]:occurrence.series.reminders};
-      }
+      if (occurrence && occurrenceDate) aggregate = getEditableOccurrenceAggregate(occurrence, occurrenceDate);
       if (!mountedRef.current) return;
       setDefinitions(latest);
       if (aggregate) setExistingAggregate(aggregate);
@@ -691,23 +692,16 @@ export function useEventEditor({
     clearErrors();
     if (relativeDateError !== null) { setDateError(relativeDateError); return false; }
     const existingEvent = existingAggregate?.event;
-    const targetDefinition = definitions.find((definition) => definition.id === selectedDefinitionId) ?? null;
-    const isExistingRelative = existingEvent?.temporalType === 'fuzzy' &&
-      existingEvent.temporalDefinitionId === selectedDefinitionId &&
-      existingEvent.resolutionContext !== null;
-    const isRelative = editorTab === 'fuzzy' && (
-      (targetDefinition !== null && targetDefinition.granularity !== 'day') || isExistingRelative
-    );
     const contextForSave=relativeResolution?{version:1 as const,referenceDate:relativeResolution.referenceDate,periodAnchorDate:relativeResolution.periodAnchorDate,parameterSnapshot:relativeResolution.parameterSnapshot}:null;
-    const recurrence = preservingSourceRule ? {ok:true as const,value:null} : isRelative
-      ? targetDefinition&&contextForSave?buildRelativeRecurrenceRule(recurrenceDraft,targetDefinition,contextForSave):recurrenceDraft.preset==='none'?{ok:true as const,value:null}:{ok:false as const,error:{field:'recurrence',message:'対象期間を確認してください'}}
+    const recurrence = preservingSourceRule ? {ok:true as const,value:null} : isRelativeDefinition
+      ? selectedDefinition&&contextForSave?buildRelativeRecurrenceRule(recurrenceDraft,selectedDefinition,contextForSave):recurrenceDraft.preset==='none'?{ok:true as const,value:null}:{ok:false as const,error:{field:'recurrence',message:'対象期間を確認してください'}}
       : buildRecurrenceRule(recurrenceDraft, startDate);
     if (!recurrence.ok) { setRecurrenceError(recurrence.error.message); return false; }
 
     const base = {
       calendarId: existingEvent?.calendarId ?? calendarId ?? '',
       title: title.trim(),
-      anchorDate: isRelative ? relativeResolution?.startDate ?? startDate : startDate,
+      anchorDate: relativeResolution?.startDate ?? startDate,
       createdTimeZoneId: existingEvent?.createdTimeZoneId ?? getTimeZoneId(),
       location: optionalText(location),
       noteDocument:capturedNote,
@@ -715,9 +709,9 @@ export function useEventEditor({
       recurrenceRule: recurrence.value,
     };
     let draft: EventDraft;
-    if (editorTab === 'fuzzy') {
+    if (temporalType === 'fuzzy') {
       if (selectedDefinitionId === null) { setSaveError('時間帯を選択してください。'); return false; }
-      if (isRelative && relativeResolution === null) { setDateError('相対日付の期間を確認してください'); return false; }
+      if (isRelativeDefinition && relativeResolution === null) { setDateError('相対日付の期間を確認してください'); return false; }
       draft = {
         ...base, temporalType: 'fuzzy', temporalDefinitionId: selectedDefinitionId,
         endDate: relativeResolution?.endDate ?? startDate,
@@ -728,8 +722,8 @@ export function useEventEditor({
           parameterSnapshot: relativeResolution.parameterSnapshot,
         },
       };
-    } else if (isAllDay) {
-      draft = { ...base, temporalType: 'allDay', endDate: allDayEndDate };
+    } else if (temporalType === 'allDay') {
+      draft = { ...base, temporalType, endDate: allDayEndDate };
     } else {
       const duration = exactDurationType === 'fixed'
         ? getEditorExactDuration({ startDate, startTime, endDate, endTime }, null)
@@ -804,19 +798,21 @@ export function useEventEditor({
         const expected = expectedDefinitionFor(aggregate.event);
         if (expected) await events.update(aggregate, expected); else await events.update(aggregate);
       }
+      savedLocation.current = { id: aggregate.event.id, date: aggregate.event.anchorDate };
       return true;
     } catch (error) {
       if (error instanceof TemporalConflictError) { await recoverTemporalConflict(); return false; }
       setSaveError('保存できませんでした。もう一度お試しください。');
       return false;
     }
-  }, [updateScopeRequest,preservingSourceRule,canInheritSource,inheritedRule,expectedDefinitionFor, recoverTemporalConflict, updatingPolicy,allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, editorTab, endDate, endTime, events, existingAggregate,
-    getTimeZoneId, isAllDay, location, newEventId, now, recurrenceDraft, reminders, reminderDefaults.status,
-    definitions, holidayProvider, occurrenceDate, occurrenceEditData, relativeResolution, relativeDateError, selectedDefinitionId,
-    startDate, startTime, status, title]);
+  }, [updateScopeRequest,preservingSourceRule,canInheritSource,inheritedRule,expectedDefinitionFor, recoverTemporalConflict, updatingPolicy,allDayEndDate, durationBlocked, exactDurationType, calendarId, clearErrors, colorId, endDate, endTime, events, existingAggregate,
+    getTimeZoneId, isRelativeDefinition, location, newEventId, now, recurrenceDraft, reminders, reminderDefaults.status,
+    definitions, holidayProvider, occurrenceDate, occurrenceEditData, relativeResolution, relativeDateError, selectedDefinition, selectedDefinitionId,
+    startDate, startTime, status, temporalType, title]);
 
   const save=useCallback(async():Promise<boolean>=>{
     if(operationRef.current||scopeActiveRef.current||noteSession.getSnapshot().pending||status!=='ready'||updatingPolicy)return false;
+    savedLocation.current = null;
     operationRef.current=true;setIsSaving(true);
     try{
       const document=await noteSession.capture();
@@ -828,23 +824,63 @@ export function useEventEditor({
     finally{if(!scopeActiveRef.current)noteSession.release();operationRef.current=false;if(mountedRef.current)setIsSaving(false);}
   },[noteSession,savePrepared,status,updatingPolicy]);
 
-  const confirmLeave=useCallback(async():Promise<boolean>=>{
-    if(completedRef.current)return true;
-    if(scopeActiveRef.current)return false;
-    if(operationRef.current)return false;
-    operationRef.current=true;setIsCheckingLeave(true);
-    try{
-      let changed=true;
-      try{const document=await noteSession.capture();changed=!areEventNotesEqual(document,loadedNoteRef.current);}
-      catch{changed=true;}
-      if(!mountedRef.current)return false;
-      if(!changed)return true;
-      return await new Promise<boolean>(resolve=>Alert.alert('変更を破棄しますか？','保存していないメモの変更があります。',[
-        {text:'編集を続ける',style:'cancel',onPress:()=>resolve(false)},
-        {text:'破棄して戻る',style:'destructive',onPress:()=>resolve(true)},
-      ],{cancelable:true,onDismiss:()=>resolve(false)}));
-    }finally{noteSession.release();operationRef.current=false;if(mountedRef.current)setIsCheckingLeave(false);}
-  },[noteSession]);
+  const recurrenceKey = recurrenceDraft.preset === 'custom' ? [
+    recurrenceDraft.frequency,
+    recurrenceDraft.intervalText,
+    recurrenceDraft.frequency === 'weekly' ? recurrenceDraft.weekdays : null,
+    recurrenceDraft.endType,
+    recurrenceDraft.endType === 'until' ? recurrenceDraft.untilDate
+      : recurrenceDraft.endType === 'count' ? recurrenceDraft.countText : null,
+  ] : recurrenceDraft.preset;
+  const draftKey = JSON.stringify([
+    title, location, colorId, temporalType, startDate, recurrenceKey,
+    reminders.map(({ timing, minutesBefore }) => timing ?? minutesBefore),
+    temporalType === 'fuzzy'
+      ? [selectedDefinitionId, relativeReference, deadlinePolicyUpdated]
+      : temporalType === 'allDay' ? allDayEndDate
+        : [startTime, exactDurationType, exactDurationType === 'fixed' ? [endDate, endTime] : null],
+  ]);
+  // 自動適用される初期値を編集と区別し、最初の入力前の値に戻した場合も確認を出さない。
+  const markDraftEdit = () => {
+    draftBaselineRef.current ??= draftKey;
+  };
+
+  const confirmLeave = useCallback(async (): Promise<boolean> => {
+    if (completedRef.current) return true;
+    if (scopeActiveRef.current || operationRef.current) return false;
+    const draftChanged = draftBaselineRef.current !== null && draftBaselineRef.current !== draftKey;
+    const checkNote = noteSession.needsLeaveSnapshot();
+    if (!draftChanged && !checkNote) return true;
+
+    operationRef.current = true;
+    setIsCheckingLeave(true);
+    try {
+      let noteChanged = false;
+      let noteUnconfirmed = false;
+      if (checkNote) {
+        try {
+          noteChanged = !areEventNotesEqual(await noteSession.capture(), loadedNoteRef.current);
+        } catch {
+          noteUnconfirmed = true;
+        }
+      }
+      if (!mountedRef.current) return false;
+      if (!draftChanged && !noteChanged && !noteUnconfirmed) return true;
+      return await new Promise<boolean>((resolve) => Alert.alert(
+        '変更を破棄しますか？',
+        noteUnconfirmed ? 'メモの最新の内容を確認できませんでした。' : '保存していない変更があります。',
+        [
+          { text: '編集を続ける', style: 'cancel', onPress: () => resolve(false) },
+          { text: '破棄して戻る', style: 'destructive', onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) },
+      ));
+    } finally {
+      if (checkNote) noteSession.release();
+      operationRef.current = false;
+      if (mountedRef.current) setIsCheckingLeave(false);
+    }
+  }, [draftKey, noteSession]);
 
   const remove = useCallback(async (): Promise<boolean> => {
     if (operationRef.current || existingAggregate === null) return false;
@@ -919,6 +955,7 @@ export function useEventEditor({
           expectedSeriesUpdatedAt: occurrenceEditData.series.event.updatedAt,
           now: now(),
         });
+        savedLocation.current = { id: identity.seriesEventId, date: pendingAggregate.event.anchorDate };
       } else {
         const editorAggregate = pendingAggregate ?? existingAggregate;
         const submitted = buildSeriesScopedAggregate({
@@ -971,6 +1008,9 @@ export function useEventEditor({
           plan,
           ...(!deleting && pendingAggregate ? { expectedDefinition: expectedDefinitionFor(pendingAggregate.event) } : {}),
         });
+        if (!deleting && plan.nextSeries) {
+          savedLocation.current = { id: plan.nextSeries.event.id, date: editorAggregate.event.anchorDate };
+        }
       }
       updateScopeRequest(null);
       setPendingAggregate(null);
@@ -999,8 +1039,10 @@ export function useEventEditor({
     isDateEditable: !isRelativeDefinition,
     isRecurrenceEditable: !isRelativeDefinition || selectedDefinition!==null,
     relativeDatePreview,
+    relativeDateRange: relativeResolution,
     occurrenceRecurrenceNotice,
     ...(isRelativeDefinition&&selectedDefinition?{relativeRecurrence:{frequency:selectedDefinition.granularity==='month'?'monthly' as const:'weekly' as const,periodAnchorDate:relativeContext?.periodAnchorDate??startDate,label:`${recurrenceDisplayDraft.preset==='none'?'繰り返しなし':recurrenceDisplayDraft.preset==='custom'?`${recurrenceDisplayDraft.intervalText}${selectedDefinition.granularity==='week'?'週':'か月'}ごと`:selectedDefinition.granularity==='week'?'毎週':'毎月'}・${selectedDefinition.label}`,preview:relativePreview,notice:relativeSelectionNotice,policyDescription:selectedDefinition.key==='this_week'&&relativeContext?`締切：${relativeContext.parameterSnapshot.thisWeekDeadlineWeekday===7?'日曜日':relativeContext.parameterSnapshot.thisWeekDeadlineWeekday===6?'土曜日':'金曜日'}、${relativeContext.parameterSnapshot.deadlineAdjustment?'土日を考慮'+(relativeContext.parameterSnapshot.deadlineAdjustment.calendarId==='jp'?'・日本の祝日を考慮':''):'休日調整なし'}（保存する条件）`:null,updatePolicy:async()=>{
+      markDraftEdit();
       if(operationRef.current)return;operationRef.current=true;setUpdatingPolicy(true);
       try{const [weekday,prefs]=await Promise.all([settings.getThisWeekDeadlineWeekday(),settings.getHolidayPreferences()]);if(!mountedRef.current)return;setThisWeekDeadlineWeekday(weekday);setHolidayPreferences(prefs);setDeadlinePolicyUpdated(true);setTemporalReselected(true);setRelativeSelectionNotice('締切条件を現在の設定に更新しました。期間と変更範囲を確認して保存してください。');}catch{if(mountedRef.current)setSaveError('締切条件を読み込めませんでした。入力内容を保持しています。');}finally{operationRef.current=false;if(mountedRef.current)setUpdatingPolicy(false);}
     }}}:{}),
@@ -1011,7 +1053,7 @@ export function useEventEditor({
     exactDurationType,
     exactDurationStatus: initialDuration.status,
     retryExactDuration: initialDuration.retry,
-    setExactDurationType,
+    setExactDurationType: (...args) => { markDraftEdit(); setExactDurationType(...args); },
     definitions,
     selectedDefinitionId,
     calendarName,
@@ -1039,36 +1081,40 @@ export function useEventEditor({
     allowReminderEnd: reminderCategory !== 'exact' || exactDurationType === 'fixed',
     notificationDefaultStatus: reminderDefaults.status,
     retryNotificationDefaults: reminderDefaults.retry,
-    resetReminderDefaults: () => { void reminderDefaults.reset().then(ok => { if (ok !== null) setReminderError(ok ? null : '通知の初期値を読み込めませんでした。再試行してください。'); }); },
-    updateReminder,
+    resetReminderDefaults: () => { markDraftEdit(); void reminderDefaults.reset().then(ok => { if (ok !== null) setReminderError(ok ? null : '通知の初期値を読み込めませんでした。再試行してください。'); }); },
+    updateReminder: (...args) => { markDraftEdit(); updateReminder(...args); },
     isDeleting,
     usesRecurrenceScope: occurrenceEditData !== null,
     scopeRequest,
-    setTitle,
-    setEditorTab,
-    setAllDay,
-    setStartDate,
-    setEndDate,
-    setStartTime,
-    setEndTime,
-    selectDefinition,
-    setColorId,
-    setLocation,
+    setTitle: (...args) => { markDraftEdit(); setTitle(...args); },
+    setEditorTab: (value) => {
+      if (existingAggregate !== null && value !== editorTab) markDraftEdit();
+      setEditorTab(value);
+    },
+    setAllDay: (...args) => { markDraftEdit(); setAllDay(...args); },
+    setStartDate: (...args) => { markDraftEdit(); setStartDate(...args); },
+    setEndDate: (...args) => { markDraftEdit(); setEndDate(...args); },
+    setStartTime: (...args) => { markDraftEdit(); setStartTime(...args); },
+    setEndTime: (...args) => { markDraftEdit(); setEndTime(...args); },
+    selectDefinition: (...args) => { markDraftEdit(); selectDefinition(...args); },
+    setColorId: (...args) => { markDraftEdit(); setColorId(...args); },
+    setLocation: (...args) => { markDraftEdit(); setLocation(...args); },
     openNoteLink,
-    setRecurrencePreset,
-    setRecurrenceFrequency,
-    setRecurrenceIntervalText,
-    toggleRecurrenceWeekday,
-    setRecurrenceEndType,
-    setRecurrenceUntilDate,
-    setRecurrenceCountText,
-    addReminder,
-    removeReminder,
-    moveReminder,
+    setRecurrencePreset: (...args) => { markDraftEdit(); setRecurrencePreset(...args); },
+    setRecurrenceFrequency: (...args) => { markDraftEdit(); setRecurrenceFrequency(...args); },
+    setRecurrenceIntervalText: (...args) => { markDraftEdit(); setRecurrenceIntervalText(...args); },
+    toggleRecurrenceWeekday: (...args) => { markDraftEdit(); toggleRecurrenceWeekday(...args); },
+    setRecurrenceEndType: (...args) => { markDraftEdit(); setRecurrenceEndType(...args); },
+    setRecurrenceUntilDate: (...args) => { markDraftEdit(); setRecurrenceUntilDate(...args); },
+    setRecurrenceCountText: (...args) => { markDraftEdit(); setRecurrenceCountText(...args); },
+    addReminder: (...args) => { markDraftEdit(); addReminder(...args); },
+    removeReminder: (...args) => { markDraftEdit(); removeReminder(...args); },
+    moveReminder: (...args) => { markDraftEdit(); moveReminder(...args); },
     retry,
     save,
     remove,
     selectScope,
+    getSavedEventLocation,
     cancelScope,
   };
 }

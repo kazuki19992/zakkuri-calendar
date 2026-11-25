@@ -81,6 +81,9 @@ test('小さい画面ではシートを画面内に制限し基準領域を縦�
     v.getByTestId('notification-timing.sheet').props.style,
   );
   expect(sheet.maxHeight).toBeLessThanOrEqual(304);
+  expect(v.getByTestId('notification-timing.sheet').props.edges).toMatchObject({
+    top: 'off', left: 'maximum', bottom: 'maximum', right: 'maximum',
+  });
   expect(
     v.getByTestId('notification-timing.header-scroll').props.scrollEnabled,
   ).not.toBe(false);

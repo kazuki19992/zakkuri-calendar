@@ -3,11 +3,14 @@
  * https://docs.expo.dev/guides/color-schemes/
  */
 
-import { Colors } from '@/constants/theme';
+import { resolveCalendarTheme } from '@/constants/theme';
+import { useMemo } from 'react';
+import { useCalendarAppearance } from './calendar-appearance-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export function useTheme() {
   const theme = useColorScheme() === 'dark' ? 'dark' : 'light';
 
-  return Colors[theme];
+  const colorId = useCalendarAppearance()?.colorId ?? null;
+  return useMemo(() => resolveCalendarTheme(theme, colorId), [theme, colorId]);
 }

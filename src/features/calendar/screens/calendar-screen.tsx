@@ -1,14 +1,18 @@
+import { Spacing, Typography } from '@/constants/theme';
 import { useState, type ReactNode } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getMonthStart, moveMonth } from '@/domain/calendar/month';
+import Reanimated, { FadeOut, Keyframe } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/use-theme';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { createCalendarTopBarModel } from '../calendar-top-bar-model';
+import type { SavedCalendarEvent } from '../calendar-refresh-context';
+import type { TimelineZoomSelection } from '../hooks/use-timeline-preset-zoom';
 import { CalendarLoadState } from '../components/calendar-load-state';
 import { CalendarAddEventButton } from '../components/calendar-add-event-button';
 import { CalendarDatePicker } from '../components/calendar-date-picker';
 import { CALENDAR_TOP_BAR_HEIGHT, CalendarTopBar } from '../components/calendar-top-bar';
+import { CalendarViewControls } from '../components/calendar-view-controls';
 import { CalendarSideMenu } from '../components/calendar-side-menu';
 import { MonthGrid } from '../components/month-grid';
 import { TwoDayView } from '../components/two-day-view';
@@ -18,8 +22,19 @@ import type { CalendarViewState } from '../hooks/use-calendar-view';
 import { formatWeekRange } from '../week-view-layout';
 import { TWO_DAY_SWIPE_BUFFER_DAYS } from '../two-day-view-model';
 
-export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt, onOpenSettings, renderDayPreview }: Readonly<{
+const crossfadeOut = FadeOut.duration(180);
+const monthEntering = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 1.025 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }] },
+}).duration(200);
+const timelineEntering = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 0.975 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }] },
+}).duration(200);
+
+export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt, onOpenSettings, renderDayPreview, savedEvent }: Readonly<{
   state: CalendarViewState;
+  savedEvent?: SavedCalendarEvent | null;
   onAddEvent(date: string): void;
   onEditEvent?(id: string, originalOccurrenceDate?: string): void;
   onCreateExactAt?(date: string, startTime: string): void;
@@ -31,6 +46,8 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
   const reduceMotion = useReduceMotion();
   const [isViewMenuVisible, setViewMenuVisible] = useState(false);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+  const [zoomSelection, setZoomSelection] = useState<TimelineZoomSelection>();
+  const [todayRequest, setTodayRequest] = useState(0);
   // 月ビューの横スワイプ・アニメーションを担う(2日ビューはuseTwoDayCarouselが担う)。
   const transition = useHorizontalSwipeTransition({
     onPrevious: state.showPreviousPeriod,
@@ -56,21 +73,30 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
   const isTimeline = state.mode !== 'month';
   const isMoving = isTimeline ? (carousel.isAnimating || carousel.isDragging) : transition.isAnimating;
   const displayDate = isTimeline ? state.anchorDate : state.visibleMonth;
-  const topBarModel = createCalendarTopBarModel(displayDate, state.today);
+  const topBarModel = createCalendarTopBarModel(displayDate, state.today, isTimeline);
 
   const toggleDatePicker = () => {
-    if (isDatePickerVisible) {
-      setDatePickerVisible(false);
+    if (isTimeline) {
+      void state.selectMode('month', displayDate);
       return;
     }
-    setDatePickerVisible(true);
-    void state.loadDatePickerMonth(getMonthStart(displayDate));
+    setDatePickerVisible((visible) => !visible);
   };
+
+  const bottomBar = (zoomControl: ReactNode = null) => (
+    <View testID="calendar.bottom-bar" style={[styles.bottomBar, {
+      backgroundColor: theme.background, borderTopColor: theme.calendarBorder,
+    }]}>
+      {zoomControl}
+      <View style={styles.bottomSpacer} />
+      <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
+    </View>
+  );
 
   const swipeContent = (
     <MonthGrid days={state.monthDays} weekModels={state.monthWeeks} onSelectDate={(date) => void state.selectDate(date)}
       onOpenDay={(date) => void state.showDay(date)} renderDayPreview={renderDayPreview}
-      onEditEvent={onEditEvent} />
+      onEditEvent={onEditEvent} savedEvent={savedEvent} />
   );
 
   return (
@@ -83,15 +109,19 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
         paddingLeft: insets.left,
         paddingRight: insets.right,
       }]}>
-        <CalendarTopBar model={topBarModel} isLoading={state.isPeriodLoading || isMoving}
+        <CalendarTopBar model={topBarModel} isLoading={state.isPeriodLoading || isMoving} reduceMotion={reduceMotion}
           onOpenMenu={() => setViewMenuVisible(true)} onToggleDatePicker={toggleDatePicker}
-          onToday={() => void state.showToday()} />
+          onToday={() => {
+            void state.showToday().then((succeeded) => {
+              if (succeeded) setTodayRequest((request) => request + 1);
+            });
+          }} />
         {state.periodError !== null ? (
           <View>
             <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.error, { color: theme.calendarHoliday }]}>{state.periodError}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="カレンダーを再読み込み"
               accessibilityState={{ disabled: state.isPeriodLoading }} disabled={state.isPeriodLoading}
-              style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 }} onPress={() => void state.retry()}>
+              style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: Spacing.three }} onPress={() => void state.retry()}>
               <Text style={{ color: theme.calendarAccent }}>再読み込み</Text>
             </Pressable>
           </View>
@@ -99,23 +129,31 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
         {state.viewModePersistenceError !== null ? (
           <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={[styles.error, { color: theme.calendarHoliday }]}>{state.viewModePersistenceError}</Text>
         ) : null}
-        <CalendarSideMenu visible={isViewMenuVisible} mode={state.mode}
+        <CalendarViewControls mode={state.mode} isModeBusy={state.isViewModeUpdating}
+          isPeriodBusy={state.isPeriodLoading || isMoving} reduceMotion={reduceMotion}
+          onSelect={(mode) => {
+            if (state.mode === mode) return;
+            setDatePickerVisible(false);
+            void state.selectMode(mode);
+          }}
+          onPrevious={() => { void (isTimeline ? carousel.movePrevious() : transition.movePrevious()); }}
+          onNext={() => { void (isTimeline ? carousel.moveNext() : transition.moveNext()); }} />
+        <CalendarSideMenu visible={isViewMenuVisible}
           calendarName={state.calendarName} calendarColorId={state.calendarColorId}
           isCalendarVisible={state.isCalendarVisible}
           isCalendarVisibilityUpdating={state.isCalendarVisibilityUpdating}
           calendarVisibilityError={state.calendarVisibilityError}
-          topInset={insets.top} bottomInset={insets.bottom}
-          reduceMotion={reduceMotion} onSelectMode={state.selectMode}
+          reduceMotion={reduceMotion}
           onSetCalendarVisible={state.setCalendarVisible}
           onOpenSettings={() => onOpenSettings?.()}
           onClose={() => setViewMenuVisible(false)} />
-        <CalendarDatePicker visible={isDatePickerVisible} month={state.datePickerMonth}
-          days={state.datePickerDays} isLoading={state.isDatePickerLoading}
-          error={state.datePickerError ?? state.periodError}
-          topOffset={insets.top + CALENDAR_TOP_BAR_HEIGHT}
-          onPreviousMonth={() => void state.loadDatePickerMonth(moveMonth(state.datePickerMonth, -1))}
-          onNextMonth={() => void state.loadDatePickerMonth(moveMonth(state.datePickerMonth, 1))}
-          onSelectDate={state.showDate} onClose={() => setDatePickerVisible(false)} />
+        {!isTimeline && isDatePickerVisible ? <CalendarDatePicker month={state.visibleMonth}
+          error={state.periodError} topOffset={CALENDAR_TOP_BAR_HEIGHT} reduceMotion={reduceMotion}
+          onSelectDate={state.showDate} onClose={() => setDatePickerVisible(false)} /> : null}
+        <View style={styles.modeViewport} collapsable={false}>
+          <Reanimated.View key={state.mode} testID="calendar.mode-content" style={StyleSheet.absoluteFill}
+            entering={reduceMotion ? undefined : isTimeline ? timelineEntering : monthEntering}
+            exiting={reduceMotion ? undefined : crossfadeOut}>
         {isTimeline ? (
           // 2日表示は画面の残り高さいっぱいにタイムラインを収め、ページ全体のスクロールを行わない。
           // 横スワイプは予備列を持つTwoDayView自身が担うため、外側の変形・不透明度制御は不要。
@@ -123,12 +161,14 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
             {isWeek && state.weekStrip[7] !== undefined && state.weekStrip[13] !== undefined ? <Text accessibilityRole="header"
               style={[styles.weekRange, { color: theme.text }]}>{formatWeekRange(state.weekStrip[7].date, state.weekStrip[13].date)}</Text> : null}
             <TwoDayView
-              key={state.mode}
-              isMoving={isMoving}
               visibleDayCount={isWeek ? 7 : isTwoDay ? 2 : 1}
               strip={timelineStrip}
               bufferDays={bufferDays}
               selectedDate={state.selectedDate}
+              savedEvent={savedEvent}
+              initialZoom={zoomSelection}
+              onZoomChange={setZoomSelection}
+              todayRequest={todayRequest}
               onOpenDay={(date) => void state.showDay(date)}
               columnWidth={carousel.columnWidth}
               translateX={carousel.translateX}
@@ -136,29 +176,27 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
               onCarouselLayout={carousel.onLayout}
               onEditEvent={onEditEvent}
               onCreateExactAt={onCreateExactAt}
+              renderBottomBar={bottomBar}
             />
-            {state.mode === 'day' || isWeek ? <View style={styles.dayNavigation}>
-              <Pressable accessibilityRole="button" accessibilityLabel={isWeek ? '前週へ移動' : '前日へ移動'} disabled={state.isPeriodLoading || isMoving}
-                style={styles.dayNavigationButton} onPress={() => void carousel.movePrevious()}><Text style={{ color: theme.calendarAccent }}>{isWeek ? '前週' : '前日'}</Text></Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={isWeek ? '翌週へ移動' : '翌日へ移動'} disabled={state.isPeriodLoading || isMoving}
-                style={styles.dayNavigationButton} onPress={() => void carousel.moveNext()}><Text style={{ color: theme.calendarAccent }}>{isWeek ? '翌週' : '翌日'}</Text></Pressable>
-            </View> : null}
-            <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
           </>
         ) : (
           // 月表示は利用可能な高さを6週で配分する。縦スクロールを置かず、横スワイプだけを受け付ける。
-          <View testID="calendar.swipe-area" style={styles.fill} {...transition.panHandlers}
-            onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}>
-            <Animated.View testID="calendar.animated-content"
-              style={[styles.monthContent, {
-                transform: [{ translateX: transition.translateX }],
-                opacity: transition.contentOpacity,
-              }]}>
-              {swipeContent}
-            </Animated.View>
-            <CalendarAddEventButton onPress={() => onAddEvent(state.selectedDate)} />
-          </View>
+          <>
+            <View testID="calendar.swipe-area" style={styles.fill} {...transition.panHandlers}
+              onLayout={(event) => transition.onLayout(event.nativeEvent.layout.width)}>
+              <Animated.View testID="calendar.animated-content"
+                style={[styles.monthContent, {
+                  transform: [{ translateX: transition.translateX }],
+                  opacity: transition.contentOpacity,
+                }]}>
+                {swipeContent}
+              </Animated.View>
+            </View>
+            {bottomBar()}
+          </>
         )}
+          </Reanimated.View>
+        </View>
       </View>
     </CalendarLoadState>
   );
@@ -167,9 +205,10 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
 const styles = StyleSheet.create({
   root: { flex: 1 },
   fill: { flex: 1 },
-  monthContent: { flex: 1, paddingTop: 8 },
-  error: { fontSize: 13, paddingHorizontal: 16, paddingBottom: 8 },
-  weekRange: { fontSize: 13, paddingHorizontal: 16, paddingVertical: 4 },
-  dayNavigation: { flexDirection: 'row', paddingRight: 72 },
-  dayNavigationButton: { minHeight: 44, minWidth: 72, justifyContent: 'center', alignItems: 'center' },
+  modeViewport: { flex: 1, overflow: 'hidden' },
+  monthContent: { flex: 1 },
+  error: { fontSize: Typography.caption, paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
+  weekRange: { fontSize: Typography.caption, paddingHorizontal: Spacing.three, paddingVertical: Spacing.one },
+  bottomBar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: Spacing.twelve, paddingVertical: Spacing.two },
+  bottomSpacer: { flex: 1 },
 });

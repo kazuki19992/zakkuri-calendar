@@ -1,56 +1,63 @@
+import { Host, Toggle } from '@expo/ui/swift-ui';
+import { disabled, labelsHidden, tint, toggleStyle } from '@expo/ui/swift-ui/modifiers';
+import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { getEventColor, getEventColorLabel, type EventColorId } from '@/constants/event-colors';
-import type { CalendarViewMode } from '@/domain/calendar/calendar-view-mode';
+import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { EVENT_COLOR_PALETTE, getEventColor, getEventColorLabel, resolveEventDisplayColorId, type EventColorId } from '@/constants/event-colors';
+import { DEFAULT_CALENDAR_TEAL, type PrimaryCalendarColorId } from '@/domain/calendar/event-color';
+import { Radii, Spacing, Typography } from '@/constants/theme';
+import { useCalendarAppearance } from '@/hooks/calendar-appearance-context';
+import { SingleSelectSheet } from '@/shared/components/single-select-sheet';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
-const viewOptions = [['day', '1日'], ['twoDay', '2日'], ['week', '週'], ['month', '月']] as const;
+const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 const CLOSED_TRANSLATE_X = -360;
 const SLIDE_DURATION_MS = 220;
+const DEFAULT_CALENDAR_COLOR_LABEL = 'ティール（初期色）';
 
 export function CalendarSideMenu({
   visible,
-  mode,
   calendarName,
   calendarColorId,
   isCalendarVisible,
   isCalendarVisibilityUpdating,
   calendarVisibilityError,
-  topInset,
-  bottomInset,
   reduceMotion,
-  onSelectMode,
   onSetCalendarVisible,
   onOpenSettings,
   onClose,
 }: Readonly<{
   visible: boolean;
-  mode: CalendarViewMode;
   calendarName: string;
   calendarColorId: EventColorId;
   isCalendarVisible: boolean;
   isCalendarVisibilityUpdating: boolean;
   calendarVisibilityError: string | null;
-  topInset: number;
-  bottomInset: number;
   reduceMotion: boolean;
-  onSelectMode(mode: CalendarViewMode): Promise<boolean>;
   onSetCalendarVisible(visible: boolean): Promise<boolean>;
   onOpenSettings(): void;
   onClose(): void;
 }>) {
   const theme = useTheme();
   const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const appearance = useCalendarAppearance();
+  const displayColorId = appearance ? appearance.colorId : resolveEventDisplayColorId(null, calendarColorId);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const swatchColor = getEventColor(displayColorId, colorScheme);
+  const colorLabel = displayColorId === null ? DEFAULT_CALENDAR_COLOR_LABEL : getEventColorLabel(displayColorId);
   const [translateX] = useState(() => new Animated.Value(CLOSED_TRANSLATE_X));
   const closingRef = useRef(false);
-  const operationVersionRef = useRef(0);
-  const [isSelecting, setSelecting] = useState(false);
-  const isBusy = isSelecting || isCalendarVisibilityUpdating;
+  const isBusy = isCalendarVisibilityUpdating;
+  const calendarVisibilityLabel = `${calendarName}を表示`;
+
+  const setCalendarVisibility = (value: boolean) => {
+    if (!isBusy && !closingRef.current) void onSetCalendarVisible(value);
+  };
 
   useEffect(() => {
     if (!visible) {
-      operationVersionRef.current += 1;
       return;
     }
     closingRef.current = false;
@@ -69,9 +76,8 @@ export function CalendarSideMenu({
   const close = useCallback((afterClose?: () => void) => {
     if (closingRef.current) return;
     closingRef.current = true;
-    operationVersionRef.current += 1;
-    setSelecting(false);
     const finish = () => {
+      setColorPickerOpen(false);
       onClose();
       afterClose?.();
       closingRef.current = false;
@@ -90,79 +96,88 @@ export function CalendarSideMenu({
     });
   }, [onClose, reduceMotion, translateX]);
 
-  const selectMode = async (nextMode: CalendarViewMode) => {
-    if (isBusy) return;
-    const operationVersion = ++operationVersionRef.current;
-    setSelecting(true);
-    const succeeded = await onSelectMode(nextMode);
-    if (operationVersion !== operationVersionRef.current) return;
-    setSelecting(false);
-    if (succeeded) close();
-  };
-
-  const setCalendarVisible = async (nextVisible: boolean) => {
-    if (isBusy) return;
-    const operationVersion = ++operationVersionRef.current;
-    setSelecting(true);
-    const succeeded = await onSetCalendarVisible(nextVisible);
-    if (operationVersion !== operationVersionRef.current) return;
-    setSelecting(false);
-    if (succeeded) close();
-  };
-
   return (
-    <Modal visible={visible} transparent animationType="none" statusBarTranslucent
+    <Modal visible={visible} transparent animationType="none" statusBarTranslucent navigationBarTranslucent
       onRequestClose={() => close()}>
       <Pressable testID="calendar-side-menu.backdrop"
         style={[styles.backdrop, { backgroundColor: theme.calendarBackdrop }]}
         accessible={false} onPress={() => close()}>
-        <Animated.View testID="calendar-side-menu.panel" accessibilityViewIsModal
+        <AnimatedSafeAreaView testID="calendar-side-menu.panel" accessibilityViewIsModal
           style={[styles.panel, {
             backgroundColor: theme.calendarOverlay,
-            paddingTop: topInset + 12,
-            paddingBottom: Math.max(bottomInset, 16),
             transform: [{ translateX }],
           }]}
           onStartShouldSetResponder={() => true}>
-          <Text accessibilityRole="header" style={[styles.appName, { color: theme.text }]}>ざっくりカレンダー</Text>
-          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>表示</Text>
-          {viewOptions.map(([value, label]) => {
-            const selected = mode === value;
-            return (
-              <Pressable key={value} accessibilityRole="menuitem" accessibilityLabel={`${label}表示`}
-                accessibilityState={{ selected, disabled: isBusy }} disabled={isBusy}
-                onPress={() => void selectMode(value)}
-                style={({ pressed }) => [styles.row, selected && { backgroundColor: theme.backgroundSelected },
-                  pressed && styles.pressed]}>
-                <Text style={[styles.icon, { color: selected ? theme.calendarAccent : theme.textSecondary }]}>▦</Text>
-                <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
-              </Pressable>
-            );
-          })}
-          <View style={[styles.divider, { backgroundColor: theme.calendarBorder }]} />
-          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>カレンダー</Text>
-          <View style={styles.calendarRow}>
-            <View accessible accessibilityLabel={`${calendarName}の色、${getEventColorLabel(calendarColorId)}`}
-              style={[styles.colorDot, { backgroundColor: getEventColor(calendarColorId, colorScheme) }]} />
-            <Text style={[styles.calendarName, { color: theme.text }]} numberOfLines={1}>{calendarName}</Text>
-            <Switch accessibilityLabel={`${calendarName}を表示`} value={isCalendarVisible}
-              disabled={isBusy} onValueChange={(value) => void setCalendarVisible(value)}
-              trackColor={{ false: theme.calendarBorder, true: theme.calendarAccent }} />
-          </View>
-          {calendarVisibilityError === null ? null : (
-            <Text accessibilityRole="alert" style={[styles.error, { color: theme.calendarHoliday }]}>
-              {calendarVisibilityError}
-            </Text>
-          )}
-          <View style={styles.spacer} />
-          <View style={[styles.divider, { backgroundColor: theme.calendarBorder }]} />
-          <Pressable accessibilityRole="button" accessibilityLabel="設定を開く"
-            disabled={isBusy} onPress={() => close(onOpenSettings)}
-            style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-            <Text style={[styles.icon, { color: theme.textSecondary }]}>⚙</Text>
-            <Text style={[styles.label, { color: theme.text }]}>設定</Text>
-          </Pressable>
-        </Animated.View>
+          <ScrollView bounces={false}>
+            <Text accessibilityRole="header" style={[styles.appName, { color: theme.text }]}>ざっくりカレンダー</Text>
+            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>カレンダー</Text>
+            <View style={styles.calendarRow}>
+              {appearance ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={`${calendarName}の色、${colorLabel}`}
+                  accessibilityHint="カレンダーの色を変更します" disabled={appearance.isBusy}
+                  onPress={() => setColorPickerOpen(true)} style={styles.colorButton}>
+                  <View style={[styles.colorDot, { backgroundColor: swatchColor }]} />
+                </Pressable>
+              ) : (
+                <View accessible accessibilityLabel={`${calendarName}の色、${colorLabel}`}
+                  style={[styles.colorDot, styles.staticColorDot, { backgroundColor: swatchColor }]} />
+              )}
+              <Text style={[styles.calendarName, { color: theme.text }]} numberOfLines={1}>{calendarName}</Text>
+              {/* iOSではスイッチのSwiftUI描画サイズに合わせて行中央へ配置する。 */}
+              {Platform.OS === 'ios' ? (
+                <Host matchContents alignment="center" testID="calendar-side-menu.visibility-switch-host">
+                  <Toggle
+                    testID="calendar-side-menu.visibility-switch"
+                    label={calendarVisibilityLabel}
+                    isOn={isCalendarVisible}
+                    onIsOnChange={setCalendarVisibility}
+                    modifiers={[toggleStyle('switch'), labelsHidden(), tint(theme.calendarAccent), disabled(isBusy)]}
+                  />
+                </Host>
+              ) : (
+                <Switch accessibilityLabel={calendarVisibilityLabel} value={isCalendarVisible}
+                  disabled={isBusy} onValueChange={setCalendarVisibility}
+                  trackColor={{ false: theme.calendarBorder, true: theme.calendarAccent }} />
+              )}
+            </View>
+            {appearance?.error ? (
+              <Text accessibilityRole="alert" style={[styles.error, { color: theme.danger }]}>
+                {appearance.error}
+              </Text>
+            ) : null}
+            {calendarVisibilityError === null ? null : (
+              <Text accessibilityRole="alert" style={[styles.error, { color: theme.calendarHoliday }]}>
+                {calendarVisibilityError}
+              </Text>
+            )}
+            <View style={[styles.divider, { backgroundColor: theme.calendarBorder }]} />
+            <Pressable accessibilityRole="button" accessibilityLabel="設定を開く"
+              disabled={isBusy} onPress={() => close(onOpenSettings)}
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+              <SymbolView name={{ ios: 'gearshape', android: 'settings', web: 'settings' }} size={20}
+                tintColor={theme.textSecondary} accessible={false} style={styles.icon} />
+              <Text style={[styles.label, { color: theme.text }]}>設定</Text>
+            </Pressable>
+          </ScrollView>
+          {appearance && colorPickerOpen ? (
+            <SingleSelectSheet<PrimaryCalendarColorId> visible={visible} title="カレンダーの色"
+              value={appearance.colorId ?? DEFAULT_CALENDAR_TEAL}
+              options={[
+                {
+                  value: DEFAULT_CALENDAR_TEAL,
+                  label: DEFAULT_CALENDAR_COLOR_LABEL,
+                  accessory: <View style={[styles.colorDot, { backgroundColor: getEventColor(null, colorScheme) }]} />,
+                },
+                ...EVENT_COLOR_PALETTE.map((item) => ({
+                  value: item.id,
+                  label: item.label,
+                  accessory: <View style={[styles.colorDot, { backgroundColor: item[colorScheme] }]} />,
+                })),
+              ]}
+              onSelect={(value) => { void appearance.setColor(value); }}
+              onClose={() => setColorPickerOpen(false)} />
+          ) : null}
+        </AnimatedSafeAreaView>
       </Pressable>
     </Modal>
   );
@@ -174,21 +189,21 @@ const styles = StyleSheet.create({
     width: '80%',
     maxWidth: 360,
     height: '100%',
-    shadowOpacity: 0.24,
-    shadowRadius: 12,
-    shadowOffset: { width: 3, height: 0 },
-    elevation: 12,
+    paddingTop: Spacing.twelve,
+    paddingBottom: Spacing.four,
   },
-  appName: { fontSize: 20, fontWeight: '600', paddingHorizontal: 20, paddingBottom: 24 },
-  sectionLabel: { fontSize: 12, paddingHorizontal: 20, paddingVertical: 8 },
-  row: { minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
-  icon: { width: 36, fontSize: 18, textAlign: 'center' },
-  label: { flex: 1, fontSize: 16 },
-  divider: { height: StyleSheet.hairlineWidth, marginVertical: 8 },
-  calendarRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20 },
-  colorDot: { width: 16, height: 16, borderRadius: 4, marginRight: 16 },
-  calendarName: { flex: 1, fontSize: 15, marginRight: 8 },
-  error: { fontSize: 12, lineHeight: 16, paddingHorizontal: 20, paddingBottom: 8 },
-  spacer: { flex: 1 },
+  appName: { fontSize: Typography.title, fontWeight: '600', paddingHorizontal: Spacing.four, paddingBottom: Spacing.four },
+  sectionLabel: { fontSize: Typography.caption, paddingHorizontal: Spacing.four, paddingVertical: Spacing.two },
+  row: { minHeight: 48, flexDirection: 'row', alignItems: 'center', marginHorizontal: Spacing.twelve,
+    paddingHorizontal: Spacing.two },
+  icon: { marginHorizontal: Spacing.two },
+  label: { flex: 1, fontSize: Typography.row },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: Spacing.two },
+  calendarRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.four },
+  colorDot: { width: 16, height: 16, borderRadius: Radii.full },
+  staticColorDot: { marginRight: Spacing.three },
+  colorButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginLeft: -Spacing.twelve },
+  calendarName: { flex: 1, fontSize: Typography.row, marginRight: Spacing.two },
+  error: { fontSize: Typography.caption, lineHeight: 16, paddingHorizontal: Spacing.four, paddingBottom: Spacing.two },
   pressed: { opacity: 0.64 },
 });

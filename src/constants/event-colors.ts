@@ -22,7 +22,15 @@ export const EVENT_COLOR_PALETTE: readonly Readonly<{
   { id: 'gray', label: '灰', light: '#5F6368', dark: '#BDC1C6' },
 ];
 
-export function getEventColor(id: EventColorId, colorScheme: 'light' | 'dark'): string {
+export const MAIN_CALENDAR_COLOR = { light: '#14665D', dark: '#87D6C5' } as const;
+
+export function resolveEventDisplayColorId(eventColorId: EventColorId | null, calendarColorId = DEFAULT_EVENT_COLOR_ID): EventColorId | null {
+  // 予定が継承する既定カレンダー色と、利用者が明示したパレットの青を区別する。
+  return eventColorId ?? (calendarColorId === DEFAULT_EVENT_COLOR_ID ? null : calendarColorId);
+}
+
+export function getEventColor(id: EventColorId | null, colorScheme: 'light' | 'dark'): string {
+  if (id === null) return MAIN_CALENDAR_COLOR[colorScheme];
   return (EVENT_COLOR_PALETTE.find((color) => color.id === id) ?? EVENT_COLOR_PALETTE[0])[colorScheme];
 }
 

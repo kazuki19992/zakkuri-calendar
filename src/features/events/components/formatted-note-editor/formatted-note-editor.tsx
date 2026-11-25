@@ -47,6 +47,8 @@ export function FormattedNoteEditor({
           containerStyle: styles.editor,
           scrollEnabled: true,
           nestedScrollEnabled: true,
+          // 余白のタップとネイティブ書式バーから本文へ戻る操作も、iOSで入力を開始できるようにする。
+          keyboardDisplayRequiresUserAction: false,
           onError:()=>{void onFailure();},
           onContentProcessDidTerminate:()=>{void onFailure();},
           onRenderProcessGone:()=>{void onFailure();},

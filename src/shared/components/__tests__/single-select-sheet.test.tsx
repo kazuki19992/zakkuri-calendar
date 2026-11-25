@@ -31,6 +31,18 @@ describe('共通の単一選択シート', () => {
     jest.mocked(useReduceMotion).mockReturnValue(false);
   });
 
+  it('下端と左右のセーフエリアをシート面の内側に確保する', async () => {
+    const view = await render(
+      <SingleSelectSheet visible title="時間帯" value="morning" options={options}
+        onSelect={jest.fn()} onClose={jest.fn()} />,
+    );
+
+    expect(view.getByTestId('single-select-sheet.sheet').props.edges).toMatchObject({
+      top: 'off', left: 'additive', bottom: 'additive', right: 'additive',
+    });
+    expect(view.getByTestId('single-select-sheet.modal').props.navigationBarTranslucent).toBe(true);
+  });
+
   it('groupと現在値を示し、選択した値を返して閉じる', async () => {
     jest.mocked(useReduceMotion).mockReturnValue(true);
     const user = userEvent.setup();

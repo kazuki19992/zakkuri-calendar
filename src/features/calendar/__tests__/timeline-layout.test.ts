@@ -142,14 +142,14 @@ describe('日別タイムライン配置', () => {
     expect(TIMELINE_HEIGHT).toBe(24 * HOUR_HEIGHT);
   });
 
-  it('予定色が未指定ならカレンダー既定色を時間軸予定へ引き継ぐ', () => {
+  it('予定色が未指定ならテーマ既定色を表す値を時間軸予定へ引き継ぐ', () => {
     const [item] = createDayTimelineItems({
       date: '2026-09-09',
       occurrences: asOccurrences([exact('色未指定', '09:00', { type: 'fixed', minutes: 30 })]),
-      definitions: new Map(), undeterminedFadeMinutes: 120, calendarColorId: 'blue',
+      definitions: new Map(), undeterminedFadeMinutes: 120,
     });
 
-    expect(item.colorId).toBe('blue');
+    expect(item.colorId).toBeNull();
   });
 
   it('瞬間予定は最小表示高を持ち、時刻の位置を保持する', () => {

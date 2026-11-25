@@ -12,6 +12,8 @@ const mockMigrateDatabase = jest.fn().mockResolvedValue(undefined);
 let mockLatestProviderProps: Record<string, unknown> = {};
 let mockProviderMounts = 0;
 
+jest.mock('@/global.css', () => ({}));
+
 jest.mock('../migrations', () => ({
   ...jest.requireActual('../migrations'),
   migrateDatabase: (...args: unknown[]) => mockMigrateDatabase(...args),

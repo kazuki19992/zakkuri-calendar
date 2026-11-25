@@ -59,7 +59,7 @@ describe('月表示の表示用モデル', () => {
     const spanning = asOccurrence({ ...baseEvent, id: 'spanning', temporalType: 'allDay', endDate: '2026-09-23' });
     const overflow = asOccurrence({ ...baseEvent, id: 'overflow', temporalType: 'exact', startTime: '10:00', duration: { type: 'fixed', minutes: 30 } });
 
-    const [week] = createMonthWeekViewModels({ grid, occurrences: [single, allDay, spanning, overflow], definitionLabels: new Map(), calendarColorId: 'blue' });
+    const [week] = createMonthWeekViewModels({ grid, occurrences: [single, allDay, spanning, overflow], definitionLabels: new Map() });
 
     expect(week.segments.map((item) => [item.id, item.lane])).toEqual([
       ['spanning', 0], ['all-day', 1], ['single', 2],
@@ -335,7 +335,6 @@ describe('月表示の表示用モデル', () => {
       occurrences: [asOccurrence(event)],
       definitionLabels: new Map([[definition.id, definition.label]]),
       definitions: new Map([[definition.id, definition]]),
-      calendarColorId: 'blue' as const,
     } as Parameters<typeof createMonthWeekViewModels>[0] & {
       definitions: ReadonlyMap<string, TemporalDefinition>;
     };
@@ -344,6 +343,7 @@ describe('月表示の表示用モデル', () => {
 
     expect(week.segments[0]).toMatchObject({
       isFuzzyRange: true,
+      alignLabelToEnd: true,
       opacityStops: [{ offset: 0, opacity: 0 }, { offset: 1, opacity: 1 }],
     });
   });

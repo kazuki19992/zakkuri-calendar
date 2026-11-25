@@ -6,7 +6,11 @@
 
 ## 利用者体験
 
-- 時間帯、予定色、繰り返しなどの単一選択は、現在値を表示した44pt以上の行をタップして同一形式のボトムシートを開く。
+- 「ざっくり種別」行をタップするとキーボードを閉じ、この日・週単位・月単位の見出しでまとめた単一選択シートを開く。フォームには選択中の種別だけをプレビューする。日内は一日の中での位置と幅を時刻の数値なしで示し、日をまたぐ範囲はバーの両端に分けてぼかしを引き継ぐ。週・月単位は実際の解決期間と日境界を示す。
+- 予定色、繰り返し、終了の指定は、現在値を表示した44pt以上の行をタップするとボトムシートを開く。終了の指定には各選択肢の説明を添える。
+- フォームを開くとタイトルにフォーカスし、空白のままでは保存できない。新規時に時間形式のタブを切り替えるだけなら破棄確認を表示しない。
+- どちらのタブにも終日スイッチを表示する。オンでは開始日と終了日を表示する。きっちりの終日オフでは開始日・開始時刻、終了の指定、終了日・終了時刻の順に表示する。開始時刻を指定していない場合は次の30分刻みを初期値にし、当日23:30を上限とする。
+- 繰り返し、色、場所、通知は作成・編集フォームに常に表示する。予定詳細の見出しでは、ざっくり予定に日付と時間帯名を、きっちり予定に具体的な時刻を表示する。各通知の実日時は通知欄に表示する。編集は詳細を置き換える。削除も詳細から操作できる。
 - シートは任意のグループ見出しと選択肢を表示する。選択肢をタップすると編集draftだけを更新して閉じ、キャンセルは値を変えずに閉じる。
 - 予定色は、現在値と各候補に色見本と名称を表示し、選択済みはチェックと`accessibilityState.selected`でも示す。
 - ざっくり／きっちり切替は、タブより下の日時から削除操作までをひとまとめに横へスライドする。Reduce Motion時は即時切替する。
@@ -29,13 +33,13 @@ features/events/components
 └─ duration-wheel-picker.tsx     # 時・分のドラムロールと分変換
 ```
 
-`SingleSelectSheet`のoptionは`value`、`label`、任意の`group`、任意の`accessory`、任意の`accessibilityLabel`を持つ。表示部品はSQLite、イベント型、時間表現定義へ依存しない。`TemporalDefinitionPicker`と`EventColorPicker`だけがそれぞれのdomain値をoptionへ変換する。
+`SingleSelectSheet`のoptionは`value`、`label`、任意の`description`、任意の`group`、任意の`accessory`、任意の`accessibilityLabel`を持つ。表示部品はSQLite、イベント型、時間表現定義へ依存しない。`TemporalDefinitionPicker`は定義からグループ付きの選択肢を構成し、`EventColorPicker`は色をシートの選択肢へ変換する。
 
 ## 状態とデータフロー
 
 選択・通知時間の確定は既存`useEventEditor`のstate更新callbackへ渡すだけとし、保存・バリデーション・Repositoryは変更しない。
 
-1. fieldが現在値とoptionをシートへ渡す。
+1. 入力欄が現在値を表示し、タップすると候補をシートに表示する。
 2. 選択でfieldの`onChange(value)`を一度だけ呼ぶ。
 3. feature hookが編集draftを更新する。
 4. 既存の保存時にevent/reminderへ永続化する。
@@ -62,7 +66,7 @@ features/events/components
 
 - `SingleSelectSheet`: group見出し、現在値、選択、取消、disabled、読み上げ状態。
 - `DurationWheelPicker`: 0分、23時間59分、分変換、取消。
-- 時間帯picker: day/week/month groupへの変換。
+- ざっくり種別の選択シートは日・週・月の候補と選択状態を検証する。選択中のプレビューは日内バーの位置・幅、日またぎの分割、相対期間の日境界とぼかしを検証する。
 - 色picker: light/darkの色見本、色名、チェック、カレンダー色fallback。
 - tabs: Reduce Motionの即時切替と通常時の横遷移値。
 - reminder editor: ドラムロール確定が既存の追加callbackへ正しい分数を渡すこと。

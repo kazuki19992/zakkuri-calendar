@@ -17,8 +17,12 @@ export default function EditEventRoute() {
   const state = useEventEditor({ calendars: repositories.calendars, events: repositories.events, settings: repositories.settings, temporalDefinitions: repositories.temporalDefinitions, holidayProvider,
     eventId: id, occurrenceDate,
     initial: { date: '2000-01-01', startTime: '09:00', endTime: '10:00', temporalType: 'exact' } });
-  const complete = useCallback(async (operation: () => Promise<boolean>) => { if (await operation()) { notifyChanged(); router.back(); } }, [notifyChanged, router]);
+  const complete = useCallback(async (operation: () => Promise<boolean>, isSave: boolean) => {
+    if (!(await operation())) return;
+    notifyChanged(isSave ? state.getSavedEventLocation?.() ?? undefined : undefined);
+    router.back();
+  }, [notifyChanged, router, state]);
   useEventLeaveGuard(state);
 
-  return <><Stack.Screen options={{ gestureEnabled: !state.isBusy }} /><EventEditorScreen state={state} onSave={() => void complete(state.save)} onDelete={() => void complete(state.remove)} onSelectScope={(scope) => void complete(() => state.selectScope(scope))} onCancel={router.back} /></>;
+  return <><Stack.Screen options={{ gestureEnabled: !state.isBusy }} /><EventEditorScreen state={state} onSave={() => void complete(state.save, true)} onDelete={() => void complete(state.remove, false)} onSelectScope={(scope) => void complete(() => state.selectScope(scope), state.scopeRequest?.operation === 'save')} onCancel={router.back} /></>;
 }

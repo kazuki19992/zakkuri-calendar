@@ -1,6 +1,6 @@
 import {deadlineWarningLabel} from '@/domain/calendar/relative-recurrence';
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
-import type { EventColorId } from '@/constants/event-colors';
+import { type EventColorId } from '@/constants/event-colors';
 import type { MonthGridDate } from '@/domain/calendar/month';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
 import { createDateRangeOpacityStops, type DateRangeOpacityStop } from './date-range-gradient';
@@ -46,11 +46,12 @@ export type MonthEventSegmentViewModel = Readonly<{
   endsInWeek: boolean;
   continuesFromPreviousWeek: boolean;
   continuesToNextWeek: boolean;
-  colorId: EventColorId;
+  colorId: EventColorId | null;
   title: string;
   temporalLabel: string;
   accessibilityLabel: string;
   isFuzzyRange: boolean;
+  alignLabelToEnd: boolean;
   opacityStops: readonly DateRangeOpacityStop[];
 }>;
 
@@ -76,7 +77,6 @@ export function createMonthWeekViewModels(input: Readonly<{
   occurrences: readonly EventOccurrence[];
   definitionLabels: ReadonlyMap<string, string>;
   definitions?: ReadonlyMap<string, TemporalDefinition>;
-  calendarColorId: EventColorId;
 }>): readonly MonthWeekViewModel[] {
   return Array.from({ length: Math.ceil(input.grid.length / 7) }, (_, weekIndex) => {
     const days = input.grid.slice(weekIndex * 7, weekIndex * 7 + 7);
@@ -134,11 +134,12 @@ export function createMonthWeekViewModels(input: Readonly<{
         endsInWeek,
         continuesFromPreviousWeek,
         continuesToNextWeek,
-        colorId: occurrence.event.colorId ?? input.calendarColorId,
+        colorId: occurrence.event.colorId,
         title: deadlineWarningLabel(occurrence.event)?`要確認・${occurrence.event.title}`:occurrence.event.title,
         temporalLabel,
         accessibilityLabel: [occurrence.event.title, temporalLabel, occurrence.occurrenceStartDate < occurrence.occurrenceThroughDate ? '複数日にまたがる予定' : null, occurrence.isRecurring ? '繰り返し予定' : null].filter((value): value is string => value !== null).join('、'),
         isFuzzyRange,
+        alignLabelToEnd: isFuzzyRange && definition.key === 'this_week' && endsInWeek,
         opacityStops: isFuzzyRange
           ? createDateRangeOpacityStops({
             rangeStartDate: occurrence.occurrenceStartDate,

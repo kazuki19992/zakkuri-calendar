@@ -1,3 +1,4 @@
+import { Spacing } from '@/constants/theme';
 import {JapaneseHolidayProvider} from '@/data/holidays/japanese-holiday-provider';
 import { notificationFailure } from './notification-notice-model';
 import {
@@ -9,9 +10,9 @@ import {
   useSyncExternalStore,
   type PropsWithChildren,
 } from 'react';
-import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Alert, AppState, Pressable, Text, View } from 'react-native';
-import { useRootNavigationState, useRouter } from 'expo-router';
+import { usePathname, useRootNavigationState, useRouter } from 'expo-router';
 import { useRepositories } from '@/data/sqlite/app-database-provider';
 import {
   createNotificationDevice,
@@ -42,9 +43,9 @@ export function NotificationProvider({ children }: PropsWithChildren) {
   const repositories = useRepositories(),
     { revision } = useCalendarRefresh(),
     router = useRouter(),
+    pathname = usePathname(),
     navigation = useRootNavigationState(),
     theme = useTheme();
-  const insets = useContext(SafeAreaInsetsContext);
   const coordinator = useMemo(
     () =>
       new NotificationCoordinator(
@@ -138,6 +139,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
     [coordinator, state],
   );
   const permissionNotice =
+    pathname === '/' &&
     state.hasReminders &&
     (state.permission === 'denied' || state.permission === 'undetermined');
   const failure = notificationFailure(state);
@@ -152,21 +154,20 @@ export function NotificationProvider({ children }: PropsWithChildren) {
       <View style={{ flex: 1 }}>
         {children}
         {notice ? (
-          <View
+          <SafeAreaView
+            testID="notification-notice"
             accessibilityRole="summary"
+            edges={{ left: 'additive', bottom: 'maximum', right: 'additive' }}
             style={{
-              padding: 16,
-              paddingBottom: Math.max(16, insets?.bottom ?? 0),
-              gap: 8,
+              padding: Spacing.three,
+              gap: Spacing.two,
               backgroundColor: theme.backgroundElement,
             }}
           >
             <Text style={{ color: theme.text }}>
-              {failure
-                ? `予定は保存されています。${failure.message}`
-                : '予定は保存されています。通知を受け取るには許可が必要です。'}
+              {failure ? failure.message : '通知はオフ'}
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three }}>
               <Pressable
                 accessibilityRole="button"
                 style={{ minHeight: 44, justifyContent: 'center' }}
@@ -203,7 +204,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
                 <Text style={{ color: theme.textSecondary }}>後で</Text>
               </Pressable>
             </View>
-          </View>
+          </SafeAreaView>
         ) : null}
       </View>
     </Context.Provider>

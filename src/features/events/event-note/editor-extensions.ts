@@ -54,5 +54,5 @@ export const createEventNoteExtensions = () => [
     shouldAutoLink: (url) => parseSafeEventNoteUrl(url) !== null,
   }),
   UndoRedo,
-  Placeholder.configure({ placeholder: 'メモを入力' }),
+  Placeholder.configure({ placeholder: 'メモを追加' }),
 ];

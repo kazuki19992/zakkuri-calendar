@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
+import type { EventColorId } from '@/domain/calendar/event-color';
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
 import type { EventReminder } from '@/domain/calendar/event-reminder';
 import type { AppDatabase } from '@/data/sqlite/database';
@@ -397,6 +398,47 @@ describe('SQLite repositories', () => {
       $valueJson: 'false',
       $updatedAt: now,
     });
+  });
+
+  it.each([
+    [null, null],
+    [{ value_json: 'broken' }, null],
+    [{ value_json: 'null' }, null],
+    [{ value_json: '"unknown"' }, null],
+    [{ value_json: '{"colorId":"blue"}' }, null],
+    [{ value_json: '"blue"' }, 'blue'],
+    [{ value_json: '"default-teal"' }, 'default-teal'],
+    [{ value_json: '"purple"' }, 'purple'],
+  ])('メインカレンダー色の設定 %j から有効な色IDだけを読み込む', async (row, expected) => {
+    const db = createDatabaseDouble();
+    db.first.mockResolvedValue(row);
+    const settings = new SqliteSettingsRepository(db.database);
+
+    await expect(settings.getPrimaryCalendarColor()).resolves.toBe(expected);
+    expect(db.first).toHaveBeenCalledWith(expect.stringContaining('WHERE key = $key'), {
+      $key: 'primary_calendar_color',
+    });
+  });
+
+  it.each(['blue', 'default-teal'] as const)('メインカレンダー色 %s を単一の設定へ保存する', async (colorId) => {
+    const db = createDatabaseDouble();
+    const settings = new SqliteSettingsRepository(db.database);
+
+    await settings.setPrimaryCalendarColor(colorId, now);
+    expect(db.run).toHaveBeenCalledTimes(1);
+    expect(db.run).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(key) DO UPDATE'), {
+      $key: 'primary_calendar_color',
+      $valueJson: JSON.stringify(colorId),
+      $updatedAt: now,
+    });
+  });
+
+  it('メインカレンダー色として無効な色IDを書き込まない', async () => {
+    const db = createDatabaseDouble();
+    const settings = new SqliteSettingsRepository(db.database);
+
+    await expect(settings.setPrimaryCalendarColor('unknown' as EventColorId, now)).rejects.toThrow();
+    expect(db.run).not.toHaveBeenCalled();
   });
 
   it('空のカレンダーIDでは表示設定を読み書きしない', async () => {

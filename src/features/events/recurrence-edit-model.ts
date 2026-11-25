@@ -1,3 +1,22 @@
+import type { EventAggregate } from '@/domain/calendar/event-reminder';
+import { materializeOccurrenceReplacement } from '@/domain/calendar/recurrence-exception';
+import type { OccurrenceEditData } from '@/domain/calendar/repositories';
+
+export function getEditableOccurrenceAggregate(data: OccurrenceEditData, occurrenceDate: string): EventAggregate {
+  const fields = data.exception?.overrideFields ?? [];
+  const event = materializeOccurrenceReplacement({
+    seriesEvent: data.series.event,
+    replacementEvent: data.replacement?.event ?? data.series.event,
+    overrideFields: fields,
+    occurrenceDate,
+    resolvedOccurrence: data.resolvedOccurrence,
+  });
+  return {
+    event: { ...event, id: data.series.event.id, recurrenceRule: data.series.event.recurrenceRule },
+    reminders: fields.includes('reminders') ? data.replacement?.reminders ?? [] : data.series.reminders,
+  };
+}
+
 export type RecurrenceEditScope = 'occurrence' | 'following' | 'series';
 
 export type ScopeRequest = Readonly<{

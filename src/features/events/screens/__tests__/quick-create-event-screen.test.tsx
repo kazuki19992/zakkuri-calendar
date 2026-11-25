@@ -4,6 +4,7 @@ import type { QuickCreateEventState } from '../../hooks/use-quick-create-event';
 import { QuickCreateEventScreen } from '../quick-create-event-screen';
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('@/hooks/use-reduce-motion', () => ({ useReduceMotion: () => true }));
 const morning: TemporalDefinition = {
   id: 'personal-default:morning',
   calendarId: 'personal-default',
@@ -68,9 +69,9 @@ describe('ざっくり予定作成画面', () => {
     await user.type(screen.getByLabelText('タイトル'), '散歩');
     await user.clear(screen.getByLabelText('日付'));
     await user.type(screen.getByLabelText('日付'), '2026-09-10');
-    const picker = screen.getByLabelText('時間帯、朝、選択する');
-    await user.press(picker);
-    await user.press(screen.getByLabelText('午後、この日'));
+    await user.press(screen.getByRole('button', { name: /ざっくり種別、朝/ }));
+    expect(screen.getByText('この日')).toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: '午後、この日' }));
     await user.press(screen.getByRole('button', { name: '保存' }));
     await user.press(screen.getByRole('button', { name: 'キャンセル' }));
 
@@ -79,8 +80,6 @@ describe('ざっくり予定作成画面', () => {
     expect(callbacks.selectDefinition).toHaveBeenCalledWith(afternoon.id);
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(picker.props.accessibilityState).toMatchObject({ disabled: false });
-    expect(screen.getAllByText('時間帯')).toHaveLength(1);
   });
 
   it('入力エラーと保存エラーを表示する', async () => {
@@ -117,7 +116,7 @@ describe('ざっくり予定作成画面', () => {
     });
     expect(screen.getByLabelText('タイトル').props.editable).toBe(false);
     expect(screen.getByLabelText('日付').props.editable).toBe(false);
-    expect(screen.getByLabelText('時間帯、朝、選択する')).toBeDisabled();
+    expect(screen.getByRole('button', { name: /ざっくり種別、朝/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'キャンセル' }).props.accessibilityState).toEqual({
       disabled: true,
     });

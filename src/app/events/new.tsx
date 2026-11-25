@@ -5,6 +5,7 @@ import { useRepositories } from '@/data/sqlite/app-database-provider';
 import { JapaneseHolidayProvider } from '@/data/holidays/japanese-holiday-provider';
 import { toCalendarDate } from '@/domain/calendar/month';
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
+import { getDefaultEditorStartTime } from '@/features/events/event-editor-model';
 import { useEventEditor } from '@/features/events/hooks/use-event-editor';
 import { EventEditorScreen } from '@/features/events/screens/event-editor-screen';
 
@@ -19,26 +20,24 @@ export default function NewEventRoute() {
   const params = useLocalSearchParams<{ date?: string; startTime?: string; endTime?: string; temporalType?: 'exact' | 'allDay' | 'fuzzy' }>();
   const repositories = useRepositories();
   const { notifyChanged } = useCalendarRefresh();
-  const startTime = params.startTime ?? new Date().toTimeString().slice(0, 5);
+  const now = new Date();
+  const startTime = params.startTime ?? getDefaultEditorStartTime(now);
   const state = useEventEditor({
     calendars: repositories.calendars,
     events: repositories.events,
     settings: repositories.settings,
     temporalDefinitions: repositories.temporalDefinitions, holidayProvider,
     initial: {
-      date: params.date ?? toCalendarDate(new Date()),
+      date: params.date ?? toCalendarDate(now),
       startTime,
       endTime: params.endTime,
       temporalType: params.temporalType ?? 'fuzzy',
     },
-    initialTab: params.temporalType === 'exact' || params.temporalType === 'allDay'
-      ? 'exact'
-      : undefined,
   });
 
   const save = useCallback(async (): Promise<void> => {
     if (!(await state.save())) return;
-    notifyChanged();
+    notifyChanged(state.getSavedEventLocation?.() ?? undefined);
     router.back();
   }, [notifyChanged, router, state]);
 

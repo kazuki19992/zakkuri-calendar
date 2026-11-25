@@ -2,6 +2,8 @@ import { act, render, screen, userEvent } from '@testing-library/react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import DayRoute from '../calendar/day/[date]';
 
+jest.mock('@/global.css', () => ({}));
+
 jest.mock('expo-router', () => ({ useFocusEffect: jest.fn(), useLocalSearchParams: jest.fn(), useRouter: jest.fn() }));
 describe('旧1日URLの互換入口', () => {
   it('有効な日付は既存mainへ履歴を閉じて渡す', async () => {
@@ -24,6 +26,9 @@ describe('旧1日URLの互換入口', () => {
     await render(<DayRoute />);
     expect(dismissTo).not.toHaveBeenCalled();
     expect(screen.getByText('日付が正しくありません')).toBeOnTheScreen();
+    expect(screen.getByTestId('day-route.screen').props.edges).toMatchObject({
+      top: 'additive', left: 'additive', bottom: 'additive', right: 'additive',
+    });
     await userEvent.setup().press(screen.getByRole('button', { name: 'カレンダーを開く' }));
     expect(dismissTo).toHaveBeenCalledWith('/');
   });

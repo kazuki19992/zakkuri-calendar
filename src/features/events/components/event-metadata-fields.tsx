@@ -1,4 +1,5 @@
 import { StyleSheet, TextInput, View } from 'react-native';
+import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export function EventMetadataFields({ location, disabled, onLocationChange }: Readonly<{
@@ -18,6 +19,6 @@ export function EventMetadataFields({ location, disabled, onLocationChange }: Re
 }
 
 const styles = StyleSheet.create({
-  fields: { gap: 10 },
-  input: { borderRadius: 8, borderWidth: 1, fontSize: 16, minHeight: 48, paddingHorizontal: 12, paddingVertical: 10 },
+  fields: { gap: Spacing.twelve },
+  input: { borderRadius: Radii.small, borderWidth: 1, fontSize: Typography.row, minHeight: 48, paddingHorizontal: Spacing.twelve, paddingVertical: Spacing.twelve },
 });

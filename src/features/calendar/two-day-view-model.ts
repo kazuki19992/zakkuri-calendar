@@ -1,5 +1,5 @@
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
-import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/constants/event-colors';
+import { type EventColorId } from '@/constants/event-colors';
 import { offsetCalendarDate, type TwoDayRange } from '@/domain/calendar/month';
 import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
@@ -51,7 +51,7 @@ export type TwoDayAllDayItemViewModel = Readonly<{
   id: string;
   eventId: string | null;
   originalOccurrenceDate?: string;
-  colorId: EventColorId | 'holiday';
+  colorId: EventColorId | 'holiday' | null;
   isInteractive: boolean;
   title: string;
   temporalLabel: string;
@@ -85,7 +85,6 @@ export function createDayViewModel(
     occurrences: readonly EventOccurrence[];
     definitions: ReadonlyMap<string, TemporalDefinition>;
     undeterminedFadeMinutes: number;
-    calendarColorId: EventColorId;
     holidayCoverage: readonly HolidayRangeCoverage[];
   }>,
 ): TwoDayViewModel {
@@ -134,7 +133,7 @@ export function createDayViewModel(
       ...item,
       kind: isFuzzyRange ? 'fuzzyRange' : 'event',
       eventId: item.eventId,
-      colorId: occurrence?.event.colorId ?? input.calendarColorId,
+      colorId: occurrence?.event.colorId ?? null,
       isInteractive: true,
       ...(rangePosition === null || occurrence === undefined ? {} : { rangePosition,
         rangeStartDate: occurrence.occurrenceStartDate, rangeThroughDate: occurrence.occurrenceThroughDate }),
@@ -165,7 +164,6 @@ export function createDayViewModel(
     occurrences: input.occurrences,
     definitions: input.definitions,
     undeterminedFadeMinutes: input.undeterminedFadeMinutes,
-    calendarColorId: input.calendarColorId,
   });
   const itemCount = new Set([...eventAllDayItems, ...timelineItems].map((item) => item.id)).size;
   const labels = [`${year}年${month}月${day}日`, `${weekdayLabel}曜日`];
@@ -187,7 +185,32 @@ export function createDayViewModel(
   };
 }
 
-const ALL_DAY_LANE_LIMIT = 2;
+export const ALL_DAY_LANE_LIMIT = 2;
+export const ALL_DAY_OVERFLOW_HEIGHT = 44;
+export function getAllDayBand(availableHeight: number, headerHeight: number, fontScale = 1) {
+  const heightBudget = availableHeight - headerHeight - 44;
+  const rowHeight = Math.max(ALL_DAY_OVERFLOW_HEIGHT, Math.min(
+    Math.ceil(ALL_DAY_OVERFLOW_HEIGHT * Math.max(1, Math.min(1.5, fontScale))),
+    heightBudget,
+  ));
+  const laneLimit = Math.min(ALL_DAY_LANE_LIMIT, Math.max(0, Math.floor(heightBudget / rowHeight)));
+  return { laneLimit, rowHeight, height: Math.max(1, laneLimit) * rowHeight };
+}
+
+export function getVisibleAllDayRows(
+  layout: TwoDayAllDayLayout,
+  visibleStart: number,
+  visibleCount: number,
+  laneLimit: number,
+): number {
+  const visibleEnd = visibleStart + visibleCount;
+  const hasSecondRow = laneLimit === 2 && (
+    layout.hiddenCounts.slice(visibleStart, visibleEnd).some((count) => count > 0)
+    || layout.segments.some(({ lane, startIndex, spanDays }) =>
+      lane === 1 && startIndex < visibleEnd && startIndex + spanDays > visibleStart)
+  );
+  return hasSecondRow ? 2 : 1;
+}
 
 /** 予備列を含む日付列を横断して、同じ予定を一本の帯へまとめる。 */
 export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[], laneLimit = ALL_DAY_LANE_LIMIT, useSavedRangePriority = false): TwoDayAllDayLayout {
@@ -223,7 +246,7 @@ export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[], lane
     () => [],
   );
   const hiddenCounts = Array.from({ length: strip.length }, () => 0);
-  const segments: TwoDayAllDaySegmentViewModel[] = [];
+  const placed: (typeof candidates[number] & { lane: number })[] = [];
   for (const candidate of candidates) {
     const lane = laneOccupancies.findIndex((occupancies) => occupancies.every((occupied) =>
       occupied.endIndex < candidate.startIndex || candidate.endIndex < occupied.startIndex));
@@ -232,34 +255,54 @@ export function createTwoDayAllDayLayout(strip: readonly TwoDayViewModel[], lane
       continue;
     }
     laneOccupancies[lane].push({ startIndex: candidate.startIndex, endIndex: candidate.endIndex });
-    const clipStartDate = strip[candidate.startIndex].date;
-    const clipThroughDate = strip[candidate.endIndex].date;
-    const isFuzzyRange = candidate.item.kind === 'fuzzyRange';
-    const rangeStartDate = candidate.item.rangeStartDate;
-    const rangeThroughDate = candidate.item.rangeThroughDate;
-    const hasGradientRange = rangeStartDate !== undefined && rangeThroughDate !== undefined;
-    const lastItem = strip[candidate.endIndex].allDayItems.find((item) => item.id === candidate.item.id);
-    segments.push({
-      id: candidate.item.id,
-      item: candidate.item,
-      startIndex: candidate.startIndex,
-      spanDays: candidate.endIndex - candidate.startIndex + 1,
-      lane,
-      isFuzzyRange,
-      startsAtRangeStart: candidate.item.rangePosition !== 'middle' && candidate.item.rangePosition !== 'end',
-      endsAtRangeEnd: lastItem?.rangePosition !== 'middle' && lastItem?.rangePosition !== 'start',
-      opacityStops: hasGradientRange
-        ? createDateRangeOpacityStops({
-          rangeStartDate: rangeStartDate ?? clipStartDate,
-          rangeThroughDate: rangeThroughDate ?? clipThroughDate,
-          clipStartDate,
-          clipThroughDate,
-          fadeInRatio: candidate.item.fadeInRatio ?? 0,
-          fadeOutRatio: candidate.item.fadeOutRatio ?? 0,
-        })
-        : [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
-    });
+    placed.push({ ...candidate, lane });
   }
+
+  // 省略のある日の最終行は一覧ボタンに使う。複数日の帯はその日だけを除き、
+  // 前後に残る部分には保存済みの全期間を基準にした濃淡を維持する。
+  const showsOverflow = hiddenCounts.map((count) => count > 0);
+  const segments: TwoDayAllDaySegmentViewModel[] = [];
+  for (const { item, lane, startIndex, endIndex } of placed) {
+    let start = startIndex;
+    while (start <= endIndex) {
+      if (lane === laneOccupancies.length - 1 && showsOverflow[start]) {
+        hiddenCounts[start] += 1;
+        start += 1;
+        continue;
+      }
+      let end = endIndex;
+      if (lane === laneOccupancies.length - 1) {
+        const nextOverflow = showsOverflow.indexOf(true, start);
+        if (nextOverflow !== -1) end = Math.min(end, nextOverflow - 1);
+      }
+      const clipStartDate = strip[start].date;
+      const clipThroughDate = strip[end].date;
+      const startItem = strip[start].allDayItems.find((candidate) => candidate.id === item.id);
+      const endItem = strip[end].allDayItems.find((candidate) => candidate.id === item.id);
+      segments.push({
+        id: start === startIndex ? item.id : `${item.id}:from:${clipStartDate}`,
+        item,
+        startIndex: start,
+        spanDays: end - start + 1,
+        lane,
+        isFuzzyRange: item.kind === 'fuzzyRange',
+        startsAtRangeStart: start === startIndex && startItem?.rangePosition !== 'middle' && startItem?.rangePosition !== 'end',
+        endsAtRangeEnd: end === endIndex && endItem?.rangePosition !== 'middle' && endItem?.rangePosition !== 'start',
+        opacityStops: item.rangeStartDate !== undefined && item.rangeThroughDate !== undefined
+          ? createDateRangeOpacityStops({
+            rangeStartDate: item.rangeStartDate,
+            rangeThroughDate: item.rangeThroughDate,
+            clipStartDate,
+            clipThroughDate,
+            fadeInRatio: item.fadeInRatio ?? 0,
+            fadeOutRatio: item.fadeOutRatio ?? 0,
+          })
+          : [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
+      });
+      start = end + 1;
+    }
+  }
+
   return { segments, hiddenCounts };
 }
 
@@ -269,11 +312,9 @@ export function createTwoDayViewModels(input: Readonly<{
   occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
-  calendarColorId?: EventColorId;
   holidayCoverage: readonly HolidayRangeCoverage[];
 }>): readonly [TwoDayViewModel, TwoDayViewModel] {
-  const inputWithColor = { ...input, calendarColorId: input.calendarColorId ?? DEFAULT_EVENT_COLOR_ID };
-  return [createDayViewModel(input.range.from, inputWithColor), createDayViewModel(input.range.through, inputWithColor)];
+  return [createDayViewModel(input.range.from, input), createDayViewModel(input.range.through, input)];
 }
 
 /**
@@ -307,10 +348,8 @@ export function createTwoDayStripViewModels(input: Readonly<{
   occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
-  calendarColorId?: EventColorId;
   holidayCoverage: readonly HolidayRangeCoverage[];
 }>): readonly TwoDayViewModel[] {
-  const inputWithColor = { ...input, calendarColorId: input.calendarColorId ?? DEFAULT_EVENT_COLOR_ID };
   return createTwoDayStripDates(input.range, input.bufferDays)
-    .map((date) => createDayViewModel(date, inputWithColor));
+    .map((date) => createDayViewModel(date, input));
 }

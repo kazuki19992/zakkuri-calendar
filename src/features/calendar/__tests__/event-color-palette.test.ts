@@ -1,4 +1,4 @@
-import { Colors } from '@/constants/theme';
+import { Colors, resolveCalendarTheme } from '@/constants/theme';
 import {
   DEFAULT_EVENT_COLOR_ID,
   EVENT_COLOR_PALETTE,
@@ -16,6 +16,27 @@ describe('予定の固定色パレット', () => {
     expect(DEFAULT_EVENT_COLOR_ID).toBe('blue');
     expect(getEventColor('blue', 'light')).toBe(EVENT_COLOR_PALETTE[0].light);
     expect(getEventColor('blue', 'dark')).toBe(EVENT_COLOR_PALETTE[0].dark);
+  });
+
+  it.each(['light', 'dark'] as const)('%sで既定の予定色はアクセントと一致し、明示した青を保持する', (scheme) => {
+    const theme = Colors[scheme];
+    expect(getEventColor(null, scheme)).toBe(theme.calendarAccent);
+    expect(theme.calendarEvent).toBe(theme.calendarAccent);
+    expect(getContrastRatio(theme.calendarEvent, theme.calendarEventText)).toBeGreaterThanOrEqual(4.5);
+    expect(getEventColor('blue', scheme)).not.toBe(theme.calendarAccent);
+  });
+
+  it.each(['light', 'dark'] as const)('%sで明示したカレンダー色をアクセントと継承色に使う', (scheme) => {
+    const initial = resolveCalendarTheme(scheme, null);
+    expect(initial).toBe(Colors[scheme]);
+    for (const swatch of EVENT_COLOR_PALETTE) {
+      const theme = resolveCalendarTheme(scheme, swatch.id);
+      expect(theme.calendarAccent).toBe(swatch[scheme]);
+      expect(theme.calendarEvent).toBe(swatch[scheme]);
+      expect(theme.calendarEventBorder).toBe(swatch[scheme]);
+      expect(getContrastRatio(theme.calendarAccent, theme.backgroundSelected)).toBeGreaterThanOrEqual(4.5);
+      expect(getEventColor('red', scheme)).toBe(EVENT_COLOR_PALETTE.find((color) => color.id === 'red')?.[scheme]);
+    }
   });
 
   it('各IDに利用者向けの固定色名を持つ', () => {

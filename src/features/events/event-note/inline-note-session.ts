@@ -1,4 +1,4 @@
-import {normalizeEventNoteDocument, parseEventNoteDocument, type EventNoteDocumentV1} from '@/domain/calendar/event-note';
+import {areEventNotesEqual,normalizeEventNoteDocument, parseEventNoteDocument, type EventNoteDocumentV1} from '@/domain/calendar/event-note';
 export type NoteDocument = EventNoteDocumentV1 | null;
 export type NoteUpdate = Readonly<{sessionId:number; revision:number; document:unknown}>;
 export type NoteResponse = NoteUpdate & Readonly<{requestId:number}>;
@@ -15,6 +15,7 @@ export class InlineNoteSession {
   private listeners=new Set<()=>void>();
   private transport:NoteTransport|null=null;
   private revision=0;
+  private editingStarted=false;
   private sequence=0;
   private disposed=false;
   private heldRequest:number|null=null;
@@ -23,11 +24,15 @@ export class InlineNoteSession {
     this.state={sessionId:1,seed:document,document,ready:false,everReady:false,pending:false,error:null};
   }
   getSnapshot=():NoteSessionSnapshot=>this.state;
+  markEditingStarted(){this.editingStarted=true;}
+  needsLeaveSnapshot(){
+    return this.editingStarted||this.state.error==='conversion'||!areEventNotesEqual(this.state.document,this.state.seed);
+  }
   subscribe=(listener:()=>void)=>{this.listeners.add(listener);return ()=>{this.listeners.delete(listener);};};
   private publish(patch:Partial<NoteSessionSnapshot>){this.state={...this.state,...patch};this.listeners.forEach(listener=>listener());}
   attach(transport:NoteTransport){this.transport=transport;return ()=>{if(this.transport===transport)this.transport=null;};}
   activate(){if(this.disposed){this.disposed=false;this.restart();}}
-  reset(document:NoteDocument){this.cancel();this.disposed=false;this.revision=0;this.publish({sessionId:this.state.sessionId+1,seed:document,document,ready:false,everReady:false,pending:false,error:null});}
+  reset(document:NoteDocument){this.cancel();this.disposed=false;this.revision=0;this.editingStarted=false;this.publish({sessionId:this.state.sessionId+1,seed:document,document,ready:false,everReady:false,pending:false,error:null});}
   ready(sessionId:number){if(this.valid(sessionId))this.publish({ready:true,everReady:true,error:null});}
   private valid(sessionId:number){return !this.disposed&&sessionId===this.state.sessionId;}
   change(update:NoteUpdate){

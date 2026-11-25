@@ -1,5 +1,5 @@
-import {useCallback,useEffect,useRef,useState,useSyncExternalStore,type ComponentRef} from 'react';
-import {Alert,Keyboard,ScrollView,View,useWindowDimensions,type NativeSyntheticEvent,type NativeScrollEvent} from 'react-native';
+import {useCallback,useEffect,useMemo,useRef,useState,useSyncExternalStore,type ComponentRef} from 'react';
+import {Alert,Keyboard,ScrollView,View,useWindowDimensions,type KeyboardEvent,type LayoutChangeEvent,type NativeSyntheticEvent,type NativeScrollEvent} from 'react-native';
 import {useReduceMotion} from '@/hooks/use-reduce-motion';
 import {computeInlineNoteHeight} from '../event-note/inline-note-layout';
 import type {InlineNoteSession,NoteUpdate,NoteResponse} from '../event-note/inline-note-session';
@@ -9,37 +9,85 @@ const EMPTY_SELECTION:EditorSelectionState={bold:false,italic:false,bulletList:f
 /** WebViewとフォームの寸法・focus・toolbarを調整し、画面からOS APIを分離する。 */
 export function useInlineNoteEditor(session:InlineNoteSession,disabled:boolean){
   const snapshot=useSyncExternalStore(session.subscribe,session.getSnapshot,session.getSnapshot);
-  const editorRef=useRef<FormattedNoteEditorDOMRef>(null);
+  // Expo DOMのプロキシはマウントしたWebViewに結び付くので、再試行時は新しいrefを渡す。
+  const editorRef = useMemo(() => ({
+    sessionId: snapshot.sessionId,
+    current: null as FormattedNoteEditorDOMRef | null,
+  }), [snapshot.sessionId]);
   const rootRef=useRef<ComponentRef<typeof View>>(null);
   const fieldRef=useRef<ComponentRef<typeof View>>(null);
   const scrollRef=useRef<ComponentRef<typeof ScrollView>>(null);
   const window=useWindowDimensions(),reduceMotion=useReduceMotion();
   const [frame,setFrame]=useState({y:0,height:window.height});
-  const [keyboardTop,setKeyboardTop]=useState<number|null>(null);
+  const [keyboardTop,setKeyboardTop]=useState<number|null>(()=>Keyboard.metrics?.()?.screenY??null);
   const [contentHeight,setContentHeight]=useState(120);
+  const [toolbarHeight, setToolbarHeight] = useState(52);
+  const onToolbarLayout = useCallback((event: LayoutChangeEvent) => {
+    setToolbarHeight(event.nativeEvent.layout.height);
+  }, []);
   const [focusState,setFocus]=useState({sessionId:snapshot.sessionId,value:false});
   const focused=focusState.sessionId===snapshot.sessionId&&focusState.value&&snapshot.ready;
   const setFocused=useCallback((value:boolean)=>setFocus({sessionId:snapshot.sessionId,value}),[snapshot.sessionId]);
   const [selection,setSelection]=useState(EMPTY_SELECTION);
   const toolbarHolding=useRef(false),scrollY=useRef(0);
   const deferredBlur=useRef(false);
+  const editorFocused=useRef(false);
   const blurTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const sessionId=snapshot.sessionId;
   const current=useCallback(()=>session.getSnapshot().sessionId===sessionId,[session,sessionId]);
   useEffect(()=>session.attach({
-    request:id=>{if(!editorRef.current)throw new Error('Editor unavailable');editorRef.current.requestSnapshot(id);},
-    release:id=>editorRef.current?.releaseSnapshot(id),blur:()=>editorRef.current?.blur(),
-  }),[session]);
-  useEffect(()=>{
-    const show=Keyboard.addListener('keyboardDidShow',event=>setKeyboardTop(event.endCoordinates.screenY));
-    const hide=Keyboard.addListener('keyboardDidHide',()=>setKeyboardTop(null));
-    const change=Keyboard.addListener('keyboardWillChangeFrame',event=>setKeyboardTop(event.endCoordinates.height>0?event.endCoordinates.screenY:null));
-    return ()=>{show.remove();hide.remove();change.remove();clearTimeout(blurTimer.current);};
-  },[]);
+    request: (id) => {
+      if (editorRef.sessionId !== session.getSnapshot().sessionId || typeof editorRef.current?.requestSnapshot !== 'function') {
+        throw new Error('Editor unavailable');
+      }
+      editorRef.current.requestSnapshot(id);
+    },
+    release:id=>editorRef.current?.releaseSnapshot?.(id),blur:()=>editorRef.current?.blur?.(),
+  }),[editorRef,session]);
+  const endEditing = useCallback(() => {
+    clearTimeout(blurTimer.current);
+    deferredBlur.current = false;
+    toolbarHolding.current = false;
+    setFocused(false);
+    if (editorFocused.current) {
+      editorFocused.current = false;
+      session.blur();
+    }
+  }, [session, setFocused]);
+  useEffect(() => {
+    const updateFrame = (event: KeyboardEvent) => {
+      setKeyboardTop(event.endCoordinates.height > 0 ? event.endCoordinates.screenY : null);
+    };
+    const animateFrame = (event: KeyboardEvent) => {
+      if (!reduceMotion) Keyboard.scheduleLayoutAnimation(event);
+      updateFrame(event);
+    };
+    const show = Keyboard.addListener('keyboardDidShow', updateFrame);
+    const willShow = Keyboard.addListener('keyboardWillShow', animateFrame);
+    const change = Keyboard.addListener('keyboardWillChangeFrame', animateFrame);
+    const willHide = Keyboard.addListener('keyboardWillHide', (event) => {
+      if (!reduceMotion) Keyboard.scheduleLayoutAnimation(event);
+      setKeyboardTop(null);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardTop(null);
+      endEditing();
+    });
+    return () => {
+      show.remove();
+      willShow.remove();
+      change.remove();
+      willHide.remove();
+      hide.remove();
+    };
+  }, [endEditing, reduceMotion]);
+  useEffect(() => () => clearTimeout(blurTimer.current), []);
   const onRootLayout=useCallback(()=>{
     rootRef.current?.measureInWindow((_x,y,_width,height)=>setFrame(previous=>previous.y===y&&previous.height===height?previous:{y,height}));
   },[]);
-  const available=Math.max(0,Math.min(frame.height,keyboardTop===null?frame.height:keyboardTop-frame.y)-52-(focused?60:0)-24);
+  // OSがすでに画面を縮めた場合は、実際に重なる分だけを余白にする。
+  const keyboardInset = keyboardTop === null ? 0 : Math.min(frame.height, Math.max(0, frame.y + frame.height - keyboardTop));
+  const available=Math.max(0,frame.height-keyboardInset-52-toolbarHeight-24);
   const height=computeInlineNoteHeight(contentHeight,available);
   useEffect(()=>{
     if(!focused)return;
@@ -49,19 +97,19 @@ export function useInlineNoteEditor(session:InlineNoteSession,disabled:boolean){
       scrollRef.current?.scrollTo({y:offset,animated:!reduceMotion});
     }),0);
     return ()=>clearTimeout(timer);
-  },[focused,keyboardTop,frame,reduceMotion,height]);
-  const endEditing=useCallback(()=>{clearTimeout(blurTimer.current);deferredBlur.current=false;toolbarHolding.current=false;setFocused(false);session.blur();},[session,setFocused]);
+  },[focused,keyboardTop,frame,reduceMotion,height,toolbarHeight]);
   const onFocusChange=useCallback(async(value:boolean)=>{
     if(!current())return;
     clearTimeout(blurTimer.current);
     deferredBlur.current=false;
-    if(value)setFocused(true);
+    editorFocused.current=value;
+    if(value){session.markEditingStarted();setFocused(true);}
     else blurTimer.current=setTimeout(()=>{
       if(!current())return;
       if(toolbarHolding.current)deferredBlur.current=true;
       else setFocused(false);
     },150);
-  },[current,setFocused]);
+  },[current,session,setFocused]);
   const onToolbarTouchEnd=useCallback(()=>{
     toolbarHolding.current=false;
     if(current()&&deferredBlur.current){deferredBlur.current=false;setFocused(false);}
@@ -77,18 +125,18 @@ export function useInlineNoteEditor(session:InlineNoteSession,disabled:boolean){
     }else session.restart();
   },[disabled,session,snapshot]);
   return {session,snapshot,
-    bindEditor:useCallback((value:FormattedNoteEditorDOMRef|null)=>{editorRef.current=value;},[]),
+    editorRef,
     bindRoot:useCallback((value:ComponentRef<typeof View>|null)=>{rootRef.current=value;},[]),
     bindField:useCallback((value:ComponentRef<typeof View>|null)=>{fieldRef.current=value;},[]),
     bindScroll:useCallback((value:ComponentRef<typeof ScrollView>|null)=>{scrollRef.current=value;},[]),
     onToolbarTouchStart:useCallback(()=>{toolbarHolding.current=true;},[]),
     onToolbarTouchEnd,
-    toggleBold:useCallback(()=>editorRef.current?.toggleBold(),[]),
-    toggleItalic:useCallback(()=>editorRef.current?.toggleItalic(),[]),
-    toggleBulletList:useCallback(()=>editorRef.current?.toggleBulletList(),[]),
-    toggleOrderedList:useCallback(()=>editorRef.current?.toggleOrderedList(),[]),
-    toggleTaskList:useCallback(()=>editorRef.current?.toggleTaskList(),[]),
-    onRootLayout,height,fontScale:window.fontScale,focused,selection,endEditing,retry,
+    toggleBold:useCallback(()=>editorRef.current?.toggleBold?.(),[editorRef]),
+    toggleItalic:useCallback(()=>editorRef.current?.toggleItalic?.(),[editorRef]),
+    toggleBulletList:useCallback(()=>editorRef.current?.toggleBulletList?.(),[editorRef]),
+    toggleOrderedList:useCallback(()=>editorRef.current?.toggleOrderedList?.(),[editorRef]),
+    toggleTaskList:useCallback(()=>editorRef.current?.toggleTaskList?.(),[editorRef]),
+    onRootLayout,onToolbarLayout,keyboardInset,height,fontScale:window.fontScale,focused,selection,endEditing,retry,
     disabled:disabled||snapshot.pending,
     onScroll:(event:NativeSyntheticEvent<NativeScrollEvent>)=>{scrollY.current=event.nativeEvent.contentOffset.y;},
     onReady:useCallback(async()=>{session.ready(sessionId);},[session,sessionId]),

@@ -74,7 +74,7 @@ export default function FormattedNoteEditorDOM({
     content: toTiptapDocument(initialDocument),
     immediatelyRender: false,
     editable: false,
-    editorProps:{attributes:{role:'textbox','aria-label':'メモ本文','aria-multiline':'true'}},
+    editorProps:{attributes:{role:'textbox','aria-label':'メモ本文','aria-placeholder':'メモを追加','aria-multiline':'true'}},
 
     onUpdate: ({ editor: updatedEditor }) => {
       dirtyRef.current = true;
@@ -92,7 +92,7 @@ export default function FormattedNoteEditorDOM({
     editor,sessionId,disabled,getRevision,getDirty,
     events:{onReady,onSnapshot,onSnapshotFailure,onStateChange,onContentHeight},
   });
-  const contentRef=useRef<HTMLElement|null>(null);
+  const contentRef=useRef<HTMLDivElement|null>(null);
   useEffect(()=>{
     const element=contentRef.current;if(!element)return;
     const report=()=>reportHeight(element.scrollHeight);
@@ -112,10 +112,18 @@ export default function FormattedNoteEditorDOM({
   }), [editor,requestSnapshot,releaseSnapshot]);
 
   return (
-    <main ref={contentRef} style={{ background: theme.background, color: theme.text }}
+    <main style={{ background: theme.background, color: theme.text, width: '100%', minHeight: '100vh' }}
       onFocusCapture={()=>{void onFocusChange?.(true);}}
       onBlurCapture={()=>{void onFocusChange?.(false);}}
-      onCompositionEnd={compositionEnd}>
+      onCompositionEnd={compositionEnd}
+      onClickCapture={(event) => {
+        const target = event.target;
+        if (target instanceof Element && target.closest('a') !== null) event.preventDefault();
+        // Safariでは、余白のタップと同じイベント中に本文へフォーカスする必要がある。
+        if (editor?.isEditable && (target === event.currentTarget || target === contentRef.current)) {
+          editor.view.dom.focus();
+        }
+      }}>
       <style>{`
         html, body, #root { background: ${theme.background}; margin: 0; }
         .event-note-editor { box-sizing: border-box; font: ${17*fontScale}px/1.55 system-ui, sans-serif;
@@ -130,13 +138,10 @@ export default function FormattedNoteEditorDOM({
         .event-note-editor ul[data-type="taskList"] input { height: 22px; width: 22px; }
         .event-note-editor p.is-editor-empty:first-child::before { color: ${theme.textSecondary};
           content: attr(data-placeholder); float: left; height: 0; pointer-events: none; }
+        .event-note-editor .tiptap:focus-within p.is-editor-empty:first-child::before { content: none; }
         .event-note-editor a { color: ${theme.accent}; text-decoration: underline; }
       `}</style>
-      <EditorContent editor={editor} className="event-note-editor"
-        onClickCapture={(event) => {
-          const target = event.target;
-          if (target instanceof Element && target.closest('a') !== null) event.preventDefault();
-        }} />
+      <EditorContent ref={contentRef} editor={editor} className="event-note-editor" />
     </main>
   );
 }

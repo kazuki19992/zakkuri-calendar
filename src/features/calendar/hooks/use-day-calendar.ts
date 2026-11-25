@@ -31,11 +31,15 @@ export function useDayCalendar(input: CalendarSnapshotInput & Readonly<{
         if (requestId !== request.current) return;
         const occurrences = snapshot.isCalendarVisible ? snapshot.occurrences : [];
         const day = createDayViewModel(date, { ...snapshot, occurrences, today: date });
+        const labels = new Map([...snapshot.definitions.values()].map(({ id, label }) => [id, label]));
+        const agendaById = new Map(createAgendaItems(occurrences, labels).map((item) => [item.id, item]));
         const visibleIds = new Set([...day.allDayItems, ...day.timelineItems].map((item) => item.id));
         setState({
           status: 'ready',
-          items: createAgendaItems(occurrences, new Map([...snapshot.definitions.values()].map((value) => [value.id, value.label])))
-            .filter((item) => visibleIds.has(item.id)),
+          items: [...visibleIds].flatMap((id) => {
+            const item = agendaById.get(id);
+            return item ? [item] : [];
+          }),
           holidayName: day.holidayName,
           holidaySupport: day.holidaySupport,
         });

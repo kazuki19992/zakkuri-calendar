@@ -71,7 +71,6 @@ jest.mock('@/features/calendar/screens/calendar-screen', () => {
   };
 });
 
-jest.mock('@/components/animated-icon', () => ({ AnimatedIcon: () => null }));
 jest.mock('@/components/hint-row', () => ({ HintRow: () => null }));
 jest.mock('@/components/themed-text', () => ({ ThemedText: () => null }));
 jest.mock('@/components/themed-view', () => ({
@@ -124,8 +123,8 @@ describe('ホームルート', () => {
         setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn(),
         getCalendarVisible: jest.fn(),
         setCalendarVisible: jest.fn(),
-        getLastEventEditorTab: jest.fn(),
-        setLastEventEditorTab: jest.fn(),
+        getPrimaryCalendarColor: jest.fn().mockResolvedValue(null),
+        setPrimaryCalendarColor: jest.fn().mockResolvedValue(undefined),
         getLastCalendarViewMode: jest.fn(),
     getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1),
     setCalendarWeekStartsOn: jest.fn().mockResolvedValue(undefined),
@@ -154,7 +153,7 @@ describe('ホームルート', () => {
     expect(push).toHaveBeenCalledWith({ pathname: '/events/new', params: { date: '2026-09-21' } });
     await user.press(screen.getByRole('button', { name: '予定を編集' }));
     expect(push).toHaveBeenCalledWith({
-      pathname: '/events/[id]', params: { id: 'event-1', occurrenceDate: '2026-10-12' },
+      pathname: '/events/detail/[id]', params: { id: 'event-1', occurrenceDate: '2026-10-12' },
     });
     await user.press(screen.getByRole('button', { name: '時刻から予定を追加' }));
     expect(push).toHaveBeenCalledWith({

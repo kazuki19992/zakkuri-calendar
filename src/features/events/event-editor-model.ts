@@ -81,6 +81,12 @@ export function formatEditorDate(date: string): string {
   return `${month}月${day}日（${WEEKDAY_LABELS[weekday]}）`;
 }
 
+export function getDefaultEditorStartTime(now: Date): string {
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const rounded = Math.min(MINUTES_PER_DAY - 30, Math.ceil(minutes / 30) * 30);
+  return toWallClockTime(rounded) ?? '00:00';
+}
+
 export function getExactEditorRange(
   event: Extract<CalendarEvent, { temporalType: 'exact' }>,
 ): ExactEditorRange {

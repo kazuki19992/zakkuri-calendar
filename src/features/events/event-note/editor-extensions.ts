@@ -16,6 +16,7 @@ import { Paragraph } from '@tiptap/extension-paragraph';
 import { Text } from '@tiptap/extension-text';
 import { Placeholder, UndoRedo } from '@tiptap/extensions';
 import { parseSafeEventNoteUrl } from '@/domain/calendar/event-note';
+import { shouldAutoLinkEventNoteUrl } from './event-note-autolink';
 
 export function shouldBlockListNesting(isActive: (name: string) => boolean): boolean {
   return isActive('bulletList') || isActive('orderedList') || isActive('taskList');
@@ -51,8 +52,8 @@ export const createEventNoteExtensions = () => [
     autolink: true,
     linkOnPaste: true,
     isAllowedUri: (url) => parseSafeEventNoteUrl(url) !== null,
-    shouldAutoLink: (url) => parseSafeEventNoteUrl(url) !== null,
+    shouldAutoLink: shouldAutoLinkEventNoteUrl,
   }),
   UndoRedo,
-  Placeholder.configure({ placeholder: 'メモを入力' }),
+  Placeholder.configure({ placeholder: 'メモを追加' }),
 ];

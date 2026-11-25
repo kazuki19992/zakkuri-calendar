@@ -25,7 +25,10 @@ function createRepositories(): Readonly<{ calendars: jest.Mocked<CalendarReposit
     events: { create: jest.fn(), getById: jest.fn().mockResolvedValue(null), listByAnchorRange: jest.fn(),
       readTemporalSchedule: jest.fn(), listSchedule: jest.fn(), getOccurrenceEditData: jest.fn(), saveOccurrenceException: jest.fn(),
       deleteOccurrenceException: jest.fn(), applyRecurrenceMutation: jest.fn(), update: jest.fn(), delete: jest.fn() },
-    settings: { getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn() },
+    settings: {
+      getPrimaryCalendarColor: jest.fn().mockResolvedValue(null), setPrimaryCalendarColor: jest.fn().mockResolvedValue(undefined),
+      getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn(),
+    },
     temporalDefinitions: { listEditable: jest.fn(), previewUpdate: jest.fn(), updateDefinition: jest.fn(), listEnabled: jest.fn().mockResolvedValue([morning]), getById: jest.fn(), disable: jest.fn() },
   };
 }
@@ -295,35 +298,172 @@ describe('予定編集の主要状態', () => {
       }),
     }));
   });
-  it('保存済みタブを復元しタブ往復でも入力値を保持する', async () => {
-    const repositories = createRepositories(); repositories.settings.getLastEventEditorTab.mockResolvedValue('exact');
-    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    expect(result.current.editorTab).toBe('exact');
-    await act(async () => { result.current.setStartTime('08:15'); result.current.setEditorTab('fuzzy'); });
-    await act(async () => { result.current.setEditorTab('exact'); });
-    expect(result.current.startTime).toBe('08:15');
-    expect(repositories.settings.setLastEventEditorTab).toHaveBeenCalledTimes(2);
-  });
-
-  it('明示されたexactは保存済みfuzzyより優先する', async () => {
+  it('タイムラインから時刻を指定された新規作成は、読込後もきっちりで開く', async () => {
     const repositories = createRepositories();
-    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, initialTab: 'exact' }));
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    expect(result.current.editorTab).toBe('exact');
-    expect(repositories.settings.getLastEventEditorTab).not.toHaveBeenCalled();
-  });
-
-  it('保存済みタブが不正なら初期予定種別へフォールバックする', async () => {
-    const repositories = createRepositories();
-    repositories.settings.getLastEventEditorTab.mockResolvedValue('invalid' as never);
-    const { result } = await renderHook(() => useEventEditor({
-      ...repositories,
-      initial: { ...initial, temporalType: 'exact' },
+    repositories.settings.getDefaultExactDuration.mockResolvedValue({ type: 'fixed', minutes: 60 });
+    const { result } = await renderHook(() => useEventEditor({ ...repositories,
+      initial: { temporalType: 'exact', date: '2026-11-26', startTime: '20:00' },
     }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
+    await waitFor(() => expect(result.current.exactDurationStatus).toBe('ready'));
+    expect(result.current).toMatchObject({
+      editorTab: 'exact', startDate: '2026-11-26', startTime: '20:00', endTime: '21:00',
+    });
+  });
 
-    expect(result.current.editorTab).toBe('exact');
+  it('新規作成はざっくりで開き、タブ往復では入力を保持する', async () => {
+    const repositories = createRepositories();
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.editorTab).toBe('fuzzy');
+    await act(() => result.current.setEditorTab('exact'));
+    await act(() => result.current.setStartTime('08:15'));
+    await act(() => result.current.setEditorTab('fuzzy'));
+    await act(() => result.current.setEditorTab('exact'));
+    expect(result.current.startTime).toBe('08:15');
+  });
+
+  it.each(['保存', '破棄'] as const)('新規作成をきっちりにして%sしても次はざっくりで開く', async (action) => {
+    const repositories = createRepositories();
+    const create = await renderHook(() => useEventEditor({
+      ...repositories, initial, createId: () => 'new-exact', getTimeZoneId: () => 'Asia/Tokyo',
+    }));
+    await waitFor(() => expect(create.result.current.status).toBe('ready'));
+    await act(() => create.result.current.setEditorTab('exact'));
+    if (action === '保存') {
+      await act(() => create.result.current.setTitle('新規予定'));
+      await waitFor(() => expect(create.result.current.isSaveDisabled).toBe(false));
+      await act(async () => { expect(await create.result.current.save()).toBe(true); });
+    } else {
+      await act(async () => { expect(await create.result.current.confirmLeave()).toBe(true); });
+    }
+    await create.unmount();
+    const reopened = await renderHook(() => useEventEditor({ ...repositories, initial }));
+    await waitFor(() => expect(reopened.result.current.status).toBe('ready'));
+    expect(reopened.result.current.editorTab).toBe('fuzzy');
+  });
+
+  it.each([
+    { label: '夕方', startMinute: 960, endMinute: 1140, startTime: '16:00', endTime: '19:00', endDate: '2026-12-31', duration: 180 },
+    { label: '設定変更後の深夜', startMinute: 1350, endMinute: 1545, startTime: '22:30', endTime: '01:45', endDate: '2027-01-01', duration: 195 },
+  ])('$labelの解決済みの範囲をきっちりの初期値にし、そのまま保存できる', async (range) => {
+    const repositories = createRepositories();
+    const definition: TemporalDefinition = {
+      ...morning, id: 'saved-day-band', label: range.label,
+      resolverConfig: { kind: 'timeOfDay', startMinute: range.startMinute, endMinute: range.endMinute },
+    };
+    const event: CalendarEvent = {
+      ...exactEvent, temporalType: 'fuzzy', anchorDate: '2026-12-31', endDate: '2026-12-31',
+      temporalDefinitionId: definition.id, resolutionContext: null, recurrenceRule: null,
+    };
+    repositories.events.getById.mockResolvedValue({ event, reminders: [] });
+    repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning, definition]);
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: event.id }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+
+    await act(async () => result.current.setEditorTab('exact'));
+
+    expect(result.current).toMatchObject({
+      editorTab: 'exact', isAllDay: false, exactDurationType: 'fixed',
+      startDate: '2026-12-31', startTime: range.startTime, endDate: range.endDate, endTime: range.endTime,
+    });
+    await act(async () => { expect(await result.current.save()).toBe(true); });
+    expect(repositories.events.update).toHaveBeenCalledWith(expect.objectContaining({
+      event: expect.objectContaining({
+        temporalType: 'exact', anchorDate: '2026-12-31', startTime: range.startTime,
+        duration: { type: 'fixed', minutes: range.duration },
+      }),
+    }));
+  });
+
+  it('保存済みの日内ざっくりを変換した後はタブを往復しても編集した時刻を維持する', async () => {
+    const repositories = createRepositories();
+    const event: CalendarEvent = {
+      ...exactEvent, temporalType: 'fuzzy', endDate: exactEvent.anchorDate,
+      temporalDefinitionId: morning.id, resolutionContext: null, recurrenceRule: null,
+    };
+    repositories.events.getById.mockResolvedValue({ event, reminders: [] });
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: event.id }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => result.current.setEditorTab('exact'));
+    await act(async () => {
+      result.current.setStartTime('07:15');
+      result.current.setEndTime('07:45');
+      result.current.setEditorTab('fuzzy');
+    });
+
+    await act(async () => result.current.setEditorTab('exact'));
+
+    expect(result.current).toMatchObject({ startTime: '07:15', endTime: '07:45' });
+  });
+
+  it.each([['exact', 'exact'], ['allDay', 'fuzzy']] as const)(
+    '新規作成に%sを指定すると%sで開き、入力は指定値を引き継ぐ',
+    async (temporalType, editorTab) => {
+      const repositories = createRepositories();
+      const { result } = await renderHook(() => useEventEditor({
+        ...repositories, initial: { ...initial, temporalType, startTime: '14:00' },
+      }));
+      await waitFor(() => expect(result.current.status).toBe('ready'));
+      expect(result.current.editorTab).toBe(editorTab);
+      await act(() => result.current.setEditorTab('exact'));
+      expect(result.current).toMatchObject({ startTime: '14:00', isAllDay: temporalType === 'allDay' });
+    },
+  );
+
+  it('ざっくりの終日を日付・通常の繰り返し・終日通知と一緒に保存する', async () => {
+    const repositories = createRepositories();
+    const timing = { version: 1, kind: 'relativeDate', anchor: 'start', daysBefore: 0, time: '09:00' } as const;
+    repositories.settings.getNotificationDefault.mockImplementation(async (category) => category === 'all_day' ? timing : null);
+    repositories.temporalDefinitions.listEnabled.mockResolvedValue([nextWeek]);
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, createId: () => 'all-day', createReminderId: () => 'all-day-reminder' }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current).toMatchObject({ editorTab: 'fuzzy', isDateEditable: false });
+    await act(async () => { result.current.setTitle('休暇'); result.current.setAllDay(true); });
+    expect(result.current).toMatchObject({
+      editorTab: 'fuzzy', isDateEditable: true, relativeDatePreview: null, reminderCategory: 'all_day',
+    });
+    await act(async () => {
+      result.current.setStartDate('2026-09-24');
+      result.current.setRecurrencePreset('daily');
+    });
+    await act(async () => { result.current.setEndDate('2026-09-26'); });
+    await act(async () => { result.current.setEditorTab('exact'); });
+    expect(result.current).toMatchObject({ isAllDay: true, endDate: '2026-09-26', recurrenceDraft: { preset: 'daily' } });
+    await act(async () => { result.current.setEditorTab('fuzzy'); });
+    let saved = false;
+    await act(async () => { saved = await result.current.save(); });
+    expect({ saved, dateError: result.current.dateError, recurrenceError: result.current.recurrenceError,
+      reminderError: result.current.reminderError, saveError: result.current.saveError }).toEqual({
+      saved: true, dateError: null, recurrenceError: null, reminderError: null, saveError: null,
+    });
+    expect(repositories.events.create).toHaveBeenCalledWith(expect.objectContaining({
+      event: expect.objectContaining({
+        temporalType: 'allDay', anchorDate: '2026-09-24', endDate: '2026-09-26',
+        recurrenceRule: { version: 1, frequency: 'daily', interval: 1, weekdays: [], end: { type: 'never' } },
+      }),
+      reminders: [expect.objectContaining({ timing })],
+    }));
+  });
+
+  it('相対日付と終日を往復すると各々の繰り返し入力を復元する', async () => {
+    const repositories = createRepositories();
+    repositories.temporalDefinitions.listEnabled.mockResolvedValue([morning, nextWeek]);
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(async () => { result.current.selectDefinition(nextWeek.id); });
+    await act(async () => { result.current.setRecurrencePreset('weekly'); });
+
+    await act(async () => { result.current.setAllDay(true); });
+    expect(result.current.recurrenceDraft.preset).toBe('none');
+    await act(async () => { result.current.setRecurrencePreset('daily'); });
+    await act(async () => { result.current.setAllDay(false); });
+    expect(result.current).toMatchObject({
+      selectedDefinitionId: nextWeek.id, recurrenceDraft: { preset: 'weekly' },
+    });
+
+    await act(async () => { result.current.setAllDay(true); });
+    expect(result.current.recurrenceDraft.preset).toBe('daily');
   });
 
   it('既存の終日予定はきっちりタブと複数日の終日入力へ展開する', async () => {
@@ -345,8 +485,9 @@ describe('予定編集の主要状態', () => {
 
   it('複数日の日時と終日をそれぞれ保存する', async () => {
     const repositories = createRepositories();
-    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, initialTab: 'exact', createId: () => 'event-new', now: () => '2026-09-09T12:00:00.000Z', getTimeZoneId: () => 'Asia/Tokyo' }));
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, createId: () => 'event-new', now: () => '2026-09-09T12:00:00.000Z', getTimeZoneId: () => 'Asia/Tokyo' }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(() => result.current.setEditorTab('exact'));
     await act(async () => { result.current.setTitle('旅行'); result.current.setEndDate('2026-09-11'); result.current.setEndTime('10:00'); });
     await act(async () => { await result.current.save(); });
     expect(repositories.events.create).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ temporalType: 'exact', duration: { type: 'fixed', minutes: 2_910 } }) }));
@@ -368,8 +509,9 @@ describe('予定編集の主要状態', () => {
   });
 
   it('終了日時が開始以前なら保存しない', async () => {
-    const repositories = createRepositories(); const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, initialTab: 'exact' }));
+    const repositories = createRepositories(); const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(() => result.current.setEditorTab('exact'));
     await act(async () => { result.current.setTitle('不正な予定'); result.current.setEndDate('2026-09-08'); });
     await act(async () => { await result.current.save(); });
     expect(result.current.endTimeError).not.toBeNull(); expect(repositories.events.create).not.toHaveBeenCalled();
@@ -548,8 +690,9 @@ describe('初期長設定と終了の指定', () => {
 describe('終了種別の境界', () => {
   it('無効になる直前の有効なfixed長を復帰時に使い、同時刻は自動で長さなしにしない', async () => {
     const repositories = createRepositories();
-    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, initialTab: 'exact' }));
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(() => result.current.setEditorTab('exact'));
     await act(async () => { result.current.setEndTime('10:00'); });
     await act(async () => { result.current.setEndTime('09:30'); result.current.setTitle('境界'); });
     await act(async () => { expect(await result.current.save()).toBe(false); });
@@ -741,8 +884,9 @@ it('保存済み単発から毎週へ変換するときもタブ往復では締�
 it.each(['fuzzy', 'exact'] as const)('未訪問の%sタブへ繰り返し入力を混ぜず、戻ると復元する', async tab => {
   const repositories = createRepositories();
   const first = tab === 'fuzzy' ? 'exact' : 'fuzzy';
-  const {result} = await renderHook(() => useEventEditor({...repositories, initial, initialTab:first}));
+  const {result} = await renderHook(() => useEventEditor({...repositories, initial}));
   await waitFor(() => expect(result.current.status).toBe('ready'));
+  await act(() => result.current.setEditorTab(first));
   await act(async () => result.current.setRecurrencePreset('daily'));
   await act(async () => result.current.setEditorTab(tab));
   expect(result.current.recurrenceDraft.preset).toBe('none');
@@ -824,10 +968,81 @@ it('メモを空にして保存でき、未準備の保存では元文書を使�
 it('取消でも最新本文を確認し、変更があれば予定全体の破棄を一度だけ確認する',async()=>{
  const {Alert}=jest.requireActual<typeof import('react-native')>('react-native');const alert=jest.spyOn(Alert,'alert').mockImplementation(()=>{});
  const repositories=createRepositories();const {result}=await renderHook(()=>useEventEditor({...repositories,initial,createId:()=> 'inline-created'}));await waitFor(()=>expect(result.current.status).toBe('ready'));
- await act(async()=>{attachInlineSession(result.current);});let leave!:Promise<boolean>;await act(async()=>{leave=result.current.confirmLeave();});
+ await act(async()=>{attachInlineSession(result.current);result.current.noteSession.markEditingStarted();});let leave!:Promise<boolean>;await act(async()=>{leave=result.current.confirmLeave();});
  expect(alert).toHaveBeenCalledTimes(1);expect(repositories.events.create).not.toHaveBeenCalled();
  await act(async()=>{alert.mock.calls[0][2]![0].onPress?.();expect(await leave).toBe(false);});expect(result.current.noteDocument).toEqual(eventNoteFromPlainText('最後の文字'));alert.mockRestore();
 });
+it('未操作で開いた予定はメモの応答を要求せず確認なしで閉じる', async () => {
+  const repositories = createRepositories();
+  repositories.events.getById.mockResolvedValue(exactAggregate);
+  const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: exactEvent.id }));
+  await waitFor(() => expect(result.current.status).toBe('ready'));
+  await act(async () => {
+    const note = attachInlineSession(result.current);
+    expect(await result.current.confirmLeave()).toBe(true);
+    expect(note.transport.request).not.toHaveBeenCalled();
+  });
+});
+
+it('新規作成で時間形式のタブを見ただけなら確認なしで閉じる', async () => {
+  const { Alert } = jest.requireActual<typeof import('react-native')>('react-native');
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    buttons?.[0].onPress?.();
+  });
+  try {
+    const repositories = createRepositories();
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(() => result.current.setEditorTab('exact'));
+    await act(() => result.current.setEditorTab('fuzzy'));
+    await act(async () => { expect(await result.current.confirmLeave()).toBe(true); });
+    expect(alert).not.toHaveBeenCalled();
+  } finally {
+    alert.mockRestore();
+  }
+});
+
+it('本文以外に変更があれば破棄を確認し、元に戻せば確認なしで閉じる', async () => {
+  const { Alert } = jest.requireActual<typeof import('react-native')>('react-native');
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  try {
+    const repositories = createRepositories();
+    repositories.events.getById.mockResolvedValue(exactAggregate);
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: exactEvent.id }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(() => result.current.setTitle('変更後のタイトル'));
+    let leave!: Promise<boolean>;
+    await act(async () => { leave = result.current.confirmLeave(); });
+    expect(alert).toHaveBeenCalledTimes(1);
+    await act(async () => { alert.mock.calls[0][2]?.[0].onPress?.(); expect(await leave).toBe(false); });
+    await act(() => result.current.setTitle(exactEvent.title));
+    await act(async () => { expect(await result.current.confirmLeave()).toBe(true); });
+    expect(alert).toHaveBeenCalledTimes(1);
+  } finally {
+    alert.mockRestore();
+  }
+});
+
+it('繰り返しを元に戻すと非表示の入力を変更として扱わない', async () => {
+  const { Alert } = jest.requireActual<typeof import('react-native')>('react-native');
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+    buttons?.[0].onPress?.();
+  });
+  try {
+    const repositories = createRepositories();
+    repositories.events.getById.mockResolvedValue({ ...exactAggregate, event: { ...exactEvent, recurrenceRule: null } });
+    const { result } = await renderHook(() => useEventEditor({ ...repositories, initial, eventId: exactEvent.id }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    await act(() => result.current.setRecurrencePreset('custom'));
+    await act(() => result.current.setRecurrenceIntervalText('2'));
+    await act(() => result.current.setRecurrencePreset('none'));
+    await act(async () => { expect(await result.current.confirmLeave()).toBe(true); });
+    expect(alert).not.toHaveBeenCalled();
+  } finally {
+    alert.mockRestore();
+  }
+});
+
 it('保存内容の範囲確認中はDOMの固定を解除せず、範囲取消で再編集を許可する',async()=>{
  const f=relativeOccurrenceFixture();const {result}=await renderHook(()=>useEventEditor({...f.repositories,initial,eventId:f.series.id,occurrenceDate:'2027-02-01',createId:()=> 'scope-note'}));await waitFor(()=>expect(result.current.status).toBe('ready'));
  let note!:ReturnType<typeof attachInlineSession>;await act(async()=>{note=attachInlineSession(result.current);await result.current.save();});

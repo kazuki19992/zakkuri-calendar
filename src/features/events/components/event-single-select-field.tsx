@@ -1,5 +1,7 @@
+import { Spacing, Typography } from '@/constants/theme';
+import { SymbolView } from 'expo-symbols';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
 import {
   SingleSelectSheet,
@@ -32,20 +34,22 @@ export function EventSingleSelectField<T extends PickerValue>({
   const selectedLabel = selectedOption?.label ?? '未選択';
 
   return (
-    <View style={[styles.row, { borderBottomColor: theme.calendarBorder }]}>
-      <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
+    <>
       <Pressable testID={testID} accessibilityRole="button"
         accessibilityLabel={`${label}、${selectedLabel}、選択する`}
         accessibilityState={{ disabled: selectionDisabled }} disabled={selectionDisabled}
-        onPress={() => setOpen(true)} style={styles.control}>
-        {leading}
-        <Text numberOfLines={1} style={[styles.value, { color: theme.text }]}>{selectedLabel}</Text>
-        <Text accessibilityElementsHidden importantForAccessibility="no"
-          style={[styles.chevron, { color: theme.textSecondary }]}>⌄</Text>
+        onPress={() => { Keyboard.dismiss(); setOpen(true); }}
+        style={[styles.row, { borderBottomColor: theme.calendarBorder }]}>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
+        <View style={styles.control}>
+          {leading}
+          <Text style={[styles.value, { color: theme.text }]}>{selectedLabel}</Text>
+          <SymbolView accessible={false} name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={12} tintColor={selectionDisabled ? theme.textDisabled : theme.textSecondary} style={styles.chevron} />
+        </View>
       </Pressable>
       <SingleSelectSheet visible={open} title={label} value={value} options={options}
         disabled={disabled} onSelect={onChange} onClose={() => setOpen(false)} />
-    </View>
+    </>
   );
 }
 
@@ -56,17 +60,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     minHeight: 52,
+    paddingVertical: Spacing.one,
     paddingHorizontal: 0,
   },
-  label: { fontSize: 15 },
+  label: { fontSize: Typography.row },
   control: {
     alignItems: 'center',
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    minHeight: 44,
-    minWidth: 136,
+    marginLeft: Spacing.two,
   },
-  value: { flexShrink: 1, fontSize: 15 },
-  chevron: { fontSize: 18, marginLeft: 8 },
+  value: { flexShrink: 1, fontSize: Typography.row, textAlign: 'right' },
+  chevron: { marginLeft: Spacing.two },
 });

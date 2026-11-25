@@ -62,7 +62,7 @@ describe('予定編集の追加項目', () => {
   it('色名と色見本を表示しdropdownで単一選択する', async () => {
     const user = userEvent.setup();
     const onChange = jest.fn();
-    const view = await render(<EventColorPicker calendarColorId="blue" value={null} disabled={false} onChange={onChange} />);
+    const view = await render(<EventColorPicker value={null} disabled={false} onChange={onChange} />);
     expect(view.getByTestId('event-editor.selected-color-swatch')).toBeOnTheScreen();
     await user.press(view.getByLabelText('予定の色、カレンダーの色、選択する'));
     expect(view.getByLabelText('赤')).toBeOnTheScreen();
@@ -75,7 +75,7 @@ describe('予定編集の追加項目', () => {
   it('dark themeでも各色候補に対応する色見本を表示する', async () => {
     jest.mocked(useColorScheme).mockReturnValue('dark');
     const user = userEvent.setup();
-    const view = await render(<EventColorPicker calendarColorId="blue" value="red"
+    const view = await render(<EventColorPicker value="red"
       disabled={false} onChange={jest.fn()} />);
     await user.press(view.getByLabelText('予定の色、赤、選択する'));
     expect(StyleSheet.flatten(view.getByTestId('event-editor.color-option-red-swatch').props.style))
@@ -85,7 +85,7 @@ describe('予定編集の追加項目', () => {
 
   it('disabledの単一選択項目はシートを開かない', async () => {
     const user = userEvent.setup();
-    const view = await render(<EventColorPicker calendarColorId="blue" value={null}
+    const view = await render(<EventColorPicker value={null}
       disabled onChange={jest.fn()} />);
     const field = view.getByLabelText('予定の色、カレンダーの色、選択する');
     expect(field).toBeDisabled();
@@ -100,7 +100,7 @@ describe('予定編集の追加項目', () => {
     const view=await render(<EventReminderEditor reminders={[{id:'r1',minutesBefore:30},{id:'r2',minutesBefore:60}]} disabled={false} error={null} onAdd={jest.fn()} onRemove={onRemove} onMove={onMove}/>);
     expect(view.getByText('開始30分前（以前の設定）')).toBeOnTheScreen();
     await fireEvent.press(view.getByLabelText('通知2を上へ'));expect(onMove).toHaveBeenCalledWith('r2',-1);
-    await fireEvent.press(view.getByLabelText('通知1を削除'));expect(onRemove).toHaveBeenCalledWith('r1');
+    await fireEvent.press(view.getAllByText('この通知を削除')[0]);expect(onRemove).toHaveBeenCalledWith('r1');
   });
   it('60分以上の通知は基準と時分を表示する',async()=>{
     const view=await render(<EventReminderEditor reminders={[{id:'r',timing:{version:1,kind:'relativeMinutes',anchor:'end',minutesBefore:90}}]} disabled={false} error={null} onAdd={jest.fn()} onRemove={jest.fn()} onMove={jest.fn()}/>);

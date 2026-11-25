@@ -1,30 +1,36 @@
 import React from 'react';
-import {Alert,View} from 'react-native';
-import {render,act,fireEvent} from '@testing-library/react-native';
+import {Alert,Dimensions,Keyboard,StyleSheet,View,type KeyboardEvent} from 'react-native';
+import {render,act,fireEvent,within} from '@testing-library/react-native';
 import {InlineNoteSession} from '../../event-note/inline-note-session';
 import {eventNoteFromPlainText} from '@/domain/calendar/event-note';
 import {useInlineNoteEditor} from '../../hooks/use-inline-note-editor';
-import {InlineFormattedNoteEditor,InlineNoteToolbar} from '../formatted-note-editor/inline-formatted-note-editor';
+import {InlineFormattedNoteEditor} from '../formatted-note-editor/inline-formatted-note-editor';
 jest.mock('@/global.css',()=>({}));
 let mockProps:any;
 let mockMounts=0;
 const mockCommands={requestSnapshot:jest.fn(),releaseSnapshot:jest.fn(),blur:jest.fn(),toggleBold:jest.fn(),toggleItalic:jest.fn(),toggleBulletList:jest.fn(),toggleOrderedList:jest.fn(),toggleTaskList:jest.fn()};
-jest.mock('../formatted-note-editor/formatted-note-editor',()=>({FormattedNoteEditor:(props:any)=>{
+jest.mock('../formatted-note-editor/formatted-note-editor.dom',()=>({__esModule:true,default:function MockDOMEditor(props:any){
  const R=jest.requireActual<typeof React>('react');const V=jest.requireActual<typeof import('react-native')>('react-native').View;
- mockProps=props;R.useImperativeHandle(props.editorRef,()=>mockCommands);R.useEffect(()=>{mockMounts++;},[]);return R.createElement(V,{testID:'inline-dom'});
+ mockProps=props;
+ // Expoのnative wrapperは描画時にオブジェクトrefへプロキシを設定する。
+ if (typeof props.ref === 'object' && props.ref !== null) props.ref.current=mockCommands;R.useEffect(()=>{mockMounts++;},[]);return R.createElement(V,{testID:'inline-dom'});
 }}));
-function Harness({session,disabled=false}:{session:InlineNoteSession;disabled?:boolean}){const model=useInlineNoteEditor(session,disabled);return <View><InlineFormattedNoteEditor model={model} linkError={null}/><InlineNoteToolbar model={model} onOpenLink={jest.fn()}/></View>;}
+function Harness({session,disabled=false}:{session:InlineNoteSession;disabled?:boolean}){const model=useInlineNoteEditor(session,disabled);return <View testID="inline-note.form" accessibilityState={{ selected: model.focused }} style={{paddingBottom:model.keyboardInset}}><InlineFormattedNoteEditor model={model} linkError={null} onOpenLink={jest.fn()}/></View>;}
 beforeEach(()=>{jest.clearAllMocks();mockMounts=0;});
 afterEach(()=>{jest.useRealTimers();jest.restoreAllMocks();});
 it('本文を最初から埋め込み、メモ専用の完了は置かずreadyまでは入力を遮断する',async()=>{
  const session=new InlineNoteSession(eventNoteFromPlainText('本文'));
  const view=await render(<Harness session={session}/>);expect(view.getByTestId('inline-dom',{includeHiddenElements:true})).toBeTruthy();expect(view.queryByText('完了')).toBeNull();expect(mockProps.disabled).toBe(true);
- await act(async()=>mockProps.onReady());expect(mockProps.disabled).toBe(false);expect(view.queryByLabelText('太字')).toBeNull();
+ expect(mockProps.dom.keyboardDisplayRequiresUserAction).toBe(false);
+ await act(async()=>mockProps.onReady());expect(mockProps.disabled).toBe(false);expect(view.getByLabelText('太字')).toBeOnTheScreen();
 });
-it('focus中だけtoolbarを表示し、選択状態を反映してcommandを送る',async()=>{
+it('入力前に書式操作を表示し、focus中は選択状態を反映してcommandを送る',async()=>{
  const view=await render(<Harness session={new InlineNoteSession()}/>);
+ expect(view.getByLabelText('箇条書き')).toBeOnTheScreen();
+ expect(view.getByLabelText('番号付きリスト')).toBeOnTheScreen();
  await act(async()=>{await mockProps.onReady();await mockProps.onFocusChange(true);await mockProps.onStateChange({bold:true,italic:false,bulletList:false,orderedList:false,taskList:false,linkUrl:null,dirty:false});});
- expect(view.getByLabelText('太字').props.accessibilityState.selected).toBe(true);
+ const field = within(view.getByTestId('inline-note.field'));
+ expect(field.getByLabelText('太字').props.accessibilityState.selected).toBe(true);
  await fireEvent.press(view.getByLabelText('太字'));expect(mockCommands.toggleBold).toHaveBeenCalledTimes(1);
 });
 it('画面の再描画やdisabledの変更でDOMを再mountしない',async()=>{
@@ -68,17 +74,18 @@ it.each(['touchEnd','touchCancel'])('長いツールバー操作の%sで、再fo
  await act(async()=>{await mockProps.onReady();await mockProps.onFocusChange(true);});
  await fireEvent(view.getByLabelText('太字'),'touchStart');
  await act(async()=>{await mockProps.onFocusChange(false);jest.advanceTimersByTime(200);});
- expect(view.getByLabelText('太字')).toBeTruthy();
+ expect(view.getByTestId('inline-note.form').props.accessibilityState.selected).toBe(true);
  await fireEvent(view.getByLabelText('太字'),event);
- expect(view.queryByLabelText('太字')).toBeNull();
+ expect(view.getByTestId('inline-note.form').props.accessibilityState.selected).toBe(false);
+ expect(view.getByLabelText('太字')).toBeOnTheScreen();
 });
-it.each(['touchEnd','touchCancel'])('長いツールバー操作でも再focus済みなら%sで閉じない',async(event)=>{
+it.each(['touchEnd','touchCancel'])('長いツールバー操作でも再focus済みなら%s後もfocusを保つ',async(event)=>{
  jest.useFakeTimers({doNotFake:['queueMicrotask']});const view=await render(<Harness session={new InlineNoteSession()}/>);
  await act(async()=>{await mockProps.onReady();await mockProps.onFocusChange(true);});
  await fireEvent(view.getByLabelText('太字'),'touchStart');
  await act(async()=>{await mockProps.onFocusChange(false);jest.advanceTimersByTime(200);await mockProps.onFocusChange(true);});
  await fireEvent(view.getByLabelText('太字'),event);
- expect(view.getByLabelText('太字')).toBeTruthy();
+ expect(view.getByTestId('inline-note.form').props.accessibilityState.selected).toBe(true);
 });
 it('短い書式タップはblurの猶予中に本文へ戻り、ツールバーを維持する',async()=>{
  jest.useFakeTimers({doNotFake:['queueMicrotask']});const view=await render(<Harness session={new InlineNoteSession()}/>);
@@ -89,4 +96,40 @@ it('短い書式タップはblurの猶予中に本文へ戻り、ツールバー
  await fireEvent.press(view.getByLabelText('太字'));
  await act(async()=>{await mockProps.onFocusChange(true);jest.advanceTimersByTime(200);});
  expect(mockCommands.toggleBold).toHaveBeenCalledTimes(1);expect(view.getByLabelText('太字')).toBeTruthy();
+});
+
+it('キーボードを閉じたらDOMのフォーカスを解除し、同じ本文を再び編集できる', async () => {
+  const listeners = new Map<string, (event: KeyboardEvent) => void>();
+  jest.spyOn(Keyboard, 'addListener').mockImplementation((name, listener) => {
+    listeners.set(name, listener);
+    return { remove: () => listeners.delete(name) };
+  });
+  const session = new InlineNoteSession();
+  const view = await render(<Harness session={session}/>);
+  const document = eventNoteFromPlainText('入力途中の本文');
+  const keyboardEvent: KeyboardEvent = {
+    duration: 250, easing: 'keyboard', isEventFromThisApp: true,
+    startCoordinates: { screenX: 0, screenY: 667, width: 390, height: 267 },
+    endCoordinates: { screenX: 0, screenY: Dimensions.get('window').height - 267, width: 390, height: 267 },
+  };
+
+  await act(async () => {
+    await mockProps.onReady();
+    await mockProps.onFocusChange(true);
+    await mockProps.onDocumentChange({ sessionId: 1, revision: 1, document });
+    listeners.get('keyboardDidShow')?.(keyboardEvent);
+  });
+  const inset = () => StyleSheet.flatten(view.getByTestId('inline-note.form').props.style).paddingBottom;
+  expect(view.getByLabelText('太字')).toBeTruthy();
+  expect(inset()).toBe(267);
+  await act(() => listeners.get('keyboardDidHide')?.(keyboardEvent));
+  expect(mockCommands.blur).toHaveBeenCalledTimes(1);
+  expect(inset()).toBe(0);
+  expect(view.getByTestId('inline-note.form').props.accessibilityState.selected).toBe(false);
+  expect(view.getByLabelText('太字')).toBeOnTheScreen();
+
+  await act(async () => mockProps.onFocusChange(true));
+  expect(view.getByLabelText('太字')).toBeTruthy();
+  expect(mockMounts).toBe(1);
+  expect(session.getSnapshot().document).toEqual(document);
 });

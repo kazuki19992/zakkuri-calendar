@@ -1,5 +1,7 @@
-import { useContext, useRef, useState } from 'react';
-import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
+import { Radii, Spacing, Typography } from '@/constants/theme';
+import { SymbolView } from 'expo-symbols';
+import { useRef, useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   FlatList,
   Modal,
@@ -98,8 +100,8 @@ function NumberWheel({
             <Text
               style={{
                 color:
-                  item === value ? theme.calendarAccent : theme.textSecondary,
-                fontSize: 20,
+                  item === value ? theme.calendarAccentText : theme.textSecondary,
+                fontSize: Typography.title,
                 fontWeight: item === value ? '700' : '400',
               }}
             >
@@ -139,7 +141,6 @@ function PickerContent({
   const theme = useTheme(),
     reduce = useReduceMotion();
   const { height } = useWindowDimensions();
-  const insets = useContext(SafeAreaInsetsContext);
   const initial = value;
   const calendar = value.kind === 'relativeDate';
   const [anchor, setAnchor] = useState(initial.anchor);
@@ -174,9 +175,11 @@ function PickerContent({
       transparent
       visible
       animationType={reduce ? 'none' : 'fade'}
+      statusBarTranslucent
+      navigationBarTranslucent
       onRequestClose={onClose}
     >
-      <View
+      <SafeAreaView edges={['top']}
         style={[styles.overlay, { backgroundColor: theme.calendarBackdrop }]}
       >
         <Pressable
@@ -184,30 +187,28 @@ function PickerContent({
           style={StyleSheet.absoluteFill}
           onPress={onClose}
         />
-        <View
+        <SafeAreaView
+          edges={{ left: 'maximum', bottom: 'maximum', right: 'maximum' }}
           testID="notification-timing.sheet"
           accessibilityViewIsModal
           style={[
             styles.sheet,
             {
               backgroundColor: theme.background,
-              maxHeight: Math.max(0, height - (insets?.top ?? 0) - 16),
-              paddingBottom: Math.max(32, insets?.bottom ?? 0),
-              paddingLeft: Math.max(20, insets?.left ?? 0),
-              paddingRight: Math.max(20, insets?.right ?? 0),
+              maxHeight: Math.max(0, height - Spacing.four),
             },
           ]}
         >
           <ScrollView
             testID="notification-timing.header-scroll"
             style={styles.headerScroll}
-            contentContainerStyle={{ gap: 10 }}
+            contentContainerStyle={{ gap: Spacing.twelve }}
             keyboardShouldPersistTaps="handled"
             bounces={false}
           >
             <Text
               accessibilityRole="header"
-              style={{ color: theme.text, fontSize: 18 }}
+              style={{ color: theme.text, fontSize: Typography.title }}
             >
               通知タイミング
             </Text>
@@ -220,11 +221,12 @@ function PickerContent({
               style={styles.row}
             >
               <Text style={{ color: theme.text }}>基準</Text>
-              <Text style={{ color: theme.text }}>
-                {anchor === 'start' ? '開始' : '終了'}
-                {calendar ? '日' : ''}
-                {fixedAnchor ? '' : ' ▾'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.two }}>
+                <Text style={{ color: theme.text }}>
+                  {anchor === 'start' ? '開始' : '終了'}{calendar ? '日' : ''}
+                </Text>
+                {fixedAnchor ? null : <SymbolView accessible={false} name={selecting ? { ios: 'chevron.up', android: 'expand_less', web: 'expand_less' } : { ios: 'chevron.down', android: 'expand_more', web: 'expand_more' }} size={12} tintColor={theme.textSecondary} />}
+              </View>
             </Pressable>
             {selecting ? (
               <View>
@@ -245,7 +247,7 @@ function PickerContent({
                         {v === 'start' ? '開始' : '終了'}
                         {calendar ? '日' : ''}
                       </Text>
-                      <Text style={{ color: theme.calendarAccent }}>
+                      <Text style={{ color: theme.calendarAccentText }}>
                         {v === anchor ? '✓' : ' '}
                       </Text>
                     </Pressable>
@@ -300,22 +302,24 @@ function PickerContent({
                 onClose();
               }}
             >
-              <Text style={{ color: theme.calendarAccent }}>確定</Text>
+              <Text style={{ color: theme.calendarAccentText }}>確定</Text>
             </Pressable>
           </View>
-        </View>
-      </View>
+        </SafeAreaView>
+      </SafeAreaView>
     </Modal>
   );
 }
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'flex-end', paddingTop: Spacing.four },
   sheet: {
-    padding: 20,
-    paddingBottom: 32,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    gap: 10,
+    flexShrink: 1,
+    padding: Spacing.four,
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.five,
+    borderTopLeftRadius: Radii.small,
+    borderTopRightRadius: Radii.small,
+    gap: Spacing.twelve,
   },
   headerScroll: { flexShrink: 1, minHeight: 44 },
   wheels: {

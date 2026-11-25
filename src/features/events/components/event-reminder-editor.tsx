@@ -1,3 +1,4 @@
+import { Spacing } from '@/constants/theme';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/hooks/use-theme';
@@ -49,11 +50,11 @@ export function EventReminderEditor({
       onPress={action}
       style={styles.button}
     >
-      <Text style={{ color: theme.calendarAccent }}>{label}</Text>
+      <Text style={{ color: theme.calendarAccentText }}>{label}</Text>
     </Pressable>
   );
   return (
-    <View style={{ gap: 8 }}>
+    <View style={{ gap: Spacing.two }}>
       {defaultStatus === 'loading' ? (
         <Text style={{ color: theme.textSecondary }}>
           通知の初期値を読み込んでいます
@@ -72,29 +73,20 @@ export function EventReminderEditor({
           {button('通知の初期値を再読み込み', () => onRetry?.())}
         </>
       ) : null}
-      {reminders.map((r, index) => (
-        <View
-          key={r.id}
-          style={[styles.row, { borderBottomColor: theme.calendarBorder }]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`通知を変更、${timingLabel(getReminderTiming(r), category === 'all_day' || category === 'fuzzy_period')}`}
-            disabled={disabled}
-            onPress={() => setEditing(r.id)}
-            style={[styles.button, { flex: 1 }]}
-          >
-            <Text style={{ color: theme.text }}>
-              {timingLabel(
-                getReminderTiming(r),
-                category === 'all_day' || category === 'fuzzy_period',
-              )}
-            </Text>
-          </Pressable>
-          {index > 0 ? button('上へ', () => onMove(r.id, -1), `通知${index + 1}を上へ`) : null}
-          {button(`通知${index + 1}を削除`, () => onRemove(r.id))}
-        </View>
-      ))}
+      {reminders.map((r, index) => {
+        const label = timingLabel(getReminderTiming(r), category === 'all_day' || category === 'fuzzy_period');
+        return (
+          <View key={r.id} style={[styles.row, { borderBottomColor: theme.calendarBorder }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`通知を変更、${label}`}
+              disabled={disabled} onPress={() => setEditing(r.id)}
+              style={[styles.button, { flex: 1 }]}>
+              <Text style={{ color: theme.text }}>{label}</Text>
+            </Pressable>
+            {index > 0 ? button('上へ', () => onMove(r.id, -1), `通知${index + 1}を上へ`) : null}
+            {button('この通知を削除', () => onRemove(r.id), `この通知を削除、${label}`)}
+          </View>
+        );
+      })}
       {reminders.length === 0 ? (
         <Text style={{ color: theme.textSecondary }}>通知なし</Text>
       ) : null}
@@ -140,6 +132,6 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 44,
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: Spacing.one,
   },
 });

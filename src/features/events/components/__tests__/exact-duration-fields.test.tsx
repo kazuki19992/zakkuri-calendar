@@ -17,8 +17,10 @@ describe('終了の指定', () => {
     const onChange = jest.fn();
     await render(<ExactDurationTypeField value="fixed" status="ready" disabled={false} onChange={onChange} onRetry={jest.fn()} />);
     await fireEvent.press(screen.getByRole('button', { name: '終了、時刻を指定' }));
-    expect(screen.getByRole('button', { name: '時刻を指定、選択中' }).props.accessibilityState.selected).toBe(true);
-    await fireEvent.press(screen.getByRole('button', { name: '長さなし' }));
+    expect(screen.getByRole('button', { name: /時刻を指定.*選択中/ }).props.accessibilityState.selected).toBe(true);
+    expect(screen.getByText('開始時刻だけを記録します。')).toBeOnTheScreen();
+    expect(screen.getByText('開始時刻は決まっていて、終了時刻は未定です。')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: /長さなし/ }));
     expect(onChange).toHaveBeenCalledWith('instant');
   });
   it('長さなしと未定では隠れた終了ピッカーを表示しないが終日は終了日を表示する', async () => {

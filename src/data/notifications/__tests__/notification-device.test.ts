@@ -59,7 +59,7 @@ describe('端末通知adapter', () => {
 });
 
 test('以前の応答のackで新しい最後の応答を消さず、同じ応答だけ消去する', async () => {
-  const make = (name: string, date: number) =>
+  const make = (name: string, date: number): Notifications.NotificationResponse =>
     ({
       actionIdentifier: 'default',
       notification: {
@@ -71,13 +71,14 @@ test('以前の応答のackで新しい最後の応答を消さず、同じ応�
             subtitle: null,
             body: null,
             categoryIdentifier: null,
+            threadIdentifier: null,
             sound: null,
             data: { version: 1, eventId: name },
           },
           trigger: null,
         },
       },
-    }) as Notifications.NotificationResponse;
+    });
   const first = make('a', 1),
     second = make('b', 2);
   let last: Notifications.NotificationResponse | null = first;

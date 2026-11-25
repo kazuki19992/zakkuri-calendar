@@ -2,7 +2,7 @@ import { render, userEvent } from '@testing-library/react-native';
 import { Platform, StyleSheet } from 'react-native';
 import type { ReactNode } from 'react';
 import type { ViewProps } from 'react-native';
-import { Colors } from '@/constants/theme';
+import { Colors, Radii } from '@/constants/theme';
 import type { MonthDayViewModel, MonthWeekViewModel } from '../../month-view-model';
 import { CalendarLoadState } from '../calendar-load-state';
 import { MonthDayCell } from '../month-day-cell';
@@ -13,12 +13,12 @@ jest.mock('@/global.css', () => ({}));
 jest.mock('expo-router', () => {
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    // previewをマウントせず、Linkのレイアウト属性と遷移先だけを検証する。
+    // iOSのプレビュー表示はネイティブに任せ、渡した背景色だけを検証する。
     Link: Object.assign(({ children, ...props }: { children: ReactNode } & ViewProps) => (
       <View {...props}>{children}</View>
     ), {
       Trigger: ({ children }: { children: ReactNode }) => children,
-      Preview: () => null,
+      Preview: ({ style }: ViewProps) => <View testID="month-calendar.link-preview" style={style} />,
     }),
   };
 });
@@ -55,12 +55,21 @@ function createWeeks(days: readonly MonthDayViewModel[]): readonly MonthWeekView
       weekIndex, lane: 0, startWeekday: 0, spanDays: 3, position: 'start' as const, startsInWeek: true, endsInWeek: true,
       continuesFromPreviousWeek: false, continuesToNextWeek: false, colorId: 'red' as const,
       title: '通院', temporalLabel: '10:00', accessibilityLabel: '通院、10:00、繰り返し予定',
-      isFuzzyRange: false, opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
+      isFuzzyRange: false, alignLabelToEnd: false, opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
     }] : [],
   }));
 }
 
 describe('独自月カレンダー表示', () => {
+  it('月表示の日付セル内に祝日名を表示し、週の境界を引く', async () => {
+    const days = createDays();
+    const view = await render(<MonthGrid days={days} weekModels={createWeeks(days)}
+      onSelectDate={jest.fn()} onOpenDay={jest.fn()} />);
+    expect(view.getByText('敬老の日')).toBeOnTheScreen();
+    expect(StyleSheet.flatten(view.getAllByTestId('month-calendar.week')[0].props.style).borderBottomWidth)
+      .toBeGreaterThan(0);
+  });
+
   it('日曜始まりの曜日見出しと土日色を実曜日に合わせる', async () => {
     const days = createDays();
     const sunday = { ...days[0], date: '2026-08-30', weekday: 0 };
@@ -86,7 +95,51 @@ describe('独自月カレンダー表示', () => {
     expect(onOpenDay).toHaveBeenNthCalledWith(1, '2026-09-21');
     expect(onOpenDay).toHaveBeenNthCalledWith(2, '2026-09-21');
     expect(onEditEvent).toHaveBeenCalledWith('series-1', '2026-09-21');
+    expect(onOpenDay).toHaveBeenCalledTimes(2);
+    expect(view.getByRole('button', { name: '通院、10:00、繰り返し予定' }).props.hitSlop).toBeUndefined();
     Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
+  });
+
+  it('不透明な月表示の予定帯は指定色で塗り、週をまたぐ辺の角を丸めない', async () => {
+    const days = createDays();
+    const weeks = createWeeks(days).map((week) => ({
+      ...week,
+      segments: week.segments.map((item) => ({ ...item, startsInWeek: false, continuesFromPreviousWeek: true })),
+    }));
+    const view = await render(<MonthGrid days={days} weekModels={weeks} onSelectDate={jest.fn()} onOpenDay={jest.fn()} />);
+    const blockId = 'month-calendar.event-block.series-1:recurrence:2026-09-21';
+    const blockStyle = StyleSheet.flatten(view.getByTestId(blockId).props.style);
+
+    expect(blockStyle).toMatchObject({
+      backgroundColor: '#B3261E',
+      borderTopRightRadius: 8,
+      borderBottomRightRadius: 8,
+    });
+    expect(blockStyle.borderTopLeftRadius ?? 0).toBe(0);
+    expect(view.queryByTestId(`${blockId}.gradient`, { includeHiddenElements: true })).toBeNull();
+    expect(StyleSheet.flatten(view.getByText('10:00 通院').props.style).color).toBe(Colors.light.background);
+  });
+
+  it('今週中の予定は帯の右端に文字を置き、文字の下にもグラデーションを表示する', async () => {
+    const days = createDays();
+    const weeks = createWeeks(days).map((week) => ({
+      ...week,
+      segments: week.segments.map((item) => ({
+        ...item,
+        temporalLabel: '今週中',
+        isFuzzyRange: true,
+        alignLabelToEnd: true,
+        opacityStops: [{ offset: 0, opacity: 0 }, { offset: 1, opacity: 1 }],
+      })),
+    }));
+    const view = await render(<MonthGrid days={days} weekModels={weeks} onSelectDate={jest.fn()} onOpenDay={jest.fn()} />);
+    const labelStyle = StyleSheet.flatten(view.getByText('今週中 通院').props.style);
+
+    expect(labelStyle.textAlign).toBe('right');
+    expect(labelStyle.backgroundColor).toBeUndefined();
+    expect(view.getByTestId('month-calendar.event-block.series-1:recurrence:2026-09-21.gradient', {
+      includeHiddenElements: true,
+    })).toBeOnTheScreen();
   });
 
   it('選択日の発生回をタップすると表示keyではなく元シリーズIDを渡す', async () => {
@@ -139,9 +192,18 @@ describe('独自月カレンダー表示', () => {
         alignSelf: 'stretch',
         width: '100%',
       });
-      expect(StyleSheet.flatten(view.getByTestId(
-        'month-calendar.day-link.2026-09-21',
-      ).props.style).flex).toBe(1);
+      const dayLink = view.getByTestId('month-calendar.day-link.2026-09-08');
+      expect(StyleSheet.flatten(dayLink.props.style)).toMatchObject({
+        flex: 1, flexBasis: 0, minWidth: 0,
+      });
+      const dayButton = view.getByRole('button', { name: '2026年9月8日を開く' });
+      expect(StyleSheet.flatten(dayButton.props.style)).toMatchObject({
+        flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 2,
+      });
+      expect(StyleSheet.flatten(view.getByTestId('month-calendar.day-circle.2026-09-08').props.style))
+        .toMatchObject({ backgroundColor: Colors.light.calendarAccent, borderRadius: Radii.full });
+      expect(StyleSheet.flatten(view.getAllByTestId('month-calendar.link-preview')[0].props.style).backgroundColor)
+        .toBe(Colors.light.background);
     } finally {
       Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
     }
@@ -160,7 +222,10 @@ describe('独自月カレンダー表示', () => {
       expect(onSelectDate).not.toHaveBeenCalled();
       const link = view.getByTestId('month-calendar.day-link.2026-09-21').children[0];
       expect(typeof link).not.toBe('string');
-      if (typeof link !== 'string') expect(link.props.href).toEqual({ pathname: '/calendar/day/[date]', params: { date: '2026-09-21', request: expect.any(String) } });
+      if (typeof link !== 'string') {
+        expect(link.props.asChild).toBe(true);
+        expect(link.props.href).toEqual({ pathname: '/calendar/day/[date]', params: { date: '2026-09-21', request: expect.any(String) } });
+      }
     } finally {
       Object.defineProperty(Platform, 'OS', { configurable: true, value: platform });
     }
@@ -189,10 +254,10 @@ describe('独自月カレンダー表示', () => {
       .toMatchObject({
         width: 30,
         height: 30,
-        borderRadius: 15,
+        borderRadius: Radii.full,
         backgroundColor: Colors.light.calendarAccent,
       });
-    expect(StyleSheet.flatten(view.getByText('8').props.style).color).toBe(Colors.light.background);
+    expect(StyleSheet.flatten(view.getByText('8').props.style).color).toBe(Colors.light.calendarEventText);
   });
 
   it('相対予定を点ではなく破線の期間バーで示す', async () => {

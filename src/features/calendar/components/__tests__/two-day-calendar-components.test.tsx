@@ -1,6 +1,9 @@
-import { fireEvent, render, userEvent, waitFor, within } from '@testing-library/react-native';
-import { Animated, PixelRatio, StyleSheet } from 'react-native';
-import { Colors } from '@/constants/theme';
+import { act, fireEvent, render as renderComponent, userEvent, waitFor, within } from '@testing-library/react-native';
+import { useImperativeHandle, type ComponentProps, type ComponentRef, type ReactElement } from 'react';
+import { Animated, PanResponder, PixelRatio, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useReduceMotion } from '@/hooks/use-reduce-motion';
+import { Colors, Radii } from '@/constants/theme';
 import {
   HOUR_HEIGHT,
   MIN_EVENT_HEIGHT,
@@ -9,16 +12,28 @@ import {
   computeTimelineScale,
 } from '../../timeline-layout';
 import type { TwoDayViewModel } from '../../two-day-view-model';
+import type { SavedCalendarEvent } from '../../calendar-refresh-context';
 import { CalendarAddEventButton } from '../calendar-add-event-button';
 import { TwoDayView } from '../two-day-view';
 import { TimelineAxis } from '../timeline-axis';
 
+jest.mock('@/hooks/use-reduce-motion', () => ({ useReduceMotion: jest.fn(() => true) }));
 jest.mock('@/global.css', () => ({}));
 jest.mock('expo-linear-gradient', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
   return { LinearGradient: (props: React.ComponentProps<typeof View>) => React.createElement(View, props) };
 });
+
+const defaultPanHandlers = PanResponder.create({}).panHandlers;
+
+function axisPadding(view: Awaited<ReturnType<typeof render>>) {
+  return StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-scroll').props.contentContainerStyle).paddingTop;
+}
+
+function render(element: ReactElement) {
+  return renderComponent(element, { wrapper: GestureHandlerRootView });
+}
 
 const timelineItem = {
   id: 'event-1', eventId: 'event-1', colorId: 'red', title: '歯医者', temporalLabel: '14:30・30分',
@@ -82,27 +97,32 @@ const strip: readonly TwoDayViewModel[] = [prevBuffer, day1, day2, nextBuffer];
 const BUFFER_DAYS = 1;
 const COLUMN_WIDTH = 195;
 
-function renderTwoDayView(overrides: Partial<{
+async function renderTwoDayView(overrides: Partial<{
   strip: readonly TwoDayViewModel[];
   bufferDays: number;
   columnWidth: number;
   now: () => Date;
+  focused: boolean;
+  visibleDayCount: 1 | 2;
   onEditEvent(id: string): void;
   onCreateExactAt(date: string, startTime: string): void;
 }> = {}) {
-  return render(
+  const view = await render(
     <TwoDayView
+      visibleDayCount={overrides.visibleDayCount}
       strip={overrides.strip ?? strip}
       bufferDays={overrides.bufferDays ?? BUFFER_DAYS}
       columnWidth={overrides.columnWidth ?? COLUMN_WIDTH}
       translateX={new Animated.Value(-(overrides.bufferDays ?? BUFFER_DAYS) * (overrides.columnWidth ?? COLUMN_WIDTH))}
-      panHandlers={{}}
+      panHandlers={defaultPanHandlers}
       onCarouselLayout={jest.fn()}
       onEditEvent={overrides.onEditEvent}
       onCreateExactAt={overrides.onCreateExactAt}
       now={overrides.now}
     />,
   );
+  if (!overrides.focused) await fireEvent.press(view.getByRole('button', { name: '24時間' }));
+  return view;
 }
 
 describe('2日カレンダー表示コンポーネント', () => {
@@ -112,12 +132,83 @@ describe('2日カレンダー表示コンポーネント', () => {
     const root = view.getByTestId('two-day-calendar');
     const [first, second] = view.getAllByTestId('two-day-calendar.timeline-column').slice(1, 3);
     await fireEvent(first, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
-    await fireEvent(root, 'touchStart', { nativeEvent: { touches: [{}, {}] } });
+    await act(() => root.props.onTouchStart({ nativeEvent: { touches: [{}, {}] } }));
     await fireEvent(second, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
-    await fireEvent(root, 'touchStart', { nativeEvent: { touches: [{}] } });
+    await act(() => root.props.onTouchStart({ nativeEvent: { touches: [{}] } }));
     await fireEvent(first, 'touchEnd', { nativeEvent: { locationY: 100, touches: [] } });
     expect(onCreateExactAt).not.toHaveBeenCalled();
   });
+  it.each([1, 2, 7] as const)('%i日表示で日付を移動しても6時間の中心を現在時刻に保つ', async (visibleDayCount) => {
+    const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
+    const { ScrollView } = reactNative;
+    const scrollTo = jest.fn();
+    function ScrollProbe({ ref, ...props }: ComponentProps<typeof ScrollView>) {
+      useImperativeHandle(ref, () => ({ scrollTo } as unknown as ComponentRef<typeof ScrollView>));
+      return <ScrollView {...props} />;
+    }
+    const scrollPort = jest.spyOn(reactNative as { readonly ScrollView: unknown }, 'ScrollView', 'get')
+      .mockReturnValue(ScrollProbe);
+    const translateX = new Animated.Value(0);
+    const now = () => new Date(2026, 8, 8, 19, 0);
+    const makeView = (includesToday: boolean) => {
+      const firstDay = includesToday ? 8 : 15;
+      const visible = Array.from({ length: visibleDayCount }, (_, index) => ({
+        ...day1,
+        date: `2026-09-${String(firstDay + index).padStart(2, '0')}`,
+        isToday: includesToday && index === 0,
+        timelineItems: includesToday ? [] : [timelineItem],
+      }));
+      return <TwoDayView visibleDayCount={visibleDayCount} strip={visible} bufferDays={0}
+        columnWidth={48} translateX={translateX} panHandlers={defaultPanHandlers} now={now}
+        onCarouselLayout={jest.fn()} />;
+    };
+    try {
+      const view = await render(makeView(true));
+      expect(view.getByRole('button', { name: '6時間' })).toBeSelected();
+      expect(view.getByTestId('two-day-calendar.timeline-scroll').props.contentOffset.y).toBe(16 * 4 * HOUR_HEIGHT);
+      scrollTo.mockClear();
+      await view.rerender(makeView(false));
+      expect(scrollTo).toHaveBeenLastCalledWith({ y: 16 * 4 * HOUR_HEIGHT, animated: false });
+    } finally {
+      scrollPort.mockRestore();
+    }
+  });
+
+  it('表示中の日に予定を保存すると、その時刻へスクロールして対象だけを強調する', async () => {
+    const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
+    const { ScrollView } = reactNative;
+    const scrollTo = jest.fn();
+    function ScrollProbe({ ref, ...props }: ComponentProps<typeof ScrollView>) {
+      useImperativeHandle(ref, () => ({ scrollTo } as unknown as ComponentRef<typeof ScrollView>));
+      return <ScrollView {...props} />;
+    }
+    const scrollPort = jest.spyOn(reactNative as { readonly ScrollView: unknown }, 'ScrollView', 'get')
+      .mockReturnValue(ScrollProbe);
+    const earlier = { ...timelineItem, id: 'earlier', eventId: 'earlier', startMinute: 9 * 60, top: 9 * HOUR_HEIGHT };
+    const day = { ...day1, isToday: false, timelineItems: [earlier, timelineItem] };
+    const translateX = new Animated.Value(-390);
+    const now = () => new Date(2026, 8, 9, 1);
+    const makeView = (savedEvent: SavedCalendarEvent | null) => (
+      <TwoDayView visibleDayCount={1} strip={[prevBuffer, day, nextBuffer]}
+        bufferDays={1} columnWidth={390} translateX={translateX} panHandlers={defaultPanHandlers}
+        now={now} onCarouselLayout={jest.fn()} savedEvent={savedEvent} />
+    );
+    try {
+      const view = await render(makeView(null));
+      scrollTo.mockClear();
+      await view.rerender(makeView({ id: 'event-1', date: day1.date, revision: 1 }));
+      expect(scrollTo).toHaveBeenCalledWith({ y: 14.5 * HOUR_HEIGHT * 4 - TIMELINE_HEIGHT * 0.2, animated: false });
+      expect(view.getByTestId('timeline-event.event-1.saved')).toBeOnTheScreen();
+      expect(view.queryByTestId('timeline-event.earlier.saved')).toBeNull();
+      scrollTo.mockClear();
+      await view.rerender(makeView(null));
+      expect(view.queryByTestId('timeline-event.event-1.saved')).toBeNull();
+      expect(scrollTo).not.toHaveBeenCalled();
+    } finally {
+      scrollPort.mockRestore();
+    }
+  });
+
   it('ダブルタップの途中に複数指操作が挟まっても予定を追加しない', async () => {
     const onCreateExactAt = jest.fn();
     const view = await renderTwoDayView({ onCreateExactAt });
@@ -136,7 +227,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const weekStrip = Array.from({ length: 21 }, (_, index) => ({ ...day1, date: `2026-09-${String(index + 1).padStart(2, '0')}`,
       timelineItems: [timelineItem, { ...timelineItem, id: 'second' }], allDayItems: [] }));
     const view = await render(<TwoDayView visibleDayCount={7} strip={weekStrip} selectedDate="2026-09-08" bufferDays={7}
-      columnWidth={342 / 7} translateX={new Animated.Value(-342)} panHandlers={{}} onCarouselLayout={jest.fn()} onOpenDay={onOpenDay} />);
+      columnWidth={342 / 7} translateX={new Animated.Value(-342)} panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()} onOpenDay={onOpenDay} />);
     expect(view.getByTestId('week-calendar')).toBeOnTheScreen();
     expect(view.getAllByText('他1件')).toHaveLength(7);
     await userEvent.setup().press(within(view.getByTestId('week-day-header.2026-09-08')).getByRole('button'));
@@ -145,26 +236,99 @@ describe('2日カレンダー表示コンポーネント', () => {
   });
   it('1日表示は予備列を含む3列で当日の件数と日付を表示する', async () => {
     const view = await render(<TwoDayView visibleDayCount={1} strip={[prevBuffer, { ...day1, allDayItems: [allDayItem] }, day2]}
-      bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={{}} onCarouselLayout={jest.fn()} />);
+      bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()} />);
     expect(view.getByTestId('single-day-calendar')).toBeOnTheScreen();
     expect(view.getByText('9月8日（火）')).toBeOnTheScreen();
-    expect(view.getByText('終日欄 1件')).toBeOnTheScreen();
+    expect(view.getByText('休暇')).toHaveStyle({ fontWeight: '700' });
     expect(view.queryByText('9月7日（月）')).toBeNull();
   });
-  it('1日の多数終日予定は高さを制限して全件をスクロールでき発生回を編集する', async () => {
+  it.each([1, 2, 7] as const)('%i日表示で3件ある日は1件と「ほか2件」を出し、発生回を開く', async (visibleDayCount) => {
     const onEditEvent = jest.fn();
-    const items = Array.from({ length: 12 }, (_, index) => ({ ...allDayItem, id: `series:${index}`, eventId: 'series',
-      originalOccurrenceDate: '2026-09-08', title: `予定${index}`, accessibilityLabel: `予定${index}、終日` }));
-    const view = await render(<TwoDayView visibleDayCount={1} strip={[prevBuffer, { ...day1, allDayItems: items }, day2]}
-      bufferDays={1} columnWidth={390} translateX={new Animated.Value(-390)} panHandlers={{}} onCarouselLayout={jest.fn()} onEditEvent={onEditEvent} />);
-    await fireEvent(view.getByTestId('single-day-calendar'), 'layout', { nativeEvent: { layout: { width: 390, height: 420 } } });
-    expect(StyleSheet.flatten(view.getByTestId('single-day.all-day.2026-09-08').props.style).height).toBeLessThanOrEqual(140);
-    const region = within(view.getByTestId('single-day.all-day.2026-09-08'));
-    expect(region.getAllByRole('button')).toHaveLength(12);
-    await userEvent.setup().press(region.getByRole('button', { name: '予定11、終日' }));
-    expect(onEditEvent).toHaveBeenCalledWith('series', '2026-09-08');
+    const items = Array.from({ length: 3 }, (_, index) => ({ ...allDayItem, id: `series:${index}`, eventId: 'series',
+      originalOccurrenceDate: '2026-09-06', title: `予定${index}`, accessibilityLabel: `予定${index}、終日` }));
+    const view = await render(<TwoDayView visibleDayCount={visibleDayCount} strip={[{ ...day1, allDayItems: items }, day2]}
+      bufferDays={0} columnWidth={visibleDayCount === 7 ? 46 : 170} translateX={new Animated.Value(0)} panHandlers={defaultPanHandlers}
+      onCarouselLayout={jest.fn()} onEditEvent={onEditEvent} />);
+    expect(view.getAllByText(/^予定[0-2]$/)).toHaveLength(1);
+    expect(view.queryByText('予定2')).toBeNull();
+    await userEvent.setup().press(view.getByRole('button', { name: /9月8日.*ほか2件/ }));
+    const sheet = within(view.getByTestId('all-day-list.panel'));
+    expect(sheet.getByRole('header', { name: '9月8日の終日予定' })).toBeOnTheScreen();
+    expect(sheet.getAllByText(/^予定[0-2]$/)).toHaveLength(3);
+    await userEvent.setup().press(sheet.getByRole('button', { name: '予定2、終日' }));
+    expect(onEditEvent).toHaveBeenCalledWith('series', '2026-09-06');
+    expect(view.queryByTestId('all-day-list.panel')).toBeNull();
   });
-  it('予備列を含む全列を横並びで描画し、共通24時間軸・予定・空状態・祝日未対応を示す', async () => {
+  it.each([1, 2, 7] as const)('%i日表示の終日欄は移動後に2行へ広がり、戻ると1行に縮む', async (visibleDayCount) => {
+    jest.mocked(useReduceMotion).mockReturnValue(false);
+    const timing = jest.spyOn(Animated, 'timing');
+    try {
+      const translateX = new Animated.Value(0);
+      const busyDay = { ...day2, allDayItems: Array.from({ length: 5 }, (_, index) =>
+        ({ ...allDayItem, id: `event-${index}` })) };
+      const createCalendar = (withItems: boolean) => <TwoDayView visibleDayCount={visibleDayCount}
+        strip={withItems ? [busyDay, day1] : [day1, day2]} bufferDays={0} columnWidth={100} translateX={translateX}
+        panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()} />;
+      const view = await render(createCalendar(false));
+      const height = () => StyleSheet.flatten(view.getByTestId('two-day-calendar.summary').props.style).height;
+      const rowHeight = StyleSheet.flatten(view.getAllByTestId('two-day-calendar.all-day-region')[0].props.style).height / 2;
+      const before = height();
+      await act(() => translateX.setValue(-50));
+      expect(height()).toBe(before);
+
+      timing.mockClear();
+      await view.rerender(createCalendar(true));
+      expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ toValue: rowHeight * 2, duration: 220 }));
+      await waitFor(() => expect(height()).toBe(before + rowHeight));
+      await view.rerender(createCalendar(false));
+      expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ toValue: rowHeight, duration: 220 }));
+      await waitFor(() => expect(height()).toBe(before));
+    } finally {
+      timing.mockRestore();
+      jest.mocked(useReduceMotion).mockReturnValue(true);
+    }
+  });
+  it.each([1, 2] as const)('%i日表示は周辺6時間を初期表示し、全体と500msで切り替える', async (visibleDayCount) => {
+    jest.mocked(useReduceMotion).mockReturnValue(false);
+    const timing = jest.spyOn(Animated, 'timing');
+    try {
+      const view = await renderTwoDayView({ focused: true, visibleDayCount, now: () => new Date(2026, 8, 8, 10, 0) });
+      const scroll = view.getByTestId('two-day-calendar.timeline-scroll');
+      const axis = view.getByTestId('two-day-calendar.timeline-axis');
+      expect(view.getByRole('button', { name: '6時間' })).toBeSelected();
+      expect(scroll.props.contentOffset.y).toBeCloseTo(7 * 4 * HOUR_HEIGHT);
+      expect(StyleSheet.flatten(axis.props.style).height).toBe(TIMELINE_HEIGHT * 4);
+
+      await fireEvent.press(view.getByRole('button', { name: '24時間' }));
+      expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ duration: 500 }));
+      await waitFor(() => expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-axis').props.style).height)
+        .toBe(TIMELINE_HEIGHT), { timeout: 1500 });
+      await fireEvent.press(view.getByRole('button', { name: '6時間' }));
+      expect(timing).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ duration: 500, toValue: 4 }));
+      await waitFor(() => expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-axis').props.style).height)
+        .toBe(TIMELINE_HEIGHT * 4), { timeout: 1500 });
+    } finally {
+      timing.mockRestore();
+      jest.mocked(useReduceMotion).mockReturnValue(true);
+    }
+  });
+  it('未選択の表示倍率も本文色で読め、押して選択状態を切り替えられる', async () => {
+    const view = await renderTwoDayView({ focused: true });
+    expect(view.getByRole('button', { name: '6時間' })).toBeSelected();
+    expect(view.getByRole('button', { name: '24時間' })).toBeEnabled();
+    expect(StyleSheet.flatten(view.getByText('24時間').props.style).color).toBe(Colors.light.text);
+    await fireEvent.press(view.getByRole('button', { name: '24時間' }));
+    expect(view.getByRole('button', { name: '24時間' })).toBeSelected();
+    expect(view.getByRole('button', { name: '6時間' })).toBeEnabled();
+  });
+
+  it.each([[2, 59, 0], [3, 30, 0.5], [23, 59, 18]])('現在時刻が%i時%i分なら6時間枠を%i時から表示する', async (hour, minute, startHour) => {
+    const view = await renderTwoDayView({ focused: true, now: () => new Date(2026, 8, 8, hour, minute) });
+    expect(view.getByTestId('two-day-calendar.timeline-scroll').props.contentOffset.y)
+      .toBeCloseTo(startHour * 4 * HOUR_HEIGHT);
+  });
+
+  it('予備列を含む全列を横並びで描画し、共通24時間軸・終日見出し・予定・祝日未対応を示す', async () => {
     const view = await renderTwoDayView({
       now: () => new Date(2026, 8, 8, 10, 0),
     });
@@ -180,8 +344,8 @@ describe('2日カレンダー表示コンポーネント', () => {
     // 現在時刻と重なる定時ラベルは、現在時刻を読みやすくするため非表示になる。
     expect(view.getAllByTestId('two-day-calendar.hour-label')).toHaveLength(24);
     expect(view.getByLabelText('歯医者、14:30・30分')).toBeOnTheScreen();
-    // 予備列(前日・翌々日)もday2と同じく予定なしのため、3列分表示される。
-    expect(view.getAllByText('予定はありません')).toHaveLength(3);
+    expect(view.getByTestId('two-day-calendar.all-day-caption')).toHaveTextContent('終日');
+    expect(view.queryByText('予定はありません')).toBeNull();
     expect(view.getByText('祝日情報未対応')).toBeOnTheScreen();
   });
 
@@ -195,7 +359,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.today-circle').props.style)).toMatchObject({
       width: 34,
       height: 34,
-      borderRadius: 17,
+      borderRadius: Radii.full,
     });
   });
 
@@ -289,25 +453,32 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(holiday.props.accessibilityRole).toBe('text');
     expect(view.queryByRole('button', { name: 'テスト記念日、祝日' })).toBeNull();
     expect(view.getByRole('button', { name: '休暇、終日' })).toBeOnTheScreen();
-    expect(StyleSheet.flatten(holiday.props.style)).toMatchObject({
-      backgroundColor: Colors.light.calendarHolidayBackground,
-      borderLeftColor: Colors.light.calendarHoliday,
-    });
+    const holidayStyle = StyleSheet.flatten(holiday.props.style);
+    expect(holidayStyle.backgroundColor).toBe(Colors.light.backgroundElement);
+    expect(holidayStyle.borderLeftWidth).toBeFalsy();
+    expect(StyleSheet.flatten(view.getByText('テスト記念日').props.style).color).toBe(Colors.light.calendarHoliday);
+    expect(view.queryByTestId('two-day-calendar.all-day-segment.holiday:2026-09-08.gradient', {
+      includeHiddenElements: true,
+    })).toBeNull();
+    const allDayStyle = StyleSheet.flatten(view.getByRole('button', { name: '休暇、終日' }).props.style);
+    expect(allDayStyle).toMatchObject({ backgroundColor: '#185ABC', borderRadius: 8 });
+    expect(view.queryByTestId('two-day-calendar.all-day-segment.all-day-event.gradient', {
+      includeHiddenElements: true,
+    })).toBeNull();
     const headers = view.getAllByTestId('two-day-calendar.date-header');
     expect(new Set(headers.map((header) => StyleSheet.flatten(header.props.style).minHeight)).size).toBe(1);
     const allDayRegions = view.getAllByTestId('two-day-calendar.all-day-region');
     expect(allDayRegions).toHaveLength(4);
     allDayRegions.forEach((region) => {
       expect(StyleSheet.flatten(region.props.style)).toMatchObject({
-        flex: 1,
-        minHeight: 30,
+        flexShrink: 0,
         borderBottomWidth: StyleSheet.hairlineWidth,
       });
     });
     expect(onEditEvent).not.toHaveBeenCalled();
   });
 
-  it('終日項目は2件まで表示し、残り件数を見た目と読み上げの両方で示す', async () => {
+  it('2行目の一覧ボタンは省略した4件を示す', async () => {
     const extraItems = ['event-2', 'event-3', 'event-4'].map((id, index) => ({
       ...allDayItem,
       id,
@@ -323,10 +494,8 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
 
     expect(view.getByLabelText('テスト記念日、祝日')).toBeOnTheScreen();
-    expect(view.getByLabelText('休暇、終日')).toBeOnTheScreen();
-    expect(view.queryByLabelText('終日予定2、終日')).toBeNull();
-    expect(view.getByText('他3件')).toBeOnTheScreen();
-    expect(view.getByLabelText('終日項目5件、他3件')).toBeOnTheScreen();
+    expect(view.queryByLabelText('休暇、終日')).toBeNull();
+    expect(view.getByText('ほか4件')).toBeOnTheScreen();
   });
 
   it('タイムラインの空き領域をダブルタップすると最も近い正時で予定を作成する', async () => {
@@ -346,7 +515,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const translateX = new Animated.Value(-195);
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH} translateX={translateX}
-        panHandlers={{}} onCarouselLayout={jest.fn()} />,
+        panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()} />,
     );
 
     const stripStyle = StyleSheet.flatten(view.getByTestId('two-day-calendar.summary-strip').props.style);
@@ -354,11 +523,29 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(stripStyle.transform[0].translateX).toBeDefined();
   });
 
+  it('週の7列と前後週の予備列を時間軸と見出しで同じ実測幅にそろえる', async () => {
+    const week = Array.from({ length: 21 }, (_, index) => ({
+      ...day1, date: `2026-09-${String(index + 1).padStart(2, '0')}`,
+    }));
+    const columnWidth = 382 / 7;
+    const view = await render(<TwoDayView visibleDayCount={7} strip={week} bufferDays={7}
+      columnWidth={columnWidth} translateX={new Animated.Value(-382)} panHandlers={defaultPanHandlers}
+      onCarouselLayout={jest.fn()} />);
+    const headings = view.getAllByTestId(/^week-day-header\./);
+    const columns = view.getAllByTestId('two-day-calendar.timeline-column');
+    expect(headings).toHaveLength(7);
+    expect(columns).toHaveLength(7);
+    for (const column of [...headings, ...columns]) {
+      expect(StyleSheet.flatten(column.props.style).width).toBe(columnWidth);
+    }
+    expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-strip').props.style).width).toBe(1146);
+  });
+
   it('時間軸(48pt)を除いた、実際に日付列が占める幅をカルーセルへ通知する', async () => {
     const onCarouselLayout = jest.fn();
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH}
-        translateX={new Animated.Value(-195)} panHandlers={{}} onCarouselLayout={onCarouselLayout}
+        translateX={new Animated.Value(-195)} panHandlers={defaultPanHandlers} onCarouselLayout={onCarouselLayout}
         />,
     );
 
@@ -373,7 +560,7 @@ describe('2日カレンダー表示コンポーネント', () => {
   });
 
   it('画面のどこからでも横スワイプを受け付けられるよう、受付領域全体へpanHandlersを適用する', async () => {
-    const panHandlers = { onStartShouldSetResponder: () => true };
+    const panHandlers = { ...defaultPanHandlers, onStartShouldSetResponder: () => true };
     const view = await render(
       <TwoDayView strip={strip} bufferDays={BUFFER_DAYS} columnWidth={COLUMN_WIDTH}
         translateX={new Animated.Value(-195)} panHandlers={panHandlers} onCarouselLayout={jest.fn()}
@@ -383,7 +570,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getByTestId('two-day-calendar').props.onStartShouldSetResponder).toBeDefined();
   });
 
-  it('位置・重複幅と4種類のグラデーションstopを描画へ渡す', async () => {
+  it('位置と重複幅を描画へ渡し、濃淡がある予定帯だけフェードする', async () => {
     const opacityPatterns = [
       [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }],
       [{ offset: 0, opacity: 0 }, { offset: 0.25, opacity: 1 }, { offset: 1, opacity: 1 }],
@@ -407,17 +594,33 @@ describe('2日カレンダー表示コンポーネント', () => {
     gradientItems.forEach((item) => {
       const blockStyle = StyleSheet.flatten(view.getByTestId(`timeline-event.${item.id}`).props.style);
       expect(blockStyle).toMatchObject({ top: item.top, height: item.height, width: '50%' });
-      const gradient = view.getByTestId(`timeline-event.${item.id}.gradient`, { includeHiddenElements: true });
-      expect(gradient.props.locations).toEqual(item.opacityStops.map((stop) => stop.offset));
-      expect(gradient.props.colors).toHaveLength(item.opacityStops.length);
+      const gradient = view.queryByTestId(`timeline-event.${item.id}.gradient`, { includeHiddenElements: true });
+      if (item.id === 'gradient-0') {
+        expect(gradient).toBeNull();
+      } else {
+        expect(gradient?.props.locations).toEqual(item.opacityStops.map((stop) => stop.offset));
+        expect(gradient?.props.colors).toHaveLength(item.opacityStops.length);
+      }
     });
+  });
+
+  it('フェードする予定には淡い色の下地を置き、両端の透明度は維持する', async () => {
+    const fades = [{ offset: 0, opacity: 0 }, { offset: 0.5, opacity: 1 }, { offset: 1, opacity: 0 }];
+    const view = await renderTwoDayView({
+      strip: [prevBuffer, { ...day1, timelineItems: [{ ...timelineItem, opacityStops: fades }] }, day2, nextBuffer],
+    });
+    const cardStyle = StyleSheet.flatten(view.getByTestId('timeline-event.event-1.card').props.style);
+    expect(cardStyle.backgroundColor).toMatch(/^rgba\(\d+, \d+, \d+, 0\.08\)$/);
+    const gradient = view.getByTestId('timeline-event.event-1.gradient', { includeHiddenElements: true });
+    expect(gradient.props.colors[0]).toMatch(/, 0\)$/);
+    expect(gradient.props.colors[2]).toMatch(/, 0\)$/);
   });
 
   it('予定テキストを不透明度が最も濃い部分へ寄せて配置する', async () => {
     const anchorPatterns = [
       { opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 0 }], expected: 'flex-start' },
       { opacityStops: [{ offset: 0, opacity: 0 }, { offset: 1, opacity: 1 }], expected: 'flex-end' },
-      { opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }], expected: 'center' },
+      { opacityStops: [{ offset: 0, opacity: 1 }, { offset: 1, opacity: 1 }], expected: 'flex-start' },
     ] as const;
     const items = anchorPatterns.map(({ opacityStops }, index) => ({
       ...timelineItem,
@@ -436,7 +639,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const view = await renderTwoDayView();
 
     await fireEvent(view.getByTestId('two-day-calendar.timeline'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: TIMELINE_HEIGHT / 2 } },
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: TIMELINE_HEIGHT / 2 + 2 * axisPadding(view) } },
     });
 
     expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-axis').props.style))
@@ -455,7 +658,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const view = await renderTwoDayView();
     const timeline = view.getByTestId('two-day-calendar.timeline');
     await fireEvent(timeline, 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: TIMELINE_HEIGHT / 2 } },
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: TIMELINE_HEIGHT / 2 + 2 * axisPadding(view) } },
     });
 
     expect(view.getByTestId('two-day-calendar.timeline-scroll').props.scrollEnabled).toBe(false);
@@ -482,21 +685,21 @@ describe('2日カレンダー表示コンポーネント', () => {
     const onCreateExactAt = jest.fn();
     const view = await renderTwoDayView({ onEditEvent, onCreateExactAt });
     await fireEvent(view.getByTestId('two-day-calendar.timeline'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: TIMELINE_HEIGHT / 2 } },
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: TIMELINE_HEIGHT / 2 + 2 * axisPadding(view) } },
     });
     await fireEvent(view.getByTestId('two-day-calendar.timeline-zoom'), 'accessibilityAction', {
       nativeEvent: { actionName: 'increment' },
     });
     await waitFor(() => {
       expect(StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-axis').props.style).height)
-        .toBeCloseTo(TIMELINE_HEIGHT * 0.6);
+        .toBeCloseTo(TIMELINE_HEIGHT * 2);
     });
 
     await fireEvent.press(view.getByLabelText('歯医者、14:30・30分'));
     const now = jest.spyOn(Date, 'now').mockReturnValueOnce(1_000).mockReturnValue(1_200);
     const column = view.getAllByTestId('two-day-calendar.timeline-column')[1];
-    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: HOUR_HEIGHT * 0.6 * 10 } });
-    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: HOUR_HEIGHT * 0.6 * 10 } });
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: HOUR_HEIGHT * 2 * 10 } });
+    await fireEvent(column, 'touchEnd', { nativeEvent: { locationY: HOUR_HEIGHT * 2 * 10 } });
 
     expect(onEditEvent).toHaveBeenCalledWith('event-1');
     expect(onCreateExactAt).toHaveBeenCalledWith('2026-09-08', '10:00');
@@ -526,13 +729,17 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(style.top + style.height).toBeLessThanOrEqual(TIMELINE_HEIGHT);
   });
 
-  it('24:00のラベルは軸の下端からはみ出さないよう、行の高さ分だけ上げて配置する', async () => {
-    const view = await renderTwoDayView();
-
-    // 行の高さ(13)分だけ上げて下端(TIMELINE_HEIGHT)に揃え、はみ出さないようにする。
-    expect(StyleSheet.flatten(view.getByText('24:00').props.style)).toMatchObject({
-      top: TIMELINE_HEIGHT - 13,
-    });
+  it('0時・中間・24時のラベルを罫線の中心に合わせ、端にも余白を設ける', async () => {
+    const view = await renderTwoDayView({ now: () => new Date(2026, 8, 8, 10, 30) });
+    const lines = view.getAllByTestId('two-day-calendar.hour-line').slice(0, 25);
+    const scroll = StyleSheet.flatten(view.getByTestId('two-day-calendar.timeline-scroll').props.contentContainerStyle);
+    for (const hour of [0, 12, 24]) {
+      const line = StyleSheet.flatten(lines[hour].props.style);
+      const label = StyleSheet.flatten(view.getByText(`${hour}:00`).props.style);
+      expect(label.top + label.lineHeight / 2).toBeCloseTo(line.top + line.height / 2);
+      expect(label.top + scroll.paddingTop).toBeGreaterThanOrEqual(0);
+      expect(label.top + label.lineHeight + scroll.paddingTop).toBeLessThanOrEqual(scroll.height);
+    }
   });
 
   it('罫線はすべて同じ太さにし、1時間ごとに物理ピクセルへ吸着した位置へ配置する', async () => {
@@ -540,7 +747,7 @@ describe('2日カレンダー表示コンポーネント', () => {
 
     // 1時間 = 21.5pt となり、ptのままでは1本おきに半ピクセル境界へ落ちる高さ。
     await fireEvent(view.getByTestId('two-day-calendar.timeline'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 516 } },
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 516 + 2 * axisPadding(view) } },
     });
     const scale = computeTimelineScale(516);
 
@@ -557,7 +764,7 @@ describe('2日カレンダー表示コンポーネント', () => {
     const view = await renderTwoDayView();
 
     await fireEvent(view.getByTestId('two-day-calendar.timeline'), 'layout', {
-      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 516 } },
+      nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 516 + 2 * axisPadding(view) } },
     });
     const columnHeight = TIMELINE_HEIGHT * computeTimelineScale(516);
 
@@ -587,12 +794,27 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getAllByTestId('two-day-calendar.hour-line')[0].props.pointerEvents).toBe('none');
   });
 
-  it('固定色を時間軸予定のグラデーションへ反映する', async () => {
+  it('薄い区間にある複数日予定の文字を通常の本文色で背景を覆わずに表示する', async () => {
+    const fuzzy = { ...allDayItem, kind: 'fuzzyRange' as const, rangePosition: 'start' as const,
+      rangeStartDate: day1.date, rangeThroughDate: '2026-09-15', fadeInRatio: 1, fadeOutRatio: 0 };
+    const view = await renderTwoDayView({ strip: [prevBuffer, { ...day1, allDayItems: [fuzzy] }, day2, nextBuffer] });
+    const label = StyleSheet.flatten(view.getByText('休暇').props.style);
+    expect(label.backgroundColor ?? 'transparent').toBe('transparent');
+    expect(label.color).toBe(Colors.light.text);
+    expect(label.textShadowColor).toBeUndefined();
+    const gradient = view.getByTestId('two-day-calendar.fuzzy-range.all-day-event.gradient', {
+      includeHiddenElements: true,
+    });
+    expect(gradient.props.locations).toEqual([0, 1]);
+    expect(gradient.props.colors).toEqual(['#185ABC00', '#185ABC20']);
+  });
+
+  it('不透明な時刻予定を指定色の単色で塗る', async () => {
     const view = await renderTwoDayView();
-    expect(view.getByTestId('timeline-event.event-1.gradient', { includeHiddenElements: true }).props.colors).toContain(
-      'rgba(179, 38, 30, 1)',
-    );
-    expect(StyleSheet.flatten(view.getByText('歯医者').props.style).backgroundColor).toBe('#B3261E');
+    const cardStyle = StyleSheet.flatten(view.getByTestId('timeline-event.event-1.card').props.style);
+    expect(cardStyle.backgroundColor).toBe('#B3261E');
+    expect(view.queryByTestId('timeline-event.event-1.gradient', { includeHiddenElements: true })).toBeNull();
+    expect(StyleSheet.flatten(view.getByText('歯医者').props.style).backgroundColor ?? 'transparent').toBe('transparent');
   });
 
   it('補助時刻を倍率に合わせてフェードし、現在時刻と重なる定時を隠す', async () => {
@@ -603,14 +825,14 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(view.getAllByText('14:00')).toHaveLength(1);
   });
 
-  it('表示中の2日に今日を含む列にだけ現在時刻の赤線を引き、時間軸に現在時刻を表示する', async () => {
+  it('時間軸に現在時刻を表示し、日付列全体に1本の赤線を引く', async () => {
     const view = await renderTwoDayView({ now: () => new Date(2026, 8, 8, 14, 30) });
 
     expect(view.getByText('14:30')).toBeOnTheScreen();
     const nowLines = view.getAllByTestId('two-day-calendar.now-line');
     expect(nowLines).toHaveLength(1);
     expect(view.getAllByTestId('two-day-calendar.now-dot')).toHaveLength(1);
-    expect(StyleSheet.flatten(nowLines[0].props.style)).toMatchObject({ top: 870 * (HOUR_HEIGHT / 60) });
+    expect(StyleSheet.flatten(nowLines[0].props.style)).toMatchObject({ top: 870 * (HOUR_HEIGHT / 60), left: 0, right: 0 });
   });
 
   it('23時台後半でも現在時刻線が下端で切れないよう、線の太さ分だけ内側へ収める', async () => {
@@ -620,20 +842,26 @@ describe('2日カレンダー表示コンポーネント', () => {
     expect(style.top + style.height).toBeLessThanOrEqual(TIMELINE_HEIGHT);
   });
 
-  it('表示中の2日がどちらも今日でなければ現在時刻を表示しない', async () => {
-    const notToday = [prevBuffer, { ...day1, isToday: false }, day2, nextBuffer];
-    const view = await renderTwoDayView({ strip: notToday, now: () => new Date(2026, 8, 8, 14, 30) });
-
-    expect(view.queryByText('14:30')).toBeNull();
-    expect(view.queryByTestId('two-day-calendar.now-line')).toBeNull();
+  it.each([1, 2, 7] as const)('%i日表示で今日を含まなくても、現在時刻と赤線を表示する', async (visibleDayCount) => {
+    const notToday = strip.map((day) => ({ ...day, isToday: false }));
+    const view = await render(<TwoDayView strip={notToday} bufferDays={1} visibleDayCount={visibleDayCount}
+      columnWidth={COLUMN_WIDTH} translateX={new Animated.Value(-COLUMN_WIDTH)}
+      panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()} now={() => new Date(2026, 8, 8, 14, 30)} />);
+    expect(view.getByLabelText('現在時刻14:30')).toBeOnTheScreen();
+    expect(view.getByTestId('two-day-calendar.now-line').props.pointerEvents).toBe('none');
   });
 
-  it('予備列が今日でも、表示中の2日でなければ時間軸のラベルは表示しないが、その列自体の線は表示する', async () => {
+  it('横移動中に今日が画面外へ出ても、現在時刻と赤線がその位置に残る', async () => {
     const bufferIsToday = [{ ...prevBuffer, isToday: true }, { ...day1, isToday: false }, day2, nextBuffer];
-    const view = await renderTwoDayView({ strip: bufferIsToday, now: () => new Date(2026, 8, 8, 14, 30) });
-
-    expect(view.queryByText('14:30')).toBeNull();
-    expect(view.getAllByTestId('two-day-calendar.now-line')).toHaveLength(1);
+    const translateX = new Animated.Value(0);
+    const view = await render(<TwoDayView strip={bufferIsToday} bufferDays={1} columnWidth={COLUMN_WIDTH}
+      translateX={translateX} panHandlers={defaultPanHandlers} onCarouselLayout={jest.fn()}
+      now={() => new Date(2026, 8, 8, 14, 30)} />);
+    const label = () => StyleSheet.flatten(view.getByTestId('two-day-calendar.now-label').props.style);
+    const line = () => StyleSheet.flatten(view.getByTestId('two-day-calendar.now-line').props.style);
+    const before = { label: label(), line: line() };
+    await act(() => translateX.setValue(-COLUMN_WIDTH));
+    expect({ label: label(), line: line() }).toEqual(before);
   });
 
   it('予定ブロックに枠線を描画しない', async () => {
@@ -647,10 +875,11 @@ describe('2日カレンダー表示コンポーネント', () => {
     const view = await renderTwoDayView();
 
     expect(StyleSheet.flatten(view.getByTestId('timeline-event.event-1.card').props.style)).toMatchObject({
-      borderRadius: 3,
+      borderRadius: 8,
       overflow: 'hidden',
     });
     expect(StyleSheet.flatten(view.getByText('歯医者').props.style)).toMatchObject({
+      fontWeight: '700',
       color: Colors.light.background,
     });
     expect(StyleSheet.flatten(view.getByText('14:30・30分').props.style)).toMatchObject({
@@ -674,16 +903,12 @@ describe('2日カレンダー表示コンポーネント', () => {
     });
   });
 
-  it('FABを56ptの軽いshadow付き円形ボタンとして表示する', async () => {
+  it('予定追加をインラインのラベル付きボタンとして表示する', async () => {
     const view = await render(<CalendarAddEventButton onPress={jest.fn()} />);
-    expect(StyleSheet.flatten(view.getByRole('button', { name: '予定を追加' }).props.style)).toMatchObject({
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      right: 18,
-      bottom: 18,
-      elevation: 3,
-    });
+    const button = view.getByRole('button', { name: '予定を追加' });
+    expect(button).toHaveTextContent('予定を追加');
+    expect(StyleSheet.flatten(button.props.style)).toMatchObject({ minHeight: 44 });
+    expect(StyleSheet.flatten(button.props.style).position).toBeUndefined();
   });
 
   it('2日ビュー上部には予定追加ボタンを表示しない', async () => {

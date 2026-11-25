@@ -53,7 +53,7 @@ describe('予定作成ルート', () => {
     const repositories = {
       calendars: { getDefault: jest.fn() },
       events: { create: jest.fn() },
-      settings: { getLastEventEditorTab: jest.fn() },
+      settings: {},
       temporalDefinitions: { listEditable: jest.fn(), previewUpdate: jest.fn(), updateDefinition: jest.fn(), listEnabled: jest.fn() },
     };
     const back = jest.fn();
@@ -65,7 +65,7 @@ describe('予定作成ルート', () => {
       .mocked(useRepositories)
       .mockReturnValue(repositories as unknown as ReturnType<typeof useRepositories>);
     jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged });
-    jest.mocked(useEventEditor).mockReturnValue({ save } as unknown as EventEditorState);
+    jest.mocked(useEventEditor).mockReturnValue({ save, getSavedEventLocation: () => ({ id: 'added-event', date: '2026-09-22' }) } as unknown as EventEditorState);
 
     await render(<NewEventRoute />);
 
@@ -81,11 +81,11 @@ describe('予定作成ルート', () => {
       }),
     });
     await user.press(screen.getByRole('button', { name: '保存' }));
-    expect(notifyChanged).toHaveBeenCalledTimes(1);
+    expect(notifyChanged).toHaveBeenCalledWith({ id: 'added-event', date: '2026-09-22' });
     expect(back).toHaveBeenCalledTimes(1);
   });
 
-  it('時刻枠からの明示的なexact作成を保存済みタブより優先する', async () => {
+  it('時刻枠で指定した時刻をきっちり側の入力に渡す', async () => {
     const repositories = {
       calendars: {},
       events: {},
@@ -112,12 +112,11 @@ describe('予定作成ルート', () => {
 
     expect(useEventEditor).toHaveBeenCalledWith(expect.objectContaining({
       settings: repositories.settings,
-      initial: expect.objectContaining({ temporalType: 'exact' }),
-      initialTab: 'exact',
+      initial: expect.objectContaining({ temporalType: 'exact', startTime: '14:00' }),
     }));
   });
 
-  it('明示された終日作成はきっちりタブを開く', async () => {
+  it('終日指定はきっちり側の入力として渡す', async () => {
     const repositories = { calendars: {}, events: {}, settings: {}, temporalDefinitions: {} };
     jest.mocked(useLocalSearchParams).mockReturnValue({ date: '2026-09-21', temporalType: 'allDay' });
     jest.mocked(useRouter).mockReturnValue({ back: jest.fn() } as unknown as ReturnType<typeof useRouter>);
@@ -129,7 +128,6 @@ describe('予定作成ルート', () => {
 
     expect(useEventEditor).toHaveBeenCalledWith(expect.objectContaining({
       initial: expect.objectContaining({ temporalType: 'allDay' }),
-      initialTab: 'exact',
     }));
   });
 

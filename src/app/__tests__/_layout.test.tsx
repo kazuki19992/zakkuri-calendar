@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
+import { preventAutoHideAsync } from 'expo-splash-screen';
 
 import RootLayout from '../_layout';
 import * as rootLayout from '../_layout';
-import { getMockConfig } from 'expo-router/build/testing-library/mock-config';
-import { getStateFromPath } from 'expo-router/build/fork/getStateFromPath';
+import { renderRouter, testRouter } from 'expo-router/testing-library';
 
 jest.mock('@/features/notifications/notification-context', () => {
   const React = jest.requireActual<typeof import('react')>('react');
@@ -47,18 +47,16 @@ jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn(),
 }));
 
-jest.mock('@/components/animated-icon', () => {
-  const React = jest.requireActual<typeof import('react')>('react');
-  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
-  return {
-    AnimatedSplashOverlay: () => React.createElement(View, { testID: 'animated-splash-overlay' }),
-  };
-});
-
 jest.mock('@/data/sqlite/app-database-provider', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  const useRepositories = () => ({
+    calendars: { getDefault: jest.fn().mockResolvedValue({ colorId: 'blue' }) },
+    settings: { getPrimaryCalendarColor: jest.fn().mockResolvedValue(null) },
+  });
+  const repositories = useRepositories();
   return {
+    useRepositories: () => repositories,
     AppDatabaseProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement(View, { testID: 'database-provider' }, children),
   };
@@ -74,37 +72,45 @@ jest.mock('@/features/calendar/calendar-refresh-context', () => {
 });
 
 describe('ルートレイアウト', () => {
-  it.each(['/events/new', '/events/event-1'])('直接起動した%sにもカレンダーへの戻り先を保持する', (path) => {
-    const config = getMockConfig({
-      _layout: rootLayout,
+  it.each(['/events/new', '/events/event-1'])('直接起動した%sにもカレンダーへの戻り先を保持する', async (path) => {
+    const { Stack: RouterStack } = jest.requireActual<typeof import('expo-router')>('expo-router');
+    const view = await renderRouter({
+      _layout: { default: () => <RouterStack />, unstable_settings: rootLayout.unstable_settings },
       index: () => null,
       'events/new': () => null,
       'events/[id]': () => null,
-    });
-    const state = getStateFromPath(path, config);
-    expect(state?.routes[0].state?.routes.map(route => route.name)).toEqual([
-      'index', path === '/events/new' ? 'events/new' : 'events/[id]',
-    ]);
+    }, { initialUrl: path });
+
+    expect(view.getPathname()).toBe(path);
+    expect(testRouter.canGoBack()).toBe(true);
+    await testRouter.back();
+    expect(view.getPathname()).toBe('/');
   });
 
   it('データベースと再読み込みproviderの内側に通常のStackを置く', async () => {
     await render(<RootLayout />);
 
-    const splashOverlay = screen.getByTestId('animated-splash-overlay');
+    expect(preventAutoHideAsync).not.toHaveBeenCalled();
     const databaseProvider = screen.getByTestId('database-provider');
     const calendarRefreshProvider = screen.getByTestId('calendar-refresh-provider');
     const stack = screen.getByTestId('router-stack');
     const notificationProvider = screen.getByTestId('notification-provider');
 
-    expect(splashOverlay.parent).toBe(databaseProvider.parent);
     expect(calendarRefreshProvider.parent).toBe(databaseProvider);
     expect(notificationProvider.parent).toBe(calendarRefreshProvider);
     expect(stack.parent).toBe(notificationProvider);
-    expect(screen.getByTestId('stack-screen.events/new')).toHaveTextContent('modal');
-    expect(screen.getByTestId('stack-screen.events/[id]')).toHaveTextContent('modal');
+    for (const route of ['events/new', 'events/[id]', 'events/detail/[id]']) {
+      expect(screen.getByTestId(`stack-screen.${route}`).props).toMatchObject(
+        Platform.OS === 'ios'
+          ? { presentation: 'formSheet', sheetAllowedDetents: [0.96] }
+          : { presentation: 'modal' },
+      );
+    }
+    expect(screen.getByTestId('stack-screen.settings/temporal/index')).toHaveProp('title', 'ざっくり時間のカスタム');
     expect(screen.getByTestId('stack-screen.settings').props).toMatchObject({
       headerShown: true,
       title: '設定',
+      headerBackButtonDisplayMode: 'minimal',
       gestureEnabled: true,
       animation: 'slide_from_right',
     });

@@ -1,20 +1,22 @@
+import { Radii, Spacing } from '@/constants/theme';
 import { StyleSheet, View } from 'react-native';
-import { EVENT_COLOR_PALETTE, getEventColor, type EventColorId } from '@/constants/event-colors';
+import { EVENT_COLOR_PALETTE, type EventColorId } from '@/constants/event-colors';
+import { useTheme } from '@/hooks/use-theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { EventSingleSelectField } from './event-single-select-field';
 
 type EventColorSelection = EventColorId | 'calendar';
 
-export function EventColorPicker({ calendarColorId, value, disabled, onChange }: Readonly<{
-  calendarColorId: EventColorId;
+export function EventColorPicker({ value, disabled, onChange }: Readonly<{
   value: EventColorId | null;
   disabled: boolean;
   onChange(value: EventColorId | null): void;
 }>) {
+  const theme = useTheme();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const options = [
     { value: 'calendar' as const, label: 'カレンダーの色',
-      color: getEventColor(calendarColorId, scheme) },
+      color: theme.calendarEvent },
     ...EVENT_COLOR_PALETTE.map((item) => ({
       value: item.id,
       label: item.label,
@@ -27,7 +29,7 @@ export function EventColorPicker({ calendarColorId, value, disabled, onChange }:
   }>[];
   const selectedValue: EventColorSelection = value ?? 'calendar';
   const selectedColor = options.find((option) => option.value === selectedValue)?.color
-    ?? getEventColor(calendarColorId, scheme);
+    ?? theme.calendarEvent;
   const selectionOptions = options.map((option) => ({
     value: option.value,
     label: option.label,
@@ -44,5 +46,5 @@ export function EventColorPicker({ calendarColorId, value, disabled, onChange }:
 }
 
 const styles = StyleSheet.create({
-  swatch: { borderRadius: 8, height: 16, marginRight: 4, width: 16 },
+  swatch: { borderRadius: Radii.small, height: 16, marginRight: Spacing.one, width: 16 },
 });

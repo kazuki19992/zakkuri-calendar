@@ -1,11 +1,14 @@
+import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useReduceMotion } from '@/hooks/use-reduce-motion';
 import { useTheme } from '@/hooks/use-theme';
 
 export type SingleSelectOption<T extends string | number> = Readonly<{
   value: T;
   label: string;
+  description?: string;
   group?: string;
   accessory?: ReactNode;
   accessibilityLabel?: string;
@@ -14,7 +17,7 @@ export type SingleSelectOption<T extends string | number> = Readonly<{
 type SingleSelectSheetProps<T extends string | number> = Readonly<{
   visible: boolean;
   title: string;
-  value: T;
+  value: T | null;
   options: readonly SingleSelectOption<T>[];
   disabled?: boolean;
   onSelect(value: T): void;
@@ -25,6 +28,7 @@ type SheetItem<T extends string | number> =
   | Readonly<{ kind: 'group'; label: string; key: string }>
   | Readonly<{ kind: 'option'; option: SingleSelectOption<T>; key: string }>;
 
+const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 const ANIMATION_DURATION_MS = 180;
 const SHEET_OFFSET = 16;
 
@@ -149,8 +153,8 @@ export function SingleSelectSheet<T extends string | number>({
 
   return (
     <Modal testID="single-select-sheet.modal" transparent visible={visible}
-      animationType="none" statusBarTranslucent onRequestClose={requestClose}>
-      <View style={styles.overlay}>
+      animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={requestClose}>
+      <SafeAreaView edges={['top']} style={styles.overlay}>
         <Animated.View testID="single-select-sheet.backdrop-shade" pointerEvents="none"
           style={[StyleSheet.absoluteFill, {
             backgroundColor: theme.calendarBackdrop,
@@ -159,7 +163,7 @@ export function SingleSelectSheet<T extends string | number>({
         <Pressable testID="single-select-sheet.backdrop" accessible={false} disabled={closing}
           importantForAccessibility="no" focusable={false} onPress={requestClose}
           style={StyleSheet.absoluteFill} />
-        <Animated.View testID="single-select-sheet.sheet" accessibilityViewIsModal
+        <AnimatedSafeAreaView testID="single-select-sheet.sheet" accessibilityViewIsModal edges={['left', 'bottom', 'right']}
           style={[styles.sheet, {
           backgroundColor: theme.background,
           borderColor: theme.calendarBorder,
@@ -182,6 +186,7 @@ export function SingleSelectSheet<T extends string | number>({
               const selected = option.value === value;
               const accessibilityLabel = [
                 option.accessibilityLabel ?? option.label,
+                option.description,
                 option.group,
                 selected ? '選択中' : undefined,
               ].filter(Boolean).join('、');
@@ -192,46 +197,53 @@ export function SingleSelectSheet<T extends string | number>({
                   onPress={() => startClose(() => onSelect(option.value))}
                   style={[styles.option, { borderBottomColor: theme.calendarBorder }]}>
                   {option.accessory}
-                  <Text style={[styles.optionLabel, { color: theme.text }]}>{option.label}</Text>
+                  <View style={styles.optionText}>
+                    <Text style={[styles.optionLabel, { color: theme.text }]}>{option.label}</Text>
+                    {option.description ? (
+                      <Text style={[styles.optionDescription, { color: theme.textSecondary }]}>{option.description}</Text>
+                    ) : null}
+                  </View>
                   <Text accessibilityElementsHidden importantForAccessibility="no"
-                    style={[styles.check, { color: theme.calendarAccent }]}>{selected ? '✓' : ''}</Text>
+                    style={[styles.check, { color: theme.calendarAccentText }]}>{selected ? '✓' : ''}</Text>
                 </Pressable>
               );
             }} />
           <Pressable accessibilityRole="button" accessibilityLabel="キャンセル"
             accessibilityState={{ disabled: closing }} disabled={closing} onPress={requestClose}
             style={[styles.cancel, { borderTopColor: theme.calendarBorder }]}>
-            <Text style={{ color: theme.calendarAccent }}>キャンセル</Text>
+            <Text style={{ color: theme.calendarAccentText }}>キャンセル</Text>
           </Pressable>
-        </Animated.View>
-      </View>
+        </AnimatedSafeAreaView>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
+  overlay: { flex: 1, justifyContent: 'flex-end', paddingTop: Spacing.four },
   sheet: {
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: Radii.large,
+    borderTopRightRadius: Radii.large,
     borderTopWidth: StyleSheet.hairlineWidth,
     maxHeight: '78%',
     overflow: 'hidden',
   },
-  header: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 18, paddingVertical: 16 },
-  title: { fontSize: 18, fontWeight: '600' },
-  group: { fontSize: 13, paddingBottom: 6, paddingHorizontal: 18, paddingTop: 16 },
+  header: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
+  title: { fontSize: Typography.title, fontWeight: '600' },
+  group: { fontSize: Typography.caption, paddingBottom: Spacing.two, paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
   option: {
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    gap: 12,
+    gap: Spacing.twelve,
     minHeight: 52,
-    paddingHorizontal: 18,
+    paddingHorizontal: Spacing.three,
   },
-  optionLabel: { flex: 1, fontSize: 16 },
-  check: { fontSize: 17, fontWeight: '700', minWidth: 22, textAlign: 'center' },
-  empty: { fontSize: 15, paddingHorizontal: 18, paddingVertical: 24, textAlign: 'center' },
+  optionText: { flex: 1, gap: Spacing.one, paddingVertical: Spacing.two },
+  optionLabel: { fontSize: Typography.row },
+  optionDescription: { fontSize: Typography.caption },
+  check: { fontSize: Typography.row, fontWeight: '700', minWidth: 22, textAlign: 'center' },
+  empty: { fontSize: Typography.row, paddingHorizontal: Spacing.three, paddingVertical: Spacing.four, textAlign: 'center' },
   cancel: {
     alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,

@@ -60,6 +60,19 @@ describe('1日表示の状態調整', () => {
     });
   });
 
+  it('終日予定の後に時刻順で予定を並べる', async () => {
+    const dependencies = createDependencies();
+    const allDay: CalendarEvent = {
+      ...event, id: 'all-day', title: '終日の予定', temporalType: 'allDay', endDate: event.anchorDate,
+      createdAt: '2026-09-03T00:00:00.000Z',
+    };
+    const late: CalendarEvent = { ...event, id: 'late', startTime: '18:00', createdAt: '2026-08-31T00:00:00.000Z' };
+    dependencies.events.listSchedule.mockResolvedValue({ events: [late, event, allDay], exceptions: [], replacementEvents: [] });
+    const { result } = await renderHook(() => useDayCalendar({ ...dependencies, date: '2026-09-21' }));
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.items.map(({ eventId }) => eventId)).toEqual(['all-day', 'event-1', 'late']);
+  });
+
   it('非表示カレンダーの予定はpreviewにも出さず祝日を維持する', async () => {
     const dependencies = createDependencies();
     dependencies.settings.getCalendarVisible.mockResolvedValue(false);

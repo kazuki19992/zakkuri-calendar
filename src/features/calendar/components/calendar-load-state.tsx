@@ -1,5 +1,7 @@
+import { Spacing, Typography } from '@/constants/theme';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { DatabaseErrorState } from '@/shared/components/database-error-state';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -14,10 +16,10 @@ export function CalendarLoadState({ status, onRetry, children }: CalendarLoadSta
 
   if (status === 'loading') {
     return (
-      <View accessibilityRole="progressbar" accessibilityLabel="カレンダーを読み込んでいます" style={styles.loading}>
+      <SafeAreaView accessibilityRole="progressbar" accessibilityLabel="カレンダーを読み込んでいます" style={styles.loading}>
         <ActivityIndicator color={theme.calendarAccent} />
         <Text style={[styles.loadingLabel, { color: theme.textSecondary }]}>カレンダーを読み込んでいます</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -28,6 +30,6 @@ export function CalendarLoadState({ status, onRetry, children }: CalendarLoadSta
 
 const styles = StyleSheet.create({
   ready: { flex: 1 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
-  loadingLabel: { fontSize: 15 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.twelve, padding: Spacing.four },
+  loadingLabel: { fontSize: Typography.row },
 });

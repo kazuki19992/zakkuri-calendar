@@ -1,7 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { PixelRatio } from 'react-native';
+import { PixelRatio, StyleSheet } from 'react-native';
 import type { CalendarEvent } from '@/domain/calendar/event';
-import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/domain/calendar/event-color';
+import { type EventColorId } from '@/constants/event-colors';
 import type { EventOccurrence } from '@/domain/calendar/event-occurrence';
 import { resolveEventTime } from '@/domain/temporal/resolve-event-time';
 import type { TemporalDefinition } from '@/domain/temporal/temporal-definition';
@@ -11,6 +11,12 @@ export const HOUR_HEIGHT = 56;
 export const TIMELINE_HEIGHT = 24 * HOUR_HEIGHT;
 export const MIN_EVENT_HEIGHT = 36;
 /** 現在時刻線の太さ。位置を下端内へ収める計算にも使う。 */
+export const HOUR_LINE_THICKNESS = StyleSheet.hairlineWidth;
+export const TIMELINE_AXIS_FONT_MULTIPLIER_LIMIT = 1.4;
+export function getTimelineAxisLineHeight(fontScale: number): number {
+  return Math.ceil(13 * Math.min(fontScale, TIMELINE_AXIS_FONT_MULTIPLIER_LIMIT));
+}
+
 export const NOW_LINE_HEIGHT = 2;
 export const TIMELINE_ODD_HOUR_LABEL_FADE_START = 0.66;
 export const TIMELINE_ODD_HOUR_LABEL_FADE_END = 0.78;
@@ -62,6 +68,11 @@ export function computeNowLineTop(minutesSinceMidnight: number, scale: number): 
  */
 export function computeHourLineTop(hour: number, scale: number): number {
   return PixelRatio.roundToNearestPixel(hour * HOUR_HEIGHT * scale);
+}
+
+export function getHourLineTop(hour: number, scale: number): number {
+  // 24時の線が列からはみ出さない位置を、時間の目盛りと共有する。
+  return Math.min(computeHourLineTop(hour, scale), TIMELINE_HEIGHT * scale - HOUR_LINE_THICKNESS);
 }
 
 /**
@@ -118,7 +129,7 @@ export type TimelineItemViewModel = Readonly<{
   eventId: string;
   originalOccurrenceDate?: string;
   title: string;
-  colorId: EventColorId;
+  colorId: EventColorId | null;
   temporalLabel: string;
   accessibilityLabel: string;
   startMinute: number;
@@ -239,7 +250,6 @@ export function createDayTimelineItems(input: Readonly<{
   occurrences: readonly EventOccurrence[];
   definitions: ReadonlyMap<string, TemporalDefinition>;
   undeterminedFadeMinutes: number;
-  calendarColorId?: EventColorId;
 }>): readonly TimelineItemViewModel[] {
   const items: MutableTimelineItem[] = [];
   for (const occurrence of input.occurrences) {
@@ -285,7 +295,7 @@ export function createDayTimelineItems(input: Readonly<{
         ? {}
         : { originalOccurrenceDate: occurrence.occurrenceIdentity.originalOccurrenceDate }),
       title: event.title,
-      colorId: event.colorId ?? input.calendarColorId ?? DEFAULT_EVENT_COLOR_ID,
+      colorId: event.colorId,
       temporalLabel,
       accessibilityLabel: [
         event.title,

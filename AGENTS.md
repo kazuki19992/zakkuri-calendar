@@ -18,7 +18,7 @@
 1. `git status --short --branch`でユーザーや他エージェントの変更を確認する。
 2. 関連するIssue、仕様書、実装計画、既存コード、テストを読む。
 3. 該当する`.agents/skills/<skill-name>/SKILL.md`または`.claude/skills/<skill-name>/SKILL.md`を読む。
-4. Expo APIや依存パッケージを扱う場合は、実装前にExpo SDK 57のバージョン固定ドキュメント`https://docs.expo.dev/versions/v57.0.0/`と対象パッケージの公式資料を確認する。
+4. Expo APIや依存パッケージを扱う場合は、実装前にExpo SDK 58のバージョン固定ドキュメント`https://docs.expo.dev/versions/v58.0.0/`と対象パッケージの公式資料を確認する。
 5. 依存追加時は、Expo SDKとの互換性があるメンテナンス中のライブラリを優先し、独自実装とのトレードオフを説明する。
 
 古い会話、過去のPR、ローカルブランチの状態だけを現在の事実として扱わない。変更され得る情報は、コード、Git、GitHub、公式資料から再確認する。
@@ -86,6 +86,7 @@ UIコンポーネントからSQLite、SQL、row型、祝日ライブラリ、業
 
 ## 7. UIとアクセシビリティ
 
+- デザインに関わる作業はリポジトリ直下の `DESIGN.md` に従う。
 - UIはNotionを参考にした落ち着いたsemantic color tokenを使い、高彩度の原色や画面固有の色を増やさない。
 - ライト・ダークの両方で、文字、境界、選択状態、グラデーションの可読性を考慮する。
 - 状態を色だけで伝えず、ラベル、枠、太さ、形状、`accessibilityState`などを併用する。

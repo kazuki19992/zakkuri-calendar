@@ -21,6 +21,29 @@ describe('2日ビューの予備列付きスワイプカルーセル', () => {
     expect(result.current.isDragging).toBe(true);
     expect(result.current.panHandlers).toBe(handlers);
   });
+  it('中断されたドラッグが元の位置に戻るまで移動中として扱う', async () => {
+    const create = jest.spyOn(PanResponder, 'create');
+    let finish!: () => void;
+    jest.spyOn(Animated, 'timing').mockImplementation(() => ({
+      start: (callback) => { finish = () => callback?.({ finished: true }); },
+      stop: jest.fn(),
+      reset: jest.fn(),
+    }));
+    const onMove = jest.fn().mockResolvedValue(true);
+    const { result } = await renderHook(() => useTwoDayCarousel({
+      onPrevious: onMove, onNext: onMove, reduceMotion: false, bufferDays: 1, leadingDate: '2026-09-07',
+    }));
+    const event = {} as GestureResponderEvent;
+    const gesture = {} as PanResponderGestureState;
+    const config = create.mock.calls.at(-1)![0];
+    await act(() => config.onPanResponderGrant?.(event, gesture));
+    await act(() => config.onPanResponderTerminate?.(event, gesture));
+    expect(result.current.isDragging).toBe(true);
+    await act(() => finish());
+    expect(result.current.isDragging).toBe(false);
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
   it('自分の取得開始でstateが更新されても予備列を維持し、失敗時に戻す', async () => {
     let finish!: (value: boolean) => void;
     const onNext = jest.fn().mockReturnValue(new Promise<boolean>((resolve) => { finish = resolve; }));
@@ -63,7 +86,7 @@ describe('2日ビューの予備列付きスワイプカルーセル', () => {
       reduceMotion: true, bufferDays: 1, leadingDate: '2026-09-07', visibleDayCount: 1 }));
     const handlers = create.mock.calls[0][0];
     const event = {} as GestureResponderEvent;
-    const gesture: PanResponderGestureState = { stateID: 1, moveX: 0, moveY: 0, x0: 0, y0: 0, dx: -100, dy: 0, vx: -1, vy: 0, numberActiveTouches: 1, _accountsForMovesUpTo: 0 };
+    const gesture: PanResponderGestureState = { stateID: 1, moveX: 0, moveY: 0, x0: 0, y0: 0, dx: -100, dy: 0, vx: -1, vy: 0, numberActiveTouches: 1 };
     await act(() => {
       handlers.onPanResponderGrant?.(event, gesture);
       handlers.onPanResponderStart?.(event, { ...gesture, numberActiveTouches: 2 });

@@ -14,7 +14,6 @@ export const EVENT_COLOR_IDS = [
 export type EventColorId = (typeof EVENT_COLOR_IDS)[number];
 
 export const DEFAULT_EVENT_COLOR_ID: EventColorId = 'blue';
-
 export function parseEventColorId(
   value: unknown,
 ): Result<EventColorId, Readonly<{ field: string; message: string }>> {

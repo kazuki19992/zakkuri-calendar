@@ -59,11 +59,28 @@ describe('実SQLiteによるMVP保存回帰', () => {
     expect(await database.first('PRAGMA integrity_check')).toEqual({ integrity_check: 'ok' });
   });
 
+  it.each(['umi', 'matcha'] as const)('メインカレンダー色 %s を再接続後に復元する', async (colorId) => {
+    await migrateDatabase(database, environment);
+    const repositories = createRepositoryContainer(database);
+    await repositories.calendars.setColor('personal-default', 'teal', now);
+    expect(await repositories.settings.getPrimaryCalendarColor()).toBeNull();
+
+    await repositories.settings.setPrimaryCalendarColor('tomato', now);
+    await repositories.settings.setPrimaryCalendarColor(colorId, now);
+    await connection.close();
+    connection = await openNodeSqliteDatabase(join(directory, 'synthetic.db'));
+    database = connection.database;
+    await migrateDatabase(database, environment);
+
+    const reopened = createRepositoryContainer(database);
+    expect(await reopened.settings.getPrimaryCalendarColor()).toBe(colorId);
+    expect(await reopened.calendars.getDefault()).toMatchObject({ colorId: 'teal' });
+  });
+
   it('再接続後も予定・書式付きメモ・通知・表示設定を復元し編集と削除ができる', async () => {
     await migrateDatabase(database, environment);
     let repositories = createRepositoryContainer(database);
     await repositories.events.create(aggregate);
-    await repositories.settings.setLastEventEditorTab('exact', now);
     await repositories.settings.setLastCalendarViewMode('week', now);
     await repositories.settings.setCalendarWeekStartsOn(0, now);
     await repositories.settings.setCalendarVisible('personal-default', false, now);
@@ -73,7 +90,6 @@ describe('実SQLiteによるMVP保存回帰', () => {
     await migrateDatabase(database, environment);
     repositories = createRepositoryContainer(database);
     expect(await repositories.events.getById(event.id)).toEqual(aggregate);
-    expect(await repositories.settings.getLastEventEditorTab()).toBe('exact');
     expect(await repositories.settings.getLastCalendarViewMode()).toBe('week');
     expect(await repositories.settings.getCalendarWeekStartsOn()).toBe(0);
     expect(await repositories.settings.getCalendarVisible('personal-default')).toBe(false);

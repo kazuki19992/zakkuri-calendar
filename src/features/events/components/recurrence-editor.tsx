@@ -2,6 +2,7 @@ import {useState} from 'react';
 import NativeDateTimePicker from '@expo/ui/community/datetime-picker';
 import {Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {format,parse} from 'date-fns';
+import { Radii, Spacing, Typography } from '@/constants/theme';
 import {isCalendarDate} from '@/domain/calendar/month';
 import {relativePeriodStart} from '@/domain/calendar/relative-recurrence';
 import type { RecurrenceRuleV1 } from '@/domain/calendar/recurrence';
@@ -60,15 +61,15 @@ export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFre
             const selected = draft.weekdays.includes(weekday);
             return <Pressable key={weekday} accessibilityRole="button"
               accessibilityLabel={`${label}曜日`} accessibilityState={{ disabled, selected }}
-              disabled={disabled} onPress={() => onWeekdayToggle(weekday)} style={[styles.weekday, {
-                backgroundColor: selected ? theme.backgroundSelected : theme.backgroundElement,
-                borderColor: selected ? theme.calendarAccent : theme.calendarBorder,
-              }]}>
-              <Text style={{ color: selected ? theme.calendarAccent : theme.text,
+              disabled={disabled} onPress={() => onWeekdayToggle(weekday)}
+              style={({ pressed }) => [styles.weekday,
+                pressed && { backgroundColor: theme.backgroundSelected },
+                selected && { borderWidth: 1, borderColor: disabled ? theme.textDisabled : theme.textSecondary }]}>
+              <Text style={{ color: disabled ? theme.textDisabled : theme.text,
                 fontWeight: selected ? '700' : '400' }}>{label}</Text>
               {selected ? <View testID={`event-editor.recurrence-weekday-${weekday}-check`}
-                style={[styles.checkBadge, { backgroundColor: theme.calendarAccent }]}>
-                <Text style={[styles.checkText, { color: theme.background }]}>✓</Text>
+                style={styles.checkBadge}>
+                <Text style={[styles.checkText, { color: disabled ? theme.textDisabled : theme.calendarAccentText }]}>✓</Text>
               </View> : null}
             </Pressable>;
           })}</View></> : null}
@@ -78,7 +79,7 @@ export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFre
           {draft.endType === 'until' && !relativeFrequency ? <TextInput accessibilityLabel="繰り返し終了日" editable={!disabled} value={draft.untilDate} onChangeText={onUntilDateChange} placeholder="YYYY-MM-DD" placeholderTextColor={theme.textSecondary} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} /> : null}
           {draft.endType==='until'&&relativeFrequency?<>
             <Pressable accessibilityRole="button" accessibilityLabel={relativeFrequency==='weekly'?'終了する対象週を選択':'終了する対象月を選択'} disabled={disabled} accessibilityState={{disabled}} onPress={()=>setSelectingUntil(true)} style={{minHeight:44,justifyContent:'center'}}>
-              <Text style={{color:theme.calendarAccent}}>{isCalendarDate(draft.untilDate)?relativeFrequency==='monthly'?format(untilValue,'yyyy年M月まで'):`${format(untilValue,'yyyy年M月d日')}の週まで`:'終了する対象期間を選択'}</Text>
+              <Text style={{color:disabled ? theme.textDisabled : theme.calendarAccentText}}>{isCalendarDate(draft.untilDate)?relativeFrequency==='monthly'?format(untilValue,'yyyy年M月まで'):`${format(untilValue,'yyyy年M月d日')}の週まで`:'終了する対象期間を選択'}</Text>
             </Pressable>
             {selectingUntil?<NativeDateTimePicker testID="relative-recurrence.until-picker" mode="date" value={untilValue}
               {...(Platform.OS==='android'?{presentation:'dialog' as const}:{locale:'ja_JP',display:'inline' as const})}
@@ -87,20 +88,20 @@ export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFre
           {draft.endType === 'count' ? <TextInput accessibilityLabel="繰り返し回数" keyboardType="number-pad" editable={!disabled} value={draft.countText} onChangeText={onCountChange} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} /> : null}
         </View>
       ) : null}
-      {error ? <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={{ color: theme.danger }}>{error}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 10 },
-  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  custom: { gap: 8 },
-  caption: { fontSize: 13, marginTop: 4 },
-  input: { borderRadius: 8, borderWidth: 1, fontSize: 16, minHeight: 44, paddingHorizontal: 12 },
-  weekday: { alignItems: 'center', borderRadius: 22, borderWidth: 2, height: 44,
+  container: { gap: Spacing.twelve },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  custom: { gap: Spacing.two },
+  caption: { fontSize: Typography.caption, marginTop: Spacing.one },
+  input: { borderRadius: Radii.small, borderWidth: 1, fontSize: Typography.row, minHeight: 44, paddingHorizontal: Spacing.twelve },
+  weekday: { alignItems: 'center', borderRadius: Radii.full, height: 44,
     justifyContent: 'center', position: 'relative', width: 44 },
-  checkBadge: { alignItems: 'center', borderRadius: 8, height: 16, justifyContent: 'center',
+  checkBadge: { alignItems: 'center', height: 16, justifyContent: 'center',
     position: 'absolute', right: -4, top: -4, width: 16 },
-  checkText: { fontSize: 10, fontWeight: '700', lineHeight: 12 },
+  checkText: { fontSize: Typography.caption, fontWeight: '700', lineHeight: 12 },
 });

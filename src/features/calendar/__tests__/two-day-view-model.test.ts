@@ -184,7 +184,7 @@ describe('2日表示の表示用モデル', () => {
         temporalLabel: '終日', accessibilityLabel: '休暇、終日',
       },
       {
-        kind: 'event', id: 'missing', eventId: 'missing', colorId: 'blue', isInteractive: true, title: '未解決',
+        kind: 'event', id: 'missing', eventId: 'missing', colorId: null, isInteractive: true, title: '未解決',
         temporalLabel: 'ざっくり', accessibilityLabel: '未解決、ざっくり',
       },
     ]);
@@ -270,7 +270,7 @@ describe('2日表示の表示用モデル', () => {
         accessibilityLabel: 'テスト記念日、祝日',
       },
       {
-        kind: 'event', id: 'all-day', eventId: 'all-day', colorId: 'blue', isInteractive: true, title: '休暇',
+        kind: 'event', id: 'all-day', eventId: 'all-day', colorId: null, isInteractive: true, title: '休暇',
         temporalLabel: '終日', accessibilityLabel: '休暇、終日',
       },
     ]);
@@ -373,8 +373,8 @@ describe('2日表示の終日レーン', () => {
         rangeStartDate: from, rangeThroughDate: through, rangePosition: date === from ? 'start' as const : date === through ? 'end' as const : 'middle' as const,
       })),
     }));
-    expect(createTwoDayAllDayLayout(strip).segments.map((segment) => segment.id)).toEqual(['b', 'c']);
-    expect(createTwoDayAllDayLayout(strip, 2, true).segments.map((segment) => segment.id)).toEqual(['a', 'c']);
+    expect(createTwoDayAllDayLayout(strip, 2).segments.map((segment) => segment.id)).toEqual(['b', 'c:from:2026-11-05']);
+    expect(createTwoDayAllDayLayout(strip, 2, true).segments.map((segment) => segment.id)).toEqual(['a']);
   });
   it('表示端で1日だけ見える複数日予定を祝日と単日予定より優先する', () => {
     const day = {
@@ -394,10 +394,10 @@ describe('2日表示の終日レーン', () => {
 
     const layout = createTwoDayAllDayLayout([day]);
 
-    expect(layout.segments.map((segment) => segment.id)).toEqual(['z-multi', 'holiday:2026-09-08']);
-    expect(layout.hiddenCounts).toEqual([1]);
-    expect(createTwoDayAllDayLayout([day], 1).segments.map((segment) => segment.id)).toEqual(['z-multi']);
-    expect(createTwoDayAllDayLayout([day], 1).hiddenCounts).toEqual([2]);
+    expect(layout.segments.map((segment) => segment.id)).toEqual(['z-multi']);
+    expect(layout.hiddenCounts).toEqual([2]);
+    expect(createTwoDayAllDayLayout([day], 1).segments).toEqual([]);
+    expect(createTwoDayAllDayLayout([day], 1).hiddenCounts).toEqual([3]);
     expect(createTwoDayAllDayLayout([day], 0)).toEqual({ segments: [], hiddenCounts: [3] });
   });
 });

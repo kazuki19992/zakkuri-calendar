@@ -1,3 +1,4 @@
+import { Radii, Spacing, Typography } from '@/constants/theme';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -43,7 +44,7 @@ export function QuickCreateEventScreen({ state, onSave, onCancel }: QuickCreateE
           <Text
             style={[
               styles.headerButtonText,
-              { color: state.isSaving ? theme.textSecondary : theme.calendarAccent },
+              { color: state.isSaving ? theme.textSecondary : theme.calendarAccentText },
             ]}
           >
             キャンセル
@@ -63,7 +64,7 @@ export function QuickCreateEventScreen({ state, onSave, onCancel }: QuickCreateE
           <Text
             style={[
               styles.headerButtonText,
-              { color: cannotSave ? theme.textSecondary : theme.calendarAccent },
+              { color: cannotSave ? theme.textSecondary : theme.calendarAccentText },
             ]}
           >
             {state.isSaving ? '保存中' : '保存'}
@@ -84,7 +85,7 @@ export function QuickCreateEventScreen({ state, onSave, onCancel }: QuickCreateE
             onPress={state.retry}
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
           >
-            <Text style={[styles.headerButtonText, { color: theme.calendarAccent }]}>再試行</Text>
+            <Text style={[styles.headerButtonText, { color: theme.calendarAccentText }]}>再試行</Text>
           </Pressable>
         </View>
       ) : (
@@ -166,20 +167,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingTop: Platform.OS === 'ios' ? 12 : 8,
+    paddingHorizontal: Spacing.two,
+    paddingTop: Platform.OS === 'ios' ? Spacing.twelve : Spacing.two,
   },
-  headerButton: { justifyContent: 'center', minHeight: 44, minWidth: 80, paddingHorizontal: 8 },
-  headerButtonText: { fontSize: 16, fontWeight: '600' },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
+  headerButton: { justifyContent: 'center', minHeight: 44, minWidth: 80, paddingHorizontal: Spacing.two },
+  headerButtonText: { fontSize: Typography.row, fontWeight: '600' },
+  headerTitle: { fontSize: Typography.row, fontWeight: '700' },
   pressed: { opacity: 0.6 },
-  stateContainer: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 24 },
-  stateText: { fontSize: 16 },
-  retryButton: { justifyContent: 'center', marginTop: 8, minHeight: 44, paddingHorizontal: 16 },
-  form: { padding: 16, paddingBottom: 48 },
-  label: { fontSize: 15, fontWeight: '700', marginBottom: 8 },
-  fieldSpacing: { marginTop: 24 },
-  input: { borderRadius: 8, borderWidth: 1, fontSize: 17, minHeight: 48, paddingHorizontal: 12 },
-  error: { fontSize: 13, marginTop: 6 },
-  saveError: { fontSize: 14, fontWeight: '600', marginTop: 24 },
+  stateContainer: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: Spacing.four },
+  stateText: { fontSize: Typography.row },
+  retryButton: { justifyContent: 'center', marginTop: Spacing.two, minHeight: 44, paddingHorizontal: Spacing.three },
+  form: { padding: Spacing.three, paddingBottom: Spacing.six },
+  label: { fontSize: Typography.row, fontWeight: '700', marginBottom: Spacing.two },
+  fieldSpacing: { marginTop: Spacing.four },
+  input: { borderRadius: Radii.small, borderWidth: 1, fontSize: Typography.row, minHeight: 48, paddingHorizontal: Spacing.twelve },
+  error: { fontSize: Typography.caption, marginTop: Spacing.two },
+  saveError: { fontSize: Typography.body, fontWeight: '600', marginTop: Spacing.four },
 });

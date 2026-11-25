@@ -166,12 +166,14 @@ export function useTwoDayCarousel(input: UseTwoDayCarouselInput): TwoDayCarousel
           setIsDragging(false);
         },
         onPanResponderTerminate: () => {
-          touchSession.finish();
-          setIsDragging(false);
-          operation.callbackStarted();
-          if (touchSession.version() !== operation.current()) return;
-          if (input.reduceMotion) translateX.setValue(baseOffset);
-          else void runAnimation(translateX, baseOffset);
+          const finish = () => {
+            touchSession.finish();
+            setIsDragging(false);
+            operation.callbackStarted();
+          };
+          if (touchSession.version() !== operation.current()) { finish(); return; }
+          if (input.reduceMotion) { translateX.setValue(baseOffset); finish(); }
+          else void runAnimation(translateX, baseOffset).finally(finish);
         },
       }),
     [baseOffset, input.reduceMotion, isAnimating, move, translateX, touchSession, operation],

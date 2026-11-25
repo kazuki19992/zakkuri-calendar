@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { DefaultExactDurationSettingsSection } from '../default-exact-duration-settings-section';
 import type { DefaultExactDurationSettingsState } from '../../hooks/use-default-exact-duration-settings';
 
@@ -8,6 +8,15 @@ const state: DefaultExactDurationSettingsState = { status: 'ready', value: { typ
   error: null, isSaving: false, reload: jest.fn(), setValue: jest.fn() };
 
 describe('初期長設定の表示', () => {
+  it('初期の長さを選ぶ行の中で適用対象を説明する', async () => {
+    await render(<DefaultExactDurationSettingsSection state={state} />);
+    const row = screen.getByRole('button', { name: '予定の初期の長さ、1時間' });
+    const description = '既存の予定は変わりません。';
+
+    expect(within(row).getByText(description)).toBeOnTheScreen();
+    expect(row).toHaveProp('accessibilityHint', description);
+  });
+
   it('6候補と選択印を表示し選んだ値を通知する', async () => {
     await render(<DefaultExactDurationSettingsSection state={state} />);
     await fireEvent.press(screen.getByRole('button', { name: '予定の初期の長さ、1時間' }));

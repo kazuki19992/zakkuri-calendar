@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
+import type { PrimaryCalendarColorId } from '@/domain/calendar/calendar-color';
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
 import type { EventReminder } from '@/domain/calendar/event-reminder';
 import type { AppDatabase } from '@/data/sqlite/database';
@@ -307,25 +308,6 @@ describe('SQLite repositories', () => {
     await expect(calendars.setColor('personal-default', 'unknown-color' as never, now)).rejects.toThrow('Invalid calendar color');
   });
 
-  it.each([null, { value_json: 'broken' }, { value_json: '"allDay"' }])(
-    '最後の編集タブの欠損・不正値をfuzzyへfallbackする',
-    async (row) => {
-      const db = createDatabaseDouble();
-      db.first.mockResolvedValue(row);
-      await expect(new SqliteSettingsRepository(db.database).getLastEventEditorTab()).resolves.toBe('fuzzy');
-    },
-  );
-
-  it('最後の編集タブを検証してupsertする', async () => {
-    const db = createDatabaseDouble();
-    const settings = new SqliteSettingsRepository(db.database);
-    await settings.setLastEventEditorTab('exact', now);
-    expect(db.run).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(key) DO UPDATE'), {
-      $key: 'last_event_editor_tab', $valueJson: '"exact"', $updatedAt: now,
-    });
-    await expect(settings.setLastEventEditorTab('allDay' as never, now)).rejects.toThrow('Invalid event editor tab');
-  });
-
   it.each([
     [null, 'twoDay'],
     [{ value_json: '"twoDay"' }, 'twoDay'],
@@ -397,6 +379,50 @@ describe('SQLite repositories', () => {
       $valueJson: 'false',
       $updatedAt: now,
     });
+  });
+
+  it.each([
+    [null, null],
+    [{ value_json: 'broken' }, null],
+    [{ value_json: 'null' }, null],
+    [{ value_json: '"unknown"' }, null],
+    [{ value_json: '{"colorId":"blue"}' }, null],
+    [{ value_json: '"blue"' }, 'umi'],
+    [{ value_json: '"default-teal"' }, 'matcha'],
+    [{ value_json: '"matcha"' }, 'matcha'],
+    [{ value_json: '"asatsuyu"' }, 'asatsuyu'],
+    [{ value_json: '"purple"' }, 'tasogare'],
+    [{ value_json: '"gray"' }, 'matcha'],
+  ])('メインカレンダー色の設定 %j から有効な色IDだけを読み込む', async (row, expected) => {
+    const db = createDatabaseDouble();
+    db.first.mockResolvedValue(row);
+    const settings = new SqliteSettingsRepository(db.database);
+
+    await expect(settings.getPrimaryCalendarColor()).resolves.toBe(expected);
+    expect(db.first).toHaveBeenCalledWith(expect.stringContaining('WHERE key = $key'), {
+      $key: 'primary_calendar_color',
+    });
+  });
+
+  it.each(['matcha', 'umi'] as const)('メインカレンダー色 %s を単一の設定へ保存する', async (colorId) => {
+    const db = createDatabaseDouble();
+    const settings = new SqliteSettingsRepository(db.database);
+
+    await settings.setPrimaryCalendarColor(colorId, now);
+    expect(db.run).toHaveBeenCalledTimes(1);
+    expect(db.run).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(key) DO UPDATE'), {
+      $key: 'primary_calendar_color',
+      $valueJson: JSON.stringify(colorId),
+      $updatedAt: now,
+    });
+  });
+
+  it('メインカレンダー色として無効な色IDを書き込まない', async () => {
+    const db = createDatabaseDouble();
+    const settings = new SqliteSettingsRepository(db.database);
+
+    await expect(settings.setPrimaryCalendarColor('unknown' as PrimaryCalendarColorId, now)).rejects.toThrow();
+    expect(db.run).not.toHaveBeenCalled();
   });
 
   it('空のカレンダーIDでは表示設定を読み書きしない', async () => {

@@ -29,7 +29,7 @@ function wallTime(value: string, minutes: number): Date {
 export function reminderFireAt(
   event: CalendarEvent,
   timing: ReminderTiming,
-  snapshot: NotificationSnapshot,
+  snapshot: Pick<NotificationSnapshot, 'definitions'>,
 ): number {
   if (!timingIsCompatible(timing, event, snapshot.definitions))
     throw new Error('incompatible_timing');

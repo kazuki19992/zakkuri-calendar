@@ -23,12 +23,13 @@ jest.mock('@/features/events/screens/event-editor-screen', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   const { Pressable, Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    EventEditorScreen: ({ onSave, onDelete }: { onSave(): void; onDelete(): void }) =>
+    EventEditorScreen: ({ onSave, onDelete, onSelectScope }: { onSave(): void; onDelete(): void; onSelectScope(scope: 'following'): void }) =>
       React.createElement(
         View,
         null,
         React.createElement(Pressable, { accessibilityRole: 'button', accessibilityLabel: '保存', onPress: onSave }, React.createElement(Text, null, '保存')),
         React.createElement(Pressable, { accessibilityRole: 'button', accessibilityLabel: '削除', onPress: onDelete }, React.createElement(Text, null, '削除')),
+        React.createElement(Pressable, { accessibilityRole: 'button', accessibilityLabel: 'これ以降の予定', onPress: () => onSelectScope('following') }, React.createElement(Text, null, 'これ以降の予定')),
       ),
   };
 });
@@ -58,4 +59,22 @@ describe('予定編集ルート', () => {
     expect(back).toHaveBeenCalledTimes(2);
     expect(jest.mocked(Stack.Screen)).toHaveBeenCalled();
   });
+  it('確認からこれ以降の予定を保存したら古い発生回を開かずカレンダーへ戻る', async () => {
+    const back = jest.fn();
+    const notifyChanged = jest.fn();
+    const selectScope = jest.fn().mockResolvedValue(true);
+    jest.mocked(useLocalSearchParams).mockReturnValue({ id: 'series', occurrenceDate: '2026-12-01' });
+    jest.mocked(useRouter).mockReturnValue({ back } as unknown as ReturnType<typeof useRouter>);
+    jest.mocked(useRepositories).mockReturnValue({} as ReturnType<typeof useRepositories>);
+    jest.mocked(useCalendarRefresh).mockReturnValue({ revision: 0, notifyChanged });
+    jest.mocked(useEventEditor).mockReturnValue({ selectScope, scopeRequest: { operation: 'save' } } as unknown as EventEditorState);
+
+    await render(<EditEventRoute />);
+    await userEvent.setup().press(screen.getByRole('button', { name: 'これ以降の予定' }));
+
+    expect(selectScope).toHaveBeenCalledWith('following');
+    expect(notifyChanged).toHaveBeenCalledTimes(1);
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
 });

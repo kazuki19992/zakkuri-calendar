@@ -4,6 +4,7 @@ import {
   buildEventReminders,
   buildRecurrenceRule,
   formatEditorDate,
+  getDefaultEditorStartTime,
   getEditorExactDuration,
   getExactEditorRange,
   getRecurrenceDraft,
@@ -11,6 +12,12 @@ import {
   moveEditorRangeStart,
   moveReminderDraft,
 } from '../event-editor-model';
+
+it('新規予定の開始を次の30分刻みに揃え、深夜は同じ日付に収める', () => {
+  expect(getDefaultEditorStartTime(new Date(2026, 10, 22, 2, 52))).toBe('03:00');
+  expect(getDefaultEditorStartTime(new Date(2026, 10, 22, 3, 30))).toBe('03:30');
+  expect(getDefaultEditorStartTime(new Date(2026, 10, 22, 23, 58))).toBe('23:30');
+});
 
 const createExactEvent = (
   duration: Extract<CalendarEvent, { temporalType: 'exact' }>['duration'],

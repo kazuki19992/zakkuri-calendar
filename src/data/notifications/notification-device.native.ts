@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import { AndroidImportance, IosAuthorizationStatus } from 'expo-notifications';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Linking, Platform } from 'react-native';
 import { parseNotificationTarget } from '@/domain/notifications/notification-target';
@@ -14,7 +15,7 @@ async function channel() {
   if (Platform.OS === 'android')
     await Notifications.setNotificationChannelAsync(CHANNEL, {
       name: '予定の通知',
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: AndroidImportance.HIGH,
       sound: 'default',
     });
 }
@@ -60,14 +61,14 @@ function normalizePermission(
 ): NotificationPermission {
   if (Platform.OS === 'ios') {
     const status = value.ios?.status;
-    if (status === Notifications.IosAuthorizationStatus.AUTHORIZED)
+    if (status === IosAuthorizationStatus.AUTHORIZED)
       return 'granted';
     if (
-      status === Notifications.IosAuthorizationStatus.PROVISIONAL ||
-      status === Notifications.IosAuthorizationStatus.EPHEMERAL
+      status === IosAuthorizationStatus.PROVISIONAL ||
+      status === IosAuthorizationStatus.EPHEMERAL
     )
       return 'quiet';
-    return status === Notifications.IosAuthorizationStatus.NOT_DETERMINED
+    return status === IosAuthorizationStatus.NOT_DETERMINED
       ? 'undetermined'
       : 'denied';
   }
@@ -84,7 +85,7 @@ export function createNotificationDevice(): NotificationDevice {
     );
     if (Platform.OS === 'android' && value === 'granted') {
       const c = await Notifications.getNotificationChannelAsync(CHANNEL);
-      if (c?.importance === Notifications.AndroidImportance.NONE)
+      if (c?.importance === AndroidImportance.NONE)
         return 'denied' as const;
     }
     return value;

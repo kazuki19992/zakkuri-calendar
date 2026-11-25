@@ -9,6 +9,6 @@ it('締切の要確認を日ビューのタイトルと読み上げに文字で�
   expect(items[0].title).toContain('要確認');expect(items[0].accessibilityLabel).toContain('調整先の平日');
 });
 it('月の予定ブロックにも要確認を文字で示す',()=>{
-  const weeks=createMonthWeekViewModels({grid:getMonthGrid('2026-11-01',1),occurrences:[occurrence],definitionLabels:new Map([['deadline','今週中']]),calendarColorId:'blue'});
+  const weeks=createMonthWeekViewModels({grid:getMonthGrid('2026-11-01',1),occurrences:[occurrence],definitionLabels:new Map([['deadline','今週中']])});
   expect(weeks.flatMap(week=>week.segments).some(item=>item.title.includes('要確認'))).toBe(true);
 });

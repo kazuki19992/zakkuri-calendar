@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "zakkuri-calendar",
+    "name": "ざっくりカレンダー",
     "slug": "zakkuri-calendar",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon-android.png",
     "scheme": "zakkuricalendar",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -30,9 +30,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/images/icon-android.png",
+          "imageWidth": 76,
+          "dark": {
+            "backgroundColor": "#202124",
+            "image": "./assets/images/icon-android.png"
+          }
         }
       ],
       "expo-sqlite",

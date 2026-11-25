@@ -98,8 +98,8 @@ function createDependencies() {
     setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn().mockResolvedValue(90),
     getCalendarVisible: jest.fn().mockResolvedValue(true),
     setCalendarVisible: jest.fn().mockResolvedValue(undefined),
-    getLastEventEditorTab: jest.fn(),
-    setLastEventEditorTab: jest.fn(),
+    getPrimaryCalendarColor: jest.fn().mockResolvedValue(null),
+    setPrimaryCalendarColor: jest.fn().mockResolvedValue(undefined),
     getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'),
     getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1),
     setCalendarWeekStartsOn: jest.fn().mockResolvedValue(undefined),
@@ -120,7 +120,7 @@ describe('カレンダー表示の状態調整', () => {
   beforeEach(() => {
     jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
   });
-  it('ナビゲーション開始だけでトークンを進め、picker・表示設定・refreshでは維持する', async () => {
+  it('ナビゲーション開始だけでトークンを進め、表示設定・refreshでは維持する', async () => {
     const dependencies = createDependencies();
     dependencies.settings.getLastCalendarViewMode.mockResolvedValue('week');
     const { result, rerender } = await renderHook(({ revision }: { revision: number }) => useCalendarView({
@@ -129,7 +129,6 @@ describe('カレンダー表示の状態調整', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'));
     const originalToken = result.current.navigationRevision;
     expect(originalToken).toBe(0);
-    await act(async () => { await result.current.loadDatePickerMonth('2026-10-01'); });
     expect(result.current.navigationRevision).toBe(originalToken);
     await act(async () => { await result.current.setCalendarVisible(false); });
     expect(result.current.navigationRevision).toBe(originalToken);
@@ -284,8 +283,6 @@ describe('カレンダー表示の状態調整', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(result.current.twoDayDays[1].holidayName).toBeNull();
     expect(result.current.twoDayDays[1].timelineItems).toHaveLength(1);
-    await act(async () => { await result.current.loadDatePickerMonth('2026-09-01'); });
-    expect(result.current.datePickerDays.every((day) => day.holidayName === null)).toBe(true);
     expect(dependencies.holidayProvider.list).not.toHaveBeenCalled();
   });
   it.each([
@@ -315,63 +312,7 @@ describe('カレンダー表示の状態調整', () => {
     expect(result.current.monthDays[0].date).toBe('2026-08-30');
   });
 
-  it('refreshの完了前に読み込んだ新しいpickerを待機状態へ戻さない', async () => {
-    const dependencies = createDependencies();
-    const { result, rerender } = await renderHook(({ revision }: { revision: number }) => useCalendarView({
-      ...dependencies, refreshRevision: revision, now: () => new Date(2026, 8, 8, 12),
-    }), { initialProps: { revision: 0 } });
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    await act(async () => { await result.current.loadDatePickerMonth('2026-09-01'); });
-    const pending = createDeferred<Awaited<ReturnType<EventRepository['listSchedule']>>>();
-    dependencies.events.listSchedule.mockReturnValueOnce(pending.promise);
-    await rerender({ revision: 1 });
-    await waitFor(() => expect(dependencies.events.listSchedule).toHaveBeenCalledTimes(3));
-    await act(async () => { await result.current.loadDatePickerMonth('2026-10-01'); });
-    await act(async () => { pending.resolve({ events: [], exceptions: [], replacementEvents: [] }); });
-    expect(result.current.datePickerMonth).toBe('2026-10-01');
-    expect(result.current.isDatePickerLoading).toBe(false);
-  });
-
-  it('設定更新後に古いpicker読込が完了しても新しい曜日順を戻さない', async () => {
-    const dependencies = createDependencies();
-    const { result, rerender } = await renderHook(({ revision }: { revision: number }) => useCalendarView({
-      ...dependencies, refreshRevision: revision, now: () => new Date(2026, 8, 8, 12),
-    }), { initialProps: { revision: 0 } });
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    const pending = createDeferred<Awaited<ReturnType<EventRepository['listSchedule']>>>();
-    dependencies.events.listSchedule.mockReturnValueOnce(pending.promise);
-    let loading!: Promise<boolean>;
-    await act(async () => { loading = result.current.loadDatePickerMonth('2026-09-01'); });
-    dependencies.settings.getCalendarWeekStartsOn.mockResolvedValue(0);
-    await rerender({ revision: 1 });
-    await waitFor(() => expect(result.current.datePickerDays[0].date).toBe('2026-08-30'));
-    await act(async () => {
-      pending.resolve({ events: [], exceptions: [], replacementEvents: [] });
-      await loading;
-    });
-    expect(result.current.datePickerDays[0].date).toBe('2026-08-30');
-    expect(result.current.isDatePickerLoading).toBe(false);
-  });
-
-  it('設定更新時の読込失敗でも古いpickerの待機状態を残さない', async () => {
-    const dependencies = createDependencies();
-    const { result, rerender } = await renderHook(({ revision }: { revision: number }) => useCalendarView({
-      ...dependencies, refreshRevision: revision, now: () => new Date(2026, 8, 8, 12),
-    }), { initialProps: { revision: 0 } });
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    const pending = createDeferred<Awaited<ReturnType<EventRepository['listSchedule']>>>();
-    dependencies.events.listSchedule.mockReturnValueOnce(pending.promise);
-    let loading!: Promise<boolean>;
-    await act(async () => { loading = result.current.loadDatePickerMonth('2026-09-01'); });
-    dependencies.settings.getCalendarWeekStartsOn.mockRejectedValueOnce(new Error('failed'));
-    await rerender({ revision: 1 });
-    await waitFor(() => expect(result.current.periodError).not.toBeNull());
-    expect(result.current.isDatePickerLoading).toBe(false);
-    expect(result.current.datePickerError).not.toBeNull();
-    await act(async () => { pending.resolve({ events: [], exceptions: [], replacementEvents: [] }); await loading; });
-  });
-
-  it('保存済みの日曜始まりで初回の月範囲とpickerを読み込む', async () => {
+  it('保存済みの日曜始まりで初回の月範囲を読み込む', async () => {
     const dependencies = createDependencies();
     dependencies.settings.getCalendarWeekStartsOn.mockResolvedValue(0);
     dependencies.settings.getLastCalendarViewMode.mockResolvedValue('month');
@@ -380,8 +321,6 @@ describe('カレンダー表示の状態調整', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(result.current.monthDays[0].date).toBe('2026-08-30');
     expect(dependencies.events.listSchedule).toHaveBeenCalledWith(calendar.id, '2026-08-30', '2026-10-10');
-    await act(async () => { await result.current.loadDatePickerMonth('2026-09-01'); });
-    expect(result.current.datePickerDays[0].date).toBe('2026-08-30');
   });
 
   it('設定変更の取得失敗では旧表示を維持し、再試行で設定と範囲を同時反映する', async () => {
@@ -674,32 +613,6 @@ describe('カレンダー表示の状態調整', () => {
     expect(result.current.twoDayDays.flatMap((day) => day.timelineItems)).toEqual([]);
   });
 
-  it('日付ピッカーの読込中に非表示へ切り替えても古い表示設定で上書きしない', async () => {
-    const dependencies = createDependencies();
-    const pendingVisibility = createDeferred<boolean>();
-    dependencies.settings.getCalendarVisible
-      .mockResolvedValueOnce(true)
-      .mockReturnValueOnce(pendingVisibility.promise);
-    const { result } = await renderHook(() =>
-      useCalendarView({ ...dependencies, now: () => new Date(2026, 8, 8, 12) }),
-    );
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-
-    let pickerLoad!: Promise<boolean>;
-    await act(async () => {
-      pickerLoad = result.current.loadDatePickerMonth('2026-09-01');
-      await Promise.resolve();
-    });
-    await act(async () => expect(await result.current.setCalendarVisible(false)).toBe(true));
-    await act(async () => pendingVisibility.resolve(true));
-
-    await expect(pickerLoad).resolves.toBe(true);
-    expect(result.current.isCalendarVisible).toBe(false);
-    expect(result.current.datePickerDays.find((day) => day.date === event.anchorDate)).toMatchObject({
-      hasEvents: false,
-    });
-  });
-
   it('2日表示は前後の予備列を含めた4日分のストリップも提供する', async () => {
     const dependencies = createDependencies();
     const { result } = await renderHook(() =>
@@ -776,49 +689,19 @@ describe('カレンダー表示の状態調整', () => {
     });
   });
 
-  it('日付ピッカーは月グリッド42日分の予定を現在表示から独立して取得する', async () => {
+  it('年月ジャンプは選択月のグリッド42日分を取得し、月表示を維持する', async () => {
     const dependencies = createDependencies();
+    dependencies.settings.getLastCalendarViewMode.mockResolvedValue('month');
     const { result } = await renderHook(() =>
       useCalendarView({ ...dependencies, now: () => new Date(2026, 8, 8, 12) }),
     );
     await waitFor(() => expect(result.current.status).toBe('ready'));
-
-    await act(async () =>
-      expect(await result.current.loadDatePickerMonth('2026-10-01')).toBe(true));
-
-    expect(result.current.datePickerMonth).toBe('2026-10-01');
-    expect(result.current.datePickerDays).toHaveLength(42);
+    await act(async () => expect(await result.current.showDate('2027-10-01')).toBe(true));
     expect(result.current).toMatchObject({
-      anchorDate: '2026-09-08',
-      visibleMonth: '2026-09-01',
-      datePickerError: null,
-      isDatePickerLoading: false,
+      mode: 'month', anchorDate: '2027-10-01', visibleMonth: '2027-10-01', selectedDate: '2027-10-01',
     });
-    expect(dependencies.events.listSchedule).toHaveBeenLastCalledWith(
-      calendar.id,
-      '2026-09-28',
-      '2026-11-08',
-    );
-  });
-
-  it('日付ピッカーの月取得に失敗しても既存表示を維持する', async () => {
-    const dependencies = createDependencies();
-    const { result } = await renderHook(() =>
-      useCalendarView({ ...dependencies, now: () => new Date(2026, 8, 8, 12) }),
-    );
-    await waitFor(() => expect(result.current.status).toBe('ready'));
-    dependencies.events.listSchedule.mockRejectedValueOnce(new Error('database unavailable'));
-
-    await act(async () =>
-      expect(await result.current.loadDatePickerMonth('2026-10-01')).toBe(false));
-
-    expect(result.current).toMatchObject({
-      anchorDate: '2026-09-08',
-      visibleMonth: '2026-09-01',
-      datePickerMonth: '2026-09-01',
-      datePickerError: '月の予定を読み込めませんでした',
-      isDatePickerLoading: false,
-    });
+    expect(result.current.monthDays).toHaveLength(42);
+    expect(dependencies.events.listSchedule).toHaveBeenLastCalledWith(calendar.id, '2027-09-27', '2027-11-07');
   });
 
   it('月表示と2日表示を選択日を保って切り替える', async () => {

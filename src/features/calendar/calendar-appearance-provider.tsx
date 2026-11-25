@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
-import { DEFAULT_CALENDAR_TEAL, DEFAULT_EVENT_COLOR_ID, type EventColorId, type PrimaryCalendarColorId } from '@/domain/calendar/event-color';
+import { DEFAULT_CALENDAR_COLOR_ID, parsePrimaryCalendarColorId, type PrimaryCalendarColorId } from '@/domain/calendar/calendar-color';
+import { DEFAULT_EVENT_COLOR_ID } from '@/domain/calendar/event-color';
 import type { CalendarRepository, SettingsRepository } from '@/domain/calendar/repositories';
 import { CalendarAppearanceContext } from '@/hooks/calendar-appearance-context';
 
@@ -7,7 +8,7 @@ export function CalendarAppearanceProvider({ calendars, settings, children }: Pr
   calendars: Pick<CalendarRepository, 'getDefault'>;
   settings: Pick<SettingsRepository, 'getPrimaryCalendarColor' | 'setPrimaryCalendarColor'>;
 }>) {
-  const [colorId, setColorId] = useState<EventColorId | null>(null);
+  const [colorId, setColorId] = useState<PrimaryCalendarColorId>(DEFAULT_CALENDAR_COLOR_ID);
   const [isBusy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -22,7 +23,8 @@ export function CalendarAppearanceProvider({ calendars, settings, children }: Pr
         const calendarColor = saved === null ? (await calendars.getDefault()).colorId : null;
         if (operation !== generation.current) return;
         // 以前の青は初期シード。明示設定の青は別キーに保存して区別する。
-        setColorId(saved === DEFAULT_CALENDAR_TEAL ? null : saved ?? (calendarColor === DEFAULT_EVENT_COLOR_ID ? null : calendarColor));
+        const legacyColor = calendarColor === DEFAULT_EVENT_COLOR_ID ? null : parsePrimaryCalendarColorId(calendarColor);
+        setColorId(saved ?? legacyColor ?? DEFAULT_CALENDAR_COLOR_ID);
         setError(null);
       } catch {
         if (operation === generation.current) setError('カレンダーの色を読み込めませんでした。');
@@ -45,7 +47,7 @@ export function CalendarAppearanceProvider({ calendars, settings, children }: Pr
     try {
       await settings.setPrimaryCalendarColor(next, new Date().toISOString());
       if (operation !== generation.current) return false;
-      setColorId(next === DEFAULT_CALENDAR_TEAL ? null : next);
+      setColorId(next);
       return true;
     } catch {
       if (operation === generation.current) setError('カレンダーの色を保存できませんでした。');

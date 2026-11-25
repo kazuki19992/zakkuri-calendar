@@ -27,7 +27,7 @@ export default function DayRoute() {
         <>
           <Text style={{ color: theme.text }}>日付が正しくありません</Text>
           <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/')} style={styles.button}>
-            <Text style={{ color: theme.calendarAccent }}>カレンダーを開く</Text>
+            <Text style={{ color: theme.calendarAccentText }}>カレンダーを開く</Text>
           </Pressable>
         </>
       )}

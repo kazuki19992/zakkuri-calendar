@@ -1,7 +1,7 @@
 import { DEFAULT_UNDETERMINED_MINUTES, parseUndeterminedMinutes } from '@/domain/temporal/temporal-preferences';
 import { defaultReminderTiming, defaultTimingIsValid, parseReminderTiming, type NotificationCategory, type ReminderTiming } from '@/domain/notifications/reminder-timing';
 import { parseExactDuration, type EventEditorTab, type ExactDuration } from '@/domain/calendar/event';
-import { parsePrimaryCalendarColorId, type PrimaryCalendarColorId } from '@/domain/calendar/event-color';
+import { isPrimaryCalendarColorId, parsePrimaryCalendarColorId, type PrimaryCalendarColorId } from '@/domain/calendar/calendar-color';
 import {
   DEFAULT_CALENDAR_VIEW_MODE,
   parseCalendarViewMode,
@@ -163,13 +163,12 @@ export class SqliteSettingsRepository implements SettingsRepository {
   }
 
   async setPrimaryCalendarColor(colorId: PrimaryCalendarColorId, updatedAt: string): Promise<void> {
-    const parsed = parsePrimaryCalendarColorId(colorId);
-    if (parsed === null) throw new Error('カレンダーの色を確認してください');
+    if (!isPrimaryCalendarColorId(colorId)) throw new Error('カレンダーの色を確認してください');
     await this.database.run(
       `INSERT INTO app_settings (key, value_json, updated_at)
        VALUES ($key, $valueJson, $updatedAt)
        ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
-      { $key: PRIMARY_CALENDAR_COLOR_KEY, $valueJson: JSON.stringify(parsed), $updatedAt: updatedAt },
+      { $key: PRIMARY_CALENDAR_COLOR_KEY, $valueJson: JSON.stringify(colorId), $updatedAt: updatedAt },
     );
   }
 

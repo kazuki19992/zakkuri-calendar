@@ -50,7 +50,7 @@ export function EventReminderEditor({
       onPress={action}
       style={styles.button}
     >
-      <Text style={{ color: theme.calendarAccent }}>{label}</Text>
+      <Text style={{ color: theme.calendarAccentText }}>{label}</Text>
     </Pressable>
   );
   return (

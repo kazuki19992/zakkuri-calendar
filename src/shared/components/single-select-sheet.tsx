@@ -204,14 +204,14 @@ export function SingleSelectSheet<T extends string | number>({
                     ) : null}
                   </View>
                   <Text accessibilityElementsHidden importantForAccessibility="no"
-                    style={[styles.check, { color: theme.calendarAccent }]}>{selected ? '✓' : ''}</Text>
+                    style={[styles.check, { color: theme.calendarAccentText }]}>{selected ? '✓' : ''}</Text>
                 </Pressable>
               );
             }} />
           <Pressable accessibilityRole="button" accessibilityLabel="キャンセル"
             accessibilityState={{ disabled: closing }} disabled={closing} onPress={requestClose}
             style={[styles.cancel, { borderTopColor: theme.calendarBorder }]}>
-            <Text style={{ color: theme.calendarAccent }}>キャンセル</Text>
+            <Text style={{ color: theme.calendarAccentText }}>キャンセル</Text>
           </Pressable>
         </AnimatedSafeAreaView>
       </SafeAreaView>

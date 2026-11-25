@@ -40,9 +40,10 @@ export function TwoDayAllDayLayer({ layout, columnWidth, height, rowHeight, visi
         ? Math.max(0, visibleStartIndex - segment.startIndex) * columnWidth + 6
         : 6;
       const labelOpacityOffset = (labelLeft + Math.min(columnWidth, 48) / 2) / Math.max(1, segment.spanDays * columnWidth - 4);
+      const eventText = item.colorId === null ? theme.calendarEventText : theme.background;
       const textStyle = isFaded
-        ? getTimelineGradientTextStyle(segment.opacityStops, labelOpacityOffset, color, theme)
-        : { color: item.colorId === 'holiday' ? theme.calendarHoliday : theme.calendarEventText };
+        ? getTimelineGradientTextStyle(segment.opacityStops, labelOpacityOffset, color, theme, eventText)
+        : { color: item.colorId === 'holiday' ? theme.calendarHoliday : eventText };
       const highlighted = savedEventId === item.eventId && savedDayIndex !== undefined
         && segment.startIndex <= savedDayIndex && savedDayIndex < segment.startIndex + segment.spanDays;
       const continuedEdges = [

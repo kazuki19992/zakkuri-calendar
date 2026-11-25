@@ -80,7 +80,7 @@ export function TwoDayColumn({ day, variant = 'summary', scale = 1, headerHeight
         <Text style={[styles.weekday, { color: theme.textSecondary }]}>{day.weekdayLabel}</Text>
         <View testID={day.isToday ? 'two-day-calendar.today-circle' : undefined}
           style={[styles.dateCircle, day.isToday && { backgroundColor: theme.calendarAccent }] }>
-          <Text style={[styles.date, { color: day.isToday ? theme.background : theme.text }] }>
+          <Text style={[styles.date, { color: day.isToday ? theme.calendarEventText : theme.text }] }>
             {Number(day.date.slice(8, 10))}
           </Text>
         </View>

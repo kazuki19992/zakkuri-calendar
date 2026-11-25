@@ -36,7 +36,7 @@ export function ExactDurationTypeField({ value, status, disabled, onChange, onRe
     {status === 'error' ? <>
       <Text accessibilityRole="alert" style={{ color: theme.calendarHoliday }}>初期の長さを読み込めませんでした。</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="初期の長さを再読み込み" disabled={disabled}
-        style={styles.row} onPress={onRetry}><Text style={{ color: theme.calendarAccent }}>再読み込み</Text></Pressable>
+        style={styles.row} onPress={onRetry}><Text style={{ color: theme.calendarAccentText }}>再読み込み</Text></Pressable>
     </> : null}
     <SingleSelectSheet visible={selecting} title="終了の指定" value={value} options={OPTIONS}
       disabled={blocked} onSelect={onChange} onClose={() => setSelecting(false)} />

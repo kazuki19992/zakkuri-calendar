@@ -1,8 +1,8 @@
 import { createContext, useContext } from 'react';
-import type { EventColorId, PrimaryCalendarColorId } from '@/domain/calendar/event-color';
+import type { PrimaryCalendarColorId } from '@/domain/calendar/calendar-color';
 
 export type CalendarAppearance = Readonly<{
-  colorId: EventColorId | null;
+  colorId: PrimaryCalendarColorId;
   isBusy: boolean;
   error: string | null;
   setColor(colorId: PrimaryCalendarColorId): Promise<boolean>;

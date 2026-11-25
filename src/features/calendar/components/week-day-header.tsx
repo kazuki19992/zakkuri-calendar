@@ -26,7 +26,7 @@ export function WeekDayHeader({ day, hiddenCount, height, columnWidth, allDayHei
       style={[styles.header, { height, borderBottomColor: selected ? theme.calendarAccent : theme.calendarBorder, borderBottomWidth: selected ? 2 : StyleSheet.hairlineWidth }]}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} nestedScrollEnabled>
       <Text numberOfLines={1} style={[styles.weekday, { color: dateColor }]}>{day.weekdayLabel}</Text>
-      <Text numberOfLines={1} style={[styles.date, { color: day.isToday ? theme.background : dateColor,
+      <Text numberOfLines={1} style={[styles.date, { color: day.isToday ? theme.calendarEventText : dateColor,
         backgroundColor: day.isToday ? theme.calendarAccent : 'transparent' }]}>{Number(day.date.slice(8, 10))}</Text>
       <Text style={[styles.more, { color: theme.textSecondary }]}>{hiddenCount > 0 ? `他${hiddenCount}件` : ' '}</Text>
       </ScrollView>

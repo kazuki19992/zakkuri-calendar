@@ -27,7 +27,7 @@ function EditAction({ label, onPress, disabled = false, accessibilityLabel = lab
       accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
       style={({ pressed }) => [styles.button, primary && styles.primary, pressed && { opacity: 0.82 }]}>
       <Text numberOfLines={2} style={[styles.actionText, {
-        color: disabled ? theme.textDisabled : primary ? theme.calendarAccent : theme.text,
+        color: disabled ? theme.textDisabled : primary ? theme.calendarAccentText : theme.text,
       }]}>{label}</Text>
     </Pressable>
   );
@@ -41,7 +41,7 @@ export function TemporalDefinitionSaveAction({ state }: Readonly<{
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled}
       style={styles.headerAction} onPress={() => { void state.prepareSave(); }}>
-      <Text style={{ color: disabled ? theme.textDisabled : theme.calendarAccent }}>{state.isSaving ? '保存中…' : '保存'}</Text>
+      <Text style={{ color: disabled ? theme.textDisabled : theme.calendarAccentText }}>{state.isSaving ? '保存中…' : '保存'}</Text>
     </Pressable>
   );
 }

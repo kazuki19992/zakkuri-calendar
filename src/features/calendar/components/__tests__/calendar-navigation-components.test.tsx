@@ -106,8 +106,8 @@ describe('カレンダーのトップナビゲーション', () => {
   });
 
   it.each([
-    ['blue', 'ティール（初期色）', '#14665D'],
-    ['purple', '紫', '#6A1B9A'],
+    ['blue', 'まっちゃ', '#1f7a5c'],
+    ['purple', 'たそがれ', '#6030a0'],
   ] as const)('カレンダー色が%sのときに色見本とラベルを合わせる', async (colorId, label, backgroundColor) => {
     const view = await render(
       <CalendarSideMenu visible calendarName="マイカレンダー" calendarColorId={colorId}
@@ -118,24 +118,22 @@ describe('カレンダーのトップナビゲーション', () => {
     expect(view.getByLabelText(`マイカレンダーの色、${label}`)).toHaveStyle({ backgroundColor });
   });
 
-  it('初期ティールを先頭に表示し、明示色から元の色に戻せる', async () => {
+  it('カレンダー色の先頭にまっちゃを表示し、選択できる', async () => {
     const setColor = jest.fn().mockResolvedValue(true);
     const view = await render(
-      <CalendarAppearanceContext.Provider value={{ colorId: 'blue', isBusy: false, error: null, setColor }}>
+      <CalendarAppearanceContext.Provider value={{ colorId: 'umi', isBusy: false, error: null, setColor }}>
         <CalendarSideMenu visible calendarName="マイカレンダー" calendarColorId="blue"
           isCalendarVisible isCalendarVisibilityUpdating={false} calendarVisibilityError={null}
           reduceMotion onSetCalendarVisible={jest.fn().mockResolvedValue(true)}
           onOpenSettings={jest.fn()} onClose={jest.fn()} />
       </CalendarAppearanceContext.Provider>,
     );
-    await fireEvent.press(view.getByRole('button', { name: 'マイカレンダーの色、青' }));
-    expect(view.getAllByRole('button').find((button) => ['ティール（初期色）', '青'].includes(button.props.accessibilityLabel)))
-      .toHaveAccessibleName('ティール（初期色）');
-    for (const label of ['ティール（初期色）', '青、選択中', '青緑', '緑', '黄土', '橙', '赤', '紫', '灰']) {
-      expect(view.getByRole('button', { name: label })).toBeOnTheScreen();
-    }
-    await fireEvent.press(view.getByRole('button', { name: 'ティール（初期色）' }));
-    expect(setColor).toHaveBeenCalledWith('default-teal');
+    await fireEvent.press(view.getByRole('button', { name: 'マイカレンダーの色、うみ' }));
+    const options = view.getAllByRole('button').filter((button) => typeof button.props.accessibilityState?.selected === 'boolean');
+    expect(options[0]).toHaveAccessibleName('まっちゃ');
+    expect(view.getByRole('button', { name: 'うみ、選択中' })).toBeSelected();
+    await fireEvent.press(view.getByRole('button', { name: 'まっちゃ' }));
+    expect(setColor).toHaveBeenCalledWith('matcha');
   });
 
   it('カレンダー表示を切り替えても開いたままになり、保存失敗時はエラーを出す', async () => {

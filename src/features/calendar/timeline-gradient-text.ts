@@ -13,7 +13,8 @@ export function getTimelineGradientTextStyle(
   stops: readonly TimelineOpacityStop[],
   offset: number,
   eventColor: string,
-  theme: Readonly<{ text: string; background: string; calendarEventText: string }>,
+  theme: Readonly<{ text: string; background: string }>,
+  eventText: string,
 ) {
   const opacity = getOpacityAt(stops, offset);
   const composite = [1, 3, 5].map((index) => {
@@ -21,6 +22,6 @@ export function getTimelineGradientTextStyle(
     const background = Number.parseInt(theme.background.slice(index, index + 2), 16);
     return Math.round(background + (event - background) * opacity).toString(16).padStart(2, '0');
   }).join('');
-  const prefersRegularText = getContrastRatio(theme.text, `#${composite}`) >= getContrastRatio(theme.calendarEventText, `#${composite}`);
-  return { color: prefersRegularText ? theme.text : theme.calendarEventText };
+  const prefersRegularText = getContrastRatio(theme.text, `#${composite}`) >= getContrastRatio(eventText, `#${composite}`);
+  return { color: prefersRegularText ? theme.text : eventText };
 }

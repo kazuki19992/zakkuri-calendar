@@ -420,11 +420,11 @@ describe('カレンダー画面', () => {
 
   it('カレンダー用lightとdarkのsemantic colorを提供する', () => {
     for (const theme of Object.values(Colors)) {
-      expect(getContrastRatio(theme.calendarAccent, theme.background)).toBeGreaterThanOrEqual(4.5);
+      expect(getContrastRatio(theme.calendarAccentText, theme.background)).toBeGreaterThanOrEqual(4.5);
       expect(getContrastRatio(theme.text, theme.backgroundElement)).toBeGreaterThanOrEqual(4.5);
       expect(getContrastRatio(theme.text, theme.backgroundSelected)).toBeGreaterThanOrEqual(4.5);
     }
-    expect(Colors.light.calendarEventText).toBe(Colors.light.background);
-    expect(Colors.dark.calendarEventText).toBe(Colors.dark.background);
+    expect(Colors.light.calendarEventText).toBe('#fffdf8');
+    expect(Colors.dark.calendarEventText).toBe('#102018');
   });
 });

@@ -100,7 +100,7 @@ function NumberWheel({
             <Text
               style={{
                 color:
-                  item === value ? theme.calendarAccent : theme.textSecondary,
+                  item === value ? theme.calendarAccentText : theme.textSecondary,
                 fontSize: Typography.title,
                 fontWeight: item === value ? '700' : '400',
               }}
@@ -247,7 +247,7 @@ function PickerContent({
                         {v === 'start' ? '開始' : '終了'}
                         {calendar ? '日' : ''}
                       </Text>
-                      <Text style={{ color: theme.calendarAccent }}>
+                      <Text style={{ color: theme.calendarAccentText }}>
                         {v === anchor ? '✓' : ' '}
                       </Text>
                     </Pressable>
@@ -302,7 +302,7 @@ function PickerContent({
                 onClose();
               }}
             >
-              <Text style={{ color: theme.calendarAccent }}>確定</Text>
+              <Text style={{ color: theme.calendarAccentText }}>確定</Text>
             </Pressable>
           </View>
         </SafeAreaView>

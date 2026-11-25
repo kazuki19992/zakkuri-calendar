@@ -49,7 +49,7 @@ export function NotificationSettingsSection({
         });
       }}
     >
-      <Text style={{ color: theme.calendarAccent }}>{label}</Text>
+      <Text style={{ color: theme.calendarAccentText }}>{label}</Text>
       {description ? <Text style={[styles.actionNote, { color: theme.textSecondary }]}>{description}</Text> : null}
     </Pressable>
   );

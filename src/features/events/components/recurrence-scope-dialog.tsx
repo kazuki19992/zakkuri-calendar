@@ -49,7 +49,7 @@ export function RecurrenceScopeDialog({ request, busy, onSelect, onCancel, showU
                 accessibilityState={{ disabled: busy }} disabled={busy}
                 onPress={() => { setConfirmationScope(null); onSelect(confirmationScope); }}
                 style={[styles.option, { borderTopColor: theme.calendarBorder }]}>
-                <Text style={{ color: theme.calendarAccent }}>{confirmText}</Text>
+                <Text style={{ color: theme.calendarAccentText }}>{confirmText}</Text>
               </Pressable>
             </>
           ) : request.options.map((option) => (

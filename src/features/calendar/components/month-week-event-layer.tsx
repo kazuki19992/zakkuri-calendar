@@ -42,7 +42,8 @@ export function MonthWeekEventLayer({ week, onOpenDay, onEditEvent, savedEvent, 
             const color = item.colorId === null ? theme.calendarEvent : getEventColor(item.colorId, scheme);
             const isOpaque = item.opacityStops.every((stop) => stop.opacity === 1);
             const hasOpaqueEnd = item.alignLabelToEnd && item.opacityStops.at(-1)?.opacity === 1;
-            const labelColor = isOpaque || hasOpaqueEnd ? theme.calendarEventText : theme.text;
+            const eventText = item.colorId === null ? theme.calendarEventText : theme.background;
+            const labelColor = isOpaque || hasOpaqueEnd ? eventText : theme.text;
             const edges = [item.startsInWeek && styles.start, item.endsInWeek && styles.end];
             const testID = `month-calendar.event-block.${item.id}`;
             const isSaved = savedEvent?.id === item.eventId

@@ -7,7 +7,7 @@ export function CalendarSaveNotice() {
   return (
     <View pointerEvents="none" style={styles.position}>
       <Text accessibilityRole="alert" accessibilityLiveRegion="polite"
-        style={[styles.label, { color: theme.background, backgroundColor: theme.calendarAccent }]}>
+        style={[styles.label, { color: theme.calendarEventText, backgroundColor: theme.calendarAccentText }]}>
         予定を保存しました
       </Text>
     </View>

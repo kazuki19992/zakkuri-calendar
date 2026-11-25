@@ -122,7 +122,7 @@ export function CalendarScreen({ state, onAddEvent, onEditEvent, onCreateExactAt
             <Pressable accessibilityRole="button" accessibilityLabel="カレンダーを再読み込み"
               accessibilityState={{ disabled: state.isPeriodLoading }} disabled={state.isPeriodLoading}
               style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: Spacing.three }} onPress={() => void state.retry()}>
-              <Text style={{ color: theme.calendarAccent }}>再読み込み</Text>
+              <Text style={{ color: theme.calendarAccentText }}>再読み込み</Text>
             </Pressable>
           </View>
         ) : null}

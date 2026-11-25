@@ -1,5 +1,5 @@
 import type { CalendarEvent } from '@/domain/calendar/event';
-import type { EventColorId } from '@/domain/calendar/event-color';
+import type { PrimaryCalendarColorId } from '@/domain/calendar/calendar-color';
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
 import type { EventReminder } from '@/domain/calendar/event-reminder';
 import type { AppDatabase } from '@/data/sqlite/database';
@@ -406,9 +406,12 @@ describe('SQLite repositories', () => {
     [{ value_json: 'null' }, null],
     [{ value_json: '"unknown"' }, null],
     [{ value_json: '{"colorId":"blue"}' }, null],
-    [{ value_json: '"blue"' }, 'blue'],
-    [{ value_json: '"default-teal"' }, 'default-teal'],
-    [{ value_json: '"purple"' }, 'purple'],
+    [{ value_json: '"blue"' }, 'umi'],
+    [{ value_json: '"default-teal"' }, 'matcha'],
+    [{ value_json: '"matcha"' }, 'matcha'],
+    [{ value_json: '"asatsuyu"' }, 'asatsuyu'],
+    [{ value_json: '"purple"' }, 'tasogare'],
+    [{ value_json: '"gray"' }, 'matcha'],
   ])('メインカレンダー色の設定 %j から有効な色IDだけを読み込む', async (row, expected) => {
     const db = createDatabaseDouble();
     db.first.mockResolvedValue(row);
@@ -420,7 +423,7 @@ describe('SQLite repositories', () => {
     });
   });
 
-  it.each(['blue', 'default-teal'] as const)('メインカレンダー色 %s を単一の設定へ保存する', async (colorId) => {
+  it.each(['matcha', 'umi'] as const)('メインカレンダー色 %s を単一の設定へ保存する', async (colorId) => {
     const db = createDatabaseDouble();
     const settings = new SqliteSettingsRepository(db.database);
 
@@ -437,7 +440,7 @@ describe('SQLite repositories', () => {
     const db = createDatabaseDouble();
     const settings = new SqliteSettingsRepository(db.database);
 
-    await expect(settings.setPrimaryCalendarColor('unknown' as EventColorId, now)).rejects.toThrow();
+    await expect(settings.setPrimaryCalendarColor('unknown' as PrimaryCalendarColorId, now)).rejects.toThrow();
     expect(db.run).not.toHaveBeenCalled();
   });
 

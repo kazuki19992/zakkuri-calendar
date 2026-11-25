@@ -123,7 +123,7 @@ function DurationWheelPickerContent({
             accessibilityState={{ selected: item === selected }}
             onPress={() => setSelected(item)} style={styles.wheelItem}>
             <Text style={[styles.wheelValue, {
-              color: item === selected ? theme.calendarAccent : theme.textSecondary,
+              color: item === selected ? theme.calendarAccentText : theme.textSecondary,
               fontWeight: item === selected ? '700' : '400',
             }]}>{item}</Text>
           </Pressable>
@@ -164,7 +164,7 @@ function DurationWheelPickerContent({
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={`${title}を確定`} disabled={!valid} accessibilityState={{ disabled: !valid }}
               onPress={() => { onConfirm(hours * 60 + minutes); onClose(); }} style={styles.action}>
-              <Text style={{ color: theme.calendarAccent, fontWeight: '600' }}>確定</Text>
+              <Text style={{ color: theme.calendarAccentText, fontWeight: '600' }}>確定</Text>
             </Pressable>
           </View>
         </SafeAreaView>

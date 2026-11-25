@@ -64,7 +64,7 @@ export function MonthDayCell({ day, onPress, onOpenDay, renderDayPreview, varian
                 { color: theme.text },
                 isSaturday && { color: theme.calendarSaturday },
                 isHoliday && { color: theme.calendarHoliday },
-                day.isToday && { color: theme.background },
+                day.isToday && { color: theme.calendarEventText },
               ]}
             >
               {day.dayNumber}

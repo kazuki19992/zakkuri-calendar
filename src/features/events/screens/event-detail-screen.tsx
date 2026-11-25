@@ -28,7 +28,7 @@ export function EventDetailScreen({ state, deleting, canDelete, usesScopeSelecti
         </Pressable>
         <Text style={[styles.heading, text]}>予定</Text>
         <Pressable accessibilityRole="button" disabled={!ready || deleting} onPress={onEdit} style={styles.headerAction}>
-          <Text style={{ color: ready && !deleting ? theme.calendarAccent : theme.textDisabled }}>編集</Text>
+          <Text style={{ color: ready && !deleting ? theme.calendarAccentText : theme.textDisabled }}>編集</Text>
         </Pressable>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
@@ -63,7 +63,7 @@ export function EventDetailScreen({ state, deleting, canDelete, usesScopeSelecti
               {state.status === 'missing' ? '予定が見つかりません' : '予定を読み込めませんでした'}
             </Text>
             {state.status === 'error' ? <Pressable accessibilityRole="button" onPress={state.retry}
-              style={styles.retry}><Text style={{ color: theme.calendarAccent }}>再読み込み</Text></Pressable> : null}
+              style={styles.retry}><Text style={{ color: theme.calendarAccentText }}>再読み込み</Text></Pressable> : null}
           </>
         )}
       </ScrollView>

@@ -4,8 +4,9 @@ import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { EVENT_COLOR_PALETTE, getEventColor, getEventColorLabel, resolveEventDisplayColorId, type EventColorId } from '@/constants/event-colors';
-import { DEFAULT_CALENDAR_TEAL, type PrimaryCalendarColorId } from '@/domain/calendar/event-color';
+import { CALENDAR_COLOR_PRESETS, getCalendarColorPreset } from '@/constants/calendar-color-presets';
+import { DEFAULT_CALENDAR_COLOR_ID, parsePrimaryCalendarColorId } from '@/domain/calendar/calendar-color';
+import { DEFAULT_EVENT_COLOR_ID, type EventColorId } from '@/domain/calendar/event-color';
 import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useCalendarAppearance } from '@/hooks/calendar-appearance-context';
 import { SingleSelectSheet } from '@/shared/components/single-select-sheet';
@@ -15,7 +16,6 @@ import { useTheme } from '@/hooks/use-theme';
 const AnimatedSafeAreaView = Animated.createAnimatedComponent(SafeAreaView);
 const CLOSED_TRANSLATE_X = -360;
 const SLIDE_DURATION_MS = 220;
-const DEFAULT_CALENDAR_COLOR_LABEL = 'ティール（初期色）';
 
 export function CalendarSideMenu({
   visible,
@@ -43,10 +43,10 @@ export function CalendarSideMenu({
   const theme = useTheme();
   const colorScheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const appearance = useCalendarAppearance();
-  const displayColorId = appearance ? appearance.colorId : resolveEventDisplayColorId(null, calendarColorId);
+  const fallbackColor = calendarColorId === DEFAULT_EVENT_COLOR_ID ? null : parsePrimaryCalendarColorId(calendarColorId);
+  const preset = getCalendarColorPreset(appearance?.colorId ?? fallbackColor ?? DEFAULT_CALENDAR_COLOR_ID);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
-  const swatchColor = getEventColor(displayColorId, colorScheme);
-  const colorLabel = displayColorId === null ? DEFAULT_CALENDAR_COLOR_LABEL : getEventColorLabel(displayColorId);
+  const swatchColor = preset[colorScheme].accent;
   const [translateX] = useState(() => new Animated.Value(CLOSED_TRANSLATE_X));
   const closingRef = useRef(false);
   const isBusy = isCalendarVisibilityUpdating;
@@ -113,13 +113,13 @@ export function CalendarSideMenu({
             <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>カレンダー</Text>
             <View style={styles.calendarRow}>
               {appearance ? (
-                <Pressable accessibilityRole="button" accessibilityLabel={`${calendarName}の色、${colorLabel}`}
+                <Pressable accessibilityRole="button" accessibilityLabel={`${calendarName}の色、${preset.label}`}
                   accessibilityHint="カレンダーの色を変更します" disabled={appearance.isBusy}
                   onPress={() => setColorPickerOpen(true)} style={styles.colorButton}>
                   <View style={[styles.colorDot, { backgroundColor: swatchColor }]} />
                 </Pressable>
               ) : (
-                <View accessible accessibilityLabel={`${calendarName}の色、${colorLabel}`}
+                <View accessible accessibilityLabel={`${calendarName}の色、${preset.label}`}
                   style={[styles.colorDot, styles.staticColorDot, { backgroundColor: swatchColor }]} />
               )}
               <Text style={[styles.calendarName, { color: theme.text }]} numberOfLines={1}>{calendarName}</Text>
@@ -160,20 +160,12 @@ export function CalendarSideMenu({
             </Pressable>
           </ScrollView>
           {appearance && colorPickerOpen ? (
-            <SingleSelectSheet<PrimaryCalendarColorId> visible={visible} title="カレンダーの色"
-              value={appearance.colorId ?? DEFAULT_CALENDAR_TEAL}
-              options={[
-                {
-                  value: DEFAULT_CALENDAR_TEAL,
-                  label: DEFAULT_CALENDAR_COLOR_LABEL,
-                  accessory: <View style={[styles.colorDot, { backgroundColor: getEventColor(null, colorScheme) }]} />,
-                },
-                ...EVENT_COLOR_PALETTE.map((item) => ({
-                  value: item.id,
-                  label: item.label,
-                  accessory: <View style={[styles.colorDot, { backgroundColor: item[colorScheme] }]} />,
-                })),
-              ]}
+            <SingleSelectSheet visible={visible} title="カレンダーの色" value={appearance.colorId}
+              options={CALENDAR_COLOR_PRESETS.map((item) => ({
+                value: item.id,
+                label: item.label,
+                accessory: <View style={[styles.colorDot, { backgroundColor: item[colorScheme].accent }]} />,
+              }))}
               onSelect={(value) => { void appearance.setColor(value); }}
               onClose={() => setColorPickerOpen(false)} />
           ) : null}

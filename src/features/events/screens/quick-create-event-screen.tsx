@@ -44,7 +44,7 @@ export function QuickCreateEventScreen({ state, onSave, onCancel }: QuickCreateE
           <Text
             style={[
               styles.headerButtonText,
-              { color: state.isSaving ? theme.textSecondary : theme.calendarAccent },
+              { color: state.isSaving ? theme.textSecondary : theme.calendarAccentText },
             ]}
           >
             キャンセル
@@ -64,7 +64,7 @@ export function QuickCreateEventScreen({ state, onSave, onCancel }: QuickCreateE
           <Text
             style={[
               styles.headerButtonText,
-              { color: cannotSave ? theme.textSecondary : theme.calendarAccent },
+              { color: cannotSave ? theme.textSecondary : theme.calendarAccentText },
             ]}
           >
             {state.isSaving ? '保存中' : '保存'}
@@ -85,7 +85,7 @@ export function QuickCreateEventScreen({ state, onSave, onCancel }: QuickCreateE
             onPress={state.retry}
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
           >
-            <Text style={[styles.headerButtonText, { color: theme.calendarAccent }]}>再試行</Text>
+            <Text style={[styles.headerButtonText, { color: theme.calendarAccentText }]}>再試行</Text>
           </Pressable>
         </View>
       ) : (

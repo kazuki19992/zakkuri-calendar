@@ -117,7 +117,7 @@ describe('独自月カレンダー表示', () => {
     });
     expect(blockStyle.borderTopLeftRadius ?? 0).toBe(0);
     expect(view.queryByTestId(`${blockId}.gradient`, { includeHiddenElements: true })).toBeNull();
-    expect(StyleSheet.flatten(view.getByText('10:00 通院').props.style).color).toBe(Colors.light.calendarEventText);
+    expect(StyleSheet.flatten(view.getByText('10:00 通院').props.style).color).toBe(Colors.light.background);
   });
 
   it('今週中の予定は帯の右端に文字を置き、文字の下にもグラデーションを表示する', async () => {
@@ -257,7 +257,7 @@ describe('独自月カレンダー表示', () => {
         borderRadius: Radii.full,
         backgroundColor: Colors.light.calendarAccent,
       });
-    expect(StyleSheet.flatten(view.getByText('8').props.style).color).toBe(Colors.light.background);
+    expect(StyleSheet.flatten(view.getByText('8').props.style).color).toBe(Colors.light.calendarEventText);
   });
 
   it('相対予定を点ではなく破線の期間バーで示す', async () => {

@@ -69,7 +69,7 @@ export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFre
                 fontWeight: selected ? '700' : '400' }}>{label}</Text>
               {selected ? <View testID={`event-editor.recurrence-weekday-${weekday}-check`}
                 style={styles.checkBadge}>
-                <Text style={[styles.checkText, { color: disabled ? theme.textDisabled : theme.calendarAccent }]}>✓</Text>
+                <Text style={[styles.checkText, { color: disabled ? theme.textDisabled : theme.calendarAccentText }]}>✓</Text>
               </View> : null}
             </Pressable>;
           })}</View></> : null}
@@ -79,7 +79,7 @@ export function RecurrenceEditor({ draft, disabled, error, onPresetChange, onFre
           {draft.endType === 'until' && !relativeFrequency ? <TextInput accessibilityLabel="繰り返し終了日" editable={!disabled} value={draft.untilDate} onChangeText={onUntilDateChange} placeholder="YYYY-MM-DD" placeholderTextColor={theme.textSecondary} style={[styles.input, { borderColor: theme.calendarBorder, color: theme.text }]} /> : null}
           {draft.endType==='until'&&relativeFrequency?<>
             <Pressable accessibilityRole="button" accessibilityLabel={relativeFrequency==='weekly'?'終了する対象週を選択':'終了する対象月を選択'} disabled={disabled} accessibilityState={{disabled}} onPress={()=>setSelectingUntil(true)} style={{minHeight:44,justifyContent:'center'}}>
-              <Text style={{color:disabled ? theme.textDisabled : theme.calendarAccent}}>{isCalendarDate(draft.untilDate)?relativeFrequency==='monthly'?format(untilValue,'yyyy年M月まで'):`${format(untilValue,'yyyy年M月d日')}の週まで`:'終了する対象期間を選択'}</Text>
+              <Text style={{color:disabled ? theme.textDisabled : theme.calendarAccentText}}>{isCalendarDate(draft.untilDate)?relativeFrequency==='monthly'?format(untilValue,'yyyy年M月まで'):`${format(untilValue,'yyyy年M月d日')}の週まで`:'終了する対象期間を選択'}</Text>
             </Pressable>
             {selectingUntil?<NativeDateTimePicker testID="relative-recurrence.until-picker" mode="date" value={untilValue}
               {...(Platform.OS==='android'?{presentation:'dialog' as const}:{locale:'ja_JP',display:'inline' as const})}

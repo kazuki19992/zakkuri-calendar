@@ -10,8 +10,8 @@ export function CalendarAddEventButton({ onPress }: Readonly<{ onPress(): void }
     <Pressable accessibilityRole="button" accessibilityLabel="予定を追加" onPress={onPress}
       style={({ pressed }) => [styles.button, { backgroundColor: theme.calendarAccent }, pressed && styles.pressed]}>
       <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={18}
-        tintColor={theme.background} accessible={false} />
-      <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.label, { color: theme.background }]}>予定を追加</Text>
+        tintColor={theme.calendarEventText} accessible={false} />
+      <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.label, { color: theme.calendarEventText }]}>予定を追加</Text>
     </Pressable>
   );
 }

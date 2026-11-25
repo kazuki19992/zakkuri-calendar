@@ -29,7 +29,7 @@ export function EventEditorHeader({ mode, busy, ready, onCancel, onSave }: Props
           accessibilityState={{ disabled: saveDisabled, busy }} disabled={saveDisabled} onPress={onSave}
           style={({ pressed }) => [styles.action, styles.save, pressed && styles.pressed]}>
           <Text numberOfLines={1} adjustsFontSizeToFit
-            style={[styles.saveLabel, { color: saveDisabled ? theme.textDisabled : theme.calendarAccent }]}>
+            style={[styles.saveLabel, { color: saveDisabled ? theme.textDisabled : theme.calendarAccentText }]}>
             {busy ? '保存中' : '保存'}
           </Text>
         </Pressable>

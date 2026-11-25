@@ -15,7 +15,7 @@ export function SingleDaySummary({ day, headerHeight, columnWidth, allDayHeight,
 }>) {
   const theme = useTheme();
   return <View style={[styles.root, { width: columnWidth }]} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}>
-    <Text accessibilityRole="header" style={[styles.date, { height: headerHeight, color: day.isToday ? theme.calendarAccent : theme.text }]}>
+    <Text accessibilityRole="header" style={[styles.date, { height: headerHeight, color: day.isToday ? theme.calendarAccentText : theme.text }]}>
       {day.dateLabel}（{day.weekdayLabel}）
     </Text>
     <AllDayRegion day={day} height={allDayHeight} hiddenCount={hiddenCount} onOpenAllDayList={onOpenAllDayList} />

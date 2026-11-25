@@ -40,7 +40,7 @@ export function FormattedNoteToolbar({
           onPress={action.onPress} style={({ pressed }) => [styles.button,
             (action.selected || pressed) && { backgroundColor: theme.backgroundSelected }]}>
           <Text style={[styles.label, {
-            color: disabled ? theme.textDisabled : action.selected ? theme.calendarAccent : theme.text,
+            color: disabled ? theme.textDisabled : action.selected ? theme.calendarAccentText : theme.text,
             fontStyle: action.label === '斜体' ? 'italic' : 'normal',
             fontWeight: action.label === '太字' ? '700' : '500',
           }]}>{action.text}</Text>
@@ -51,7 +51,7 @@ export function FormattedNoteToolbar({
         disabled={disabled || state.linkUrl === null}
         onPress={() => { if (state.linkUrl !== null) onOpenLink(state.linkUrl); }}
         style={[styles.button, styles.linkButton]}>
-        <Text style={[styles.linkLabel, { color: disabled || state.linkUrl === null ? theme.textDisabled : theme.calendarAccent }]}>リンクを閲覧</Text>
+        <Text style={[styles.linkLabel, { color: disabled || state.linkUrl === null ? theme.textDisabled : theme.calendarAccentText }]}>リンクを閲覧</Text>
       </Pressable>
     </View>
   );

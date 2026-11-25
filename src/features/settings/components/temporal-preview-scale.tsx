@@ -68,7 +68,7 @@ export function PreviewClockLabels({ ticks, onEdit }: Readonly<{
             {({ pressed }) => <View style={[styles.editable, {
               opacity: pressed ? 0.82 : 1,
             }]}>
-              <Text style={[styles.label, { color: theme.calendarAccent }]}>{time}</Text>
+              <Text style={[styles.label, { color: theme.calendarAccentText }]}>{time}</Text>
               <SymbolView accessible={false} name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={10} tintColor={theme.calendarAccent} />
             </View>}
           </Pressable>

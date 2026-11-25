@@ -18,7 +18,7 @@ export function AllDayRegion({ day, height, hiddenCount, compact = false, onOpen
         accessibilityLabel={`${day.dateLabel}の終日予定、ほか${hiddenCount}件`}
         onPress={() => onOpenAllDayList?.(day.date)}
         style={styles.more}>
-        <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.label, { color: theme.calendarAccent }]}>ほか{hiddenCount}件</Text>
+        <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.label, { color: theme.calendarAccentText }]}>ほか{hiddenCount}件</Text>
       </Pressable> : <>
         {day.holidaySupport === 'unsupported' ? <Text adjustsFontSizeToFit numberOfLines={1} style={[styles.label, { color: theme.textSecondary }]}>{compact ? '祝日未対応' : '祝日情報未対応'}</Text> : null}
       </>}

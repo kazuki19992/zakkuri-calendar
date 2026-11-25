@@ -6,7 +6,8 @@ import type { CalendarViewMode } from './calendar-view-mode';
 import type { WeekStartsOn } from './month';
 import type { HolidayPreferencesV1 } from './holiday-preferences';
 import type { CalendarEvent, EventEditorTab, ExactDuration } from './event';
-import type { EventColorId, PrimaryCalendarColorId } from './event-color';
+import type { EventColorId } from './event-color';
+import type { PrimaryCalendarColorId } from './calendar-color';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
 import type { EventAggregate } from './event-reminder';
 import type {

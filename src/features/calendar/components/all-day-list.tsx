@@ -19,7 +19,7 @@ export function AllDayList({ day, reduceMotion, onClose, onEditEvent }: Readonly
         <View style={styles.header}>
           <Text accessibilityRole="header" style={[styles.heading, { color: theme.text }]}>{day.dateLabel}の終日予定</Text>
           <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-            <Text style={{ color: theme.calendarAccent }}>閉じる</Text>
+            <Text style={{ color: theme.calendarAccentText }}>閉じる</Text>
           </Pressable>
         </View>
         <ScrollView>

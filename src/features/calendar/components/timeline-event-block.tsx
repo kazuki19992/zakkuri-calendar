@@ -42,9 +42,10 @@ export function TimelineEventBlock({ item, scale = 1, compact = false, highlight
   const useTop = (!isFaded && height <= 56) || (compact && peak <= 0.65);
   const textAnchor = useTop ? 'flex-start' : resolveTextAnchor(peak);
   const textOffset = textAnchor === 'flex-start' ? 0.2 : textAnchor === 'flex-end' ? 0.8 : 0.5;
+  const eventText = item.colorId === null ? theme.calendarEventText : theme.background;
   const textStyle = isFaded
-    ? getTimelineGradientTextStyle(item.opacityStops, textOffset, eventColor, theme)
-    : { color: theme.calendarEventText };
+    ? getTimelineGradientTextStyle(item.opacityStops, textOffset, eventColor, theme, eventText)
+    : { color: eventText };
 
   const content = (
     <View testID={`timeline-event.${item.id}.card`} style={[

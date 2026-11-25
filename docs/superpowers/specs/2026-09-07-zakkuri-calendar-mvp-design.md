@@ -348,7 +348,7 @@ MVPでは既定の個人カレンダーを1件seedする。将来の複数カレ
 - `undetermined_fade_minutes`: `120`
 - `last_event_editor_tab`: `fuzzy`または`exact`（schema version 2の互換用。作成・編集画面は参照しない）
 - `this_week_deadline_weekday`: `5`、`6`、`7`のいずれか（schema version 3、既定値は金曜日の`5`）
-- `primary_calendar_color`: メインカレンダーで明示選択した色IDをJSON文字列として保存する。先頭の「ティール（初期色）」は `"default-teal"`、固定パレットの色は対応するIDを使う。未登録・不正値は未選択として扱う。旧シードの青と明示選択の `"blue"` は区別する。
+- `primary_calendar_color`: メインカレンダーで選んだ12色のプリセットIDをJSON文字列として保存する。既定は `"matcha"`（まっちゃ）。未登録・不正値は未選択として扱う。旧プレビューのIDは対応するプリセットに読み替え、ティールの既定値と灰は「まっちゃ」とする。旧シードの青と旧プレビューで明示選択した青は区別する。
 
 読み出し時にキーごとの型検証を行い、不正値は安全な既定値へフォールバックして修復対象として扱う。
 

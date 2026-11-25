@@ -188,7 +188,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
                   );
                 }}
               >
-                <Text style={{ color: theme.calendarAccent }}>
+                <Text style={{ color: theme.calendarAccentText }}>
                   {failure
                     ? failure.retryLabel
                     : state.permission === 'undetermined'

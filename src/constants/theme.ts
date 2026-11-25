@@ -1,25 +1,22 @@
 import '@/global.css';
 
 import { Platform } from 'react-native';
-import { getEventColor, MAIN_CALENDAR_COLOR, type EventColorId } from './event-colors';
+import { DEFAULT_CALENDAR_COLOR_ID, type PrimaryCalendarColorId } from '@/domain/calendar/calendar-color';
+import { getCalendarColorPreset } from './calendar-color-presets';
+import { getContrastRatio } from './event-colors';
 
-export const Colors = {
+const baseColors = {
   light: {
     text: '#202624',
     background: '#FFFFFF',
     backgroundElement: '#F3F6F4',
-    backgroundSelected: '#DDEDE7',
     textSecondary: '#53625C',
     textDisabled: '#7B8882',
     controlBorder: '#D9E2DC',
     calendarSaturday: '#1967D2',
     calendarHoliday: '#B3261E',
     danger: '#B3261E',
-    calendarAccent: MAIN_CALENDAR_COLOR.light,
     calendarBorder: '#D9E2DC',
-    calendarEvent: MAIN_CALENDAR_COLOR.light,
-    calendarEventText: '#FFFFFF',
-    calendarEventBorder: MAIN_CALENDAR_COLOR.light,
     calendarHolidayBackground: '#F3F6F4',
     calendarNowIndicator: '#EA4335',
     calendarOverlay: '#FFFFFF',
@@ -29,18 +26,13 @@ export const Colors = {
     text: '#E8EFEA',
     background: '#202124',
     backgroundElement: '#292F2C',
-    backgroundSelected: '#29423A',
     textSecondary: '#ACBBB3',
     textDisabled: '#85928A',
     controlBorder: '#3B4B43',
     calendarSaturday: '#8AB4F8',
     calendarHoliday: '#F28B82',
     danger: '#F28B82',
-    calendarAccent: MAIN_CALENDAR_COLOR.dark,
     calendarBorder: '#3B4B43',
-    calendarEvent: MAIN_CALENDAR_COLOR.dark,
-    calendarEventText: '#202124',
-    calendarEventBorder: MAIN_CALENDAR_COLOR.dark,
     calendarHolidayBackground: '#292F2C',
     calendarNowIndicator: '#F28B82',
     calendarOverlay: '#292F2C',
@@ -48,23 +40,45 @@ export const Colors = {
   },
 } as const;
 
-export function resolveCalendarTheme(scheme: keyof typeof Colors, colorId: EventColorId | null) {
-  const base = Colors[scheme];
-  if (colorId === null) return base;
-  const accent = getEventColor(colorId, scheme);
-  const fraction = scheme === 'dark' ? 0.18 : 0.08;
+function mixColor(background: string, foreground: string, fraction: number): string {
   const channels = [1, 3, 5].map((index) => {
-    const background = Number.parseInt(base.background.slice(index, index + 2), 16);
-    const foreground = Number.parseInt(accent.slice(index, index + 2), 16);
-    return Math.round(background + (foreground - background) * fraction).toString(16).padStart(2, '0');
+    const base = Number.parseInt(background.slice(index, index + 2), 16);
+    const overlay = Number.parseInt(foreground.slice(index, index + 2), 16);
+    return Math.round(base + (overlay - base) * fraction).toString(16).padStart(2, '0');
   });
+  return `#${channels.join('')}`;
+}
+
+function createCalendarTheme(scheme: keyof typeof baseColors, colorId: PrimaryCalendarColorId) {
+  const base = baseColors[scheme];
+  const { accent, onAccent } = getCalendarColorPreset(colorId)[scheme];
+  const backgroundSelected = mixColor(base.background, accent, scheme === 'dark' ? 0.18 : 0.08);
+  const textBackgrounds = [base.background, base.backgroundElement, base.calendarOverlay, backgroundSelected];
+  let calendarAccentText = accent;
+  // 面にはプリセットの値を使用し、文字だけを本文色に寄せて読みやすくする。
+  for (let step = 1; step <= 10 && textBackgrounds.some((color) => getContrastRatio(calendarAccentText, color) < 4.5); step++) {
+    calendarAccentText = mixColor(accent, base.text, step / 10);
+  }
+  const calendarEventText = getContrastRatio(accent, onAccent) >= 4.5 ? onAccent
+    : getContrastRatio(accent, '#FFFFFF') > getContrastRatio(accent, '#000000') ? '#FFFFFF' : '#000000';
   return {
     ...base,
+    backgroundSelected,
     calendarAccent: accent,
+    calendarAccentText,
     calendarEvent: accent,
+    calendarEventText,
     calendarEventBorder: accent,
-    backgroundSelected: `#${channels.join('')}`,
   };
+}
+
+export const Colors = {
+  light: createCalendarTheme('light', DEFAULT_CALENDAR_COLOR_ID),
+  dark: createCalendarTheme('dark', DEFAULT_CALENDAR_COLOR_ID),
+};
+
+export function resolveCalendarTheme(scheme: keyof typeof Colors, colorId: PrimaryCalendarColorId | null) {
+  return colorId === null || colorId === DEFAULT_CALENDAR_COLOR_ID ? Colors[scheme] : createCalendarTheme(scheme, colorId);
 }
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;

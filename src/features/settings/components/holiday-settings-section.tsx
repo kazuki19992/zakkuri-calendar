@@ -39,7 +39,7 @@ function HolidaySettingsError({ state }: Readonly<{ state: HolidayPreferencesSta
       {state.status === 'error' ? (
         <Pressable accessibilityRole="button" accessibilityLabel="祝日設定を再読み込み" style={styles.row}
           onPress={() => void state.reload()}>
-          <Text style={{ color: theme.calendarAccent }}>再読み込み</Text>
+          <Text style={{ color: theme.calendarAccentText }}>再読み込み</Text>
         </Pressable>
       ) : null}
     </>

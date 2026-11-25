@@ -52,7 +52,7 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
         {state.status === 'loading' ? <View style={styles.center}><ActivityIndicator /></View> : null}
         {state.status === 'error' ? <View style={styles.center}>
           <Text style={{ color: theme.text }}>予定を読み込めませんでした</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="再試行" onPress={state.retry} style={styles.retry}><Text style={{ color: theme.calendarAccent }}>再試行</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="再試行" onPress={state.retry} style={styles.retry}><Text style={{ color: theme.calendarAccentText }}>再試行</Text></Pressable>
         </View> : null}
         {state.status === 'ready' ? <ScrollView ref={bindScroll} onScroll={onScroll} scrollEventThrottle={16} contentContainerStyle={styles.form} keyboardShouldPersistTaps="always">
           <View onTouchStart={endEditing}>
@@ -84,7 +84,7 @@ export function EventEditorScreen({ state, onSave, onDelete, onSelectScope, onCa
                 {state.relativeRecurrence?<>
                   <Text style={{color:theme.text}}>{state.relativeRecurrence.label}</Text>
                   {state.relativeRecurrence.notice?<Text style={{color:theme.textSecondary}}>{state.relativeRecurrence.notice}</Text>:null}
-                  {state.relativeRecurrence.policyDescription?<><Text style={{color:theme.textSecondary}}>{state.relativeRecurrence.policyDescription}</Text><Pressable accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={()=>{void state.relativeRecurrence?.updatePolicy?.();}} style={{minHeight:44,justifyContent:'center'}}><Text style={{color:theme.calendarAccent}}>締切条件を現在の設定に更新</Text></Pressable></>:null}
+                  {state.relativeRecurrence.policyDescription?<><Text style={{color:theme.textSecondary}}>{state.relativeRecurrence.policyDescription}</Text><Pressable accessibilityRole="button" disabled={busy} accessibilityState={{disabled:busy}} onPress={()=>{void state.relativeRecurrence?.updatePolicy?.();}} style={{minHeight:44,justifyContent:'center'}}><Text style={{color:theme.calendarAccentText}}>締切条件を現在の設定に更新</Text></Pressable></>:null}
                   {state.relativeRecurrence.preview.map((label,index)=><Text key={index} style={{color:theme.textSecondary}}>{index===0?'初回':`次の${index}回目`}: {label}</Text>)}
                 </>:null}
                 {!state.isRecurrenceEditable ? <Text style={{ color: theme.textSecondary }}>複数日のざっくり予定では現在利用できません</Text> : null}

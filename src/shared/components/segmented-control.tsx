@@ -59,7 +59,7 @@ export function SegmentedControl<Value extends string>({
               backgroundColor: pressed || (selected && !showMovingHighlight) ? theme.backgroundSelected : 'transparent',
             }]}>
             <Text numberOfLines={1} adjustsFontSizeToFit
-              style={[styles.label, selected && styles.selected, { color: disabled ? theme.textDisabled : selected ? theme.calendarAccent : theme.text }]}>
+              style={[styles.label, selected && styles.selected, { color: disabled ? theme.textDisabled : selected ? theme.calendarAccentText : theme.text }]}>
               {option.label}
             </Text>
           </Pressable>

@@ -37,7 +37,7 @@ export function TemporalFadeAdjustmentScreen({
           <Pressable accessibilityRole="button" style={styles.action} onPress={() => onAccept({
             fadeInRatio: draft.fadeInRatio, fadeOutRatio: draft.fadeOutRatio,
           })}>
-            <Text style={[styles.actionText, { color: theme.calendarAccent }]}>完了</Text>
+            <Text style={[styles.actionText, { color: theme.calendarAccentText }]}>完了</Text>
           </Pressable>
         </View>
         <ScrollView scrollEnabled={!dragging} contentContainerStyle={styles.content}>

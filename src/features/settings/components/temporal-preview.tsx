@@ -179,7 +179,7 @@ export function TemporalPreview({
       {onAdjustFade && valid && !singleDay ? (
         <Pressable accessibilityRole="button" onPress={onAdjustFade}
           style={({ pressed }) => [styles.adjust, pressed && { opacity: 0.82 }]}>
-          <Text style={{ color: theme.calendarAccent }}>ぼかしを調整</Text>
+          <Text style={{ color: theme.calendarAccentText }}>ぼかしを調整</Text>
         </Pressable>
       ) : null}
       {singleDay ? <Text style={{ color: theme.textSecondary }}>1日だけの期間はカレンダーで均一な色で表示します。</Text> : null}

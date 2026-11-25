@@ -32,7 +32,11 @@
         {
           "backgroundColor": "#FFFFFF",
           "image": "./assets/images/icon-android.png",
-          "imageWidth": 76
+          "imageWidth": 76,
+          "dark": {
+            "backgroundColor": "#202124",
+            "image": "./assets/images/icon-android.png"
+          }
         }
       ],
       "expo-sqlite",

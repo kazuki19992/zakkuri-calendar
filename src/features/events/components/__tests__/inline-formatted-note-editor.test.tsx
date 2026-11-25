@@ -24,10 +24,10 @@ it('本文を最初から埋め込み、メモ専用の完了は置かずready�
  expect(mockProps.dom.keyboardDisplayRequiresUserAction).toBe(false);
  await act(async()=>mockProps.onReady());expect(mockProps.disabled).toBe(false);expect(view.getByLabelText('太字')).toBeOnTheScreen();
 });
-it('入力前に書式名が見え、focus中は選択状態を反映してcommandを送る',async()=>{
+it('入力前に書式操作を表示し、focus中は選択状態を反映してcommandを送る',async()=>{
  const view=await render(<Harness session={new InlineNoteSession()}/>);
- expect(view.getByText('箇条書き')).toBeOnTheScreen();
- expect(view.getByText('番号付き')).toBeOnTheScreen();
+ expect(view.getByLabelText('箇条書き')).toBeOnTheScreen();
+ expect(view.getByLabelText('番号付きリスト')).toBeOnTheScreen();
  await act(async()=>{await mockProps.onReady();await mockProps.onFocusChange(true);await mockProps.onStateChange({bold:true,italic:false,bulletList:false,orderedList:false,taskList:false,linkUrl:null,dirty:false});});
  const field = within(view.getByTestId('inline-note.field'));
  expect(field.getByLabelText('太字').props.accessibilityState.selected).toBe(true);

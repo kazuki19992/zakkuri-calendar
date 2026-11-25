@@ -6,6 +6,7 @@ import type {NoteUpdate,NoteResponse} from '../../event-note/inline-note-session
 import { EditorContent, useEditor } from '@tiptap/react';
 import { useDOMImperativeHandle, type DOMImperativeFactory } from 'expo/dom';
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
+import { applyEventNoteAutolinks } from '../../event-note/event-note-autolink';
 import { createEventNoteExtensions } from '../../event-note/editor-extensions';
 import { fromTiptapDocument, toTiptapDocument } from '../../event-note/tiptap-note-adapter';
 import { createEditorSelectionState } from './formatted-note-editor-state';
@@ -114,7 +115,10 @@ export default function FormattedNoteEditorDOM({
   return (
     <main style={{ background: theme.background, color: theme.text, width: '100%', minHeight: '100vh' }}
       onFocusCapture={()=>{void onFocusChange?.(true);}}
-      onBlurCapture={()=>{void onFocusChange?.(false);}}
+      onBlurCapture={() => {
+        if (editor?.isEditable && dirtyRef.current && !editor.view.composing) applyEventNoteAutolinks(editor);
+        void onFocusChange?.(false);
+      }}
       onCompositionEnd={compositionEnd}
       onClickCapture={(event) => {
         const target = event.target;

@@ -1,3 +1,5 @@
+import { Editor } from '@tiptap/core';
+import { applyEventNoteAutolinks } from '../event-note-autolink';
 import type { EventNoteDocumentV1 } from '@/domain/calendar/event-note';
 import { createEventNoteExtensions, shouldBlockListNesting } from '../editor-extensions';
 import { fromTiptapDocument, toTiptapDocument } from '../tiptap-note-adapter';
@@ -36,6 +38,47 @@ describe('Tiptap予定メモadapter', () => {
       ok: false,
       error: { message: 'invalid Tiptap event note document' },
     });
+  });
+
+  test('空白で終わらないURLをリンク化し、書式・既存リンク・本文を保持する', () => {
+    const editor = new Editor({
+      element: null,
+      extensions: createEventNoteExtensions(),
+      content: toTiptapDocument({ version: 1, blocks: [{ type: 'paragraph', content: [
+        { text: 'すでにリンク', link: 'https://example.org/' },
+        { text: ' （http://example.net） と ' },
+        { text: 'https://example.com/a?b=1', bold: true },
+      ] }] }),
+    });
+    try {
+      applyEventNoteAutolinks(editor);
+      applyEventNoteAutolinks(editor);
+      expect(fromTiptapDocument(editor.getJSON())).toEqual({ ok: true, value: { version: 1, blocks: [{
+        type: 'paragraph', content: [
+          { text: 'すでにリンク', link: 'https://example.org/' },
+          { text: ' （' },
+          { text: 'http://example.net', link: 'http://example.net/' },
+          { text: '） と ' },
+          { text: 'https://example.com/a?b=1', link: 'https://example.com/a?b=1', bold: true },
+        ],
+      }] } });
+    } finally {
+      editor.destroy();
+    }
+  });
+
+  test('危険なスキームやURLに似た通常の文字列はリンク化しない', () => {
+    const text = 'javascript:alert(1) ftp://example.com example.org https://';
+    const editor = new Editor({ element: null, extensions: createEventNoteExtensions(),
+      content: toTiptapDocument({ version: 1, blocks: [{ type: 'paragraph', content: [{ text }] }] }) });
+    try {
+      applyEventNoteAutolinks(editor);
+      expect(fromTiptapDocument(editor.getJSON())).toEqual({
+        ok: true, value: { version: 1, blocks: [{ type: 'paragraph', content: [{ text }] }] },
+      });
+    } finally {
+      editor.destroy();
+    }
   });
 
   test('意味のある空段落を維持する', () => {

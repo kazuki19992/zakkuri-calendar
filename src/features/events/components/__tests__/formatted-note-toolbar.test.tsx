@@ -31,6 +31,14 @@ describe('書式付きメモtoolbar', () => {
       .toEqual({ disabled: false, selected: true });
     expect(view.getByLabelText('斜体').props.accessibilityState)
       .toEqual({ disabled: false, selected: false });
+    for (const [label, icon] of [
+      ['太字', 'bold'], ['斜体', 'italic'], ['箇条書き', 'bullet-list'],
+      ['番号付きリスト', 'ordered-list'], ['チェックリスト', 'check-list'],
+    ]) {
+      expect(view.getByLabelText(label)).toBeOnTheScreen();
+      expect(view.getByTestId(`note-toolbar.${icon}-icon`, { includeHiddenElements: true })).toBeOnTheScreen();
+    }
+    expect(view.queryByText('太字')).toBeNull();
     await user.press(view.getByLabelText('太字'));
     await user.press(view.getByLabelText('選択したリンクを開く'));
     expect(onToggleBold).toHaveBeenCalledTimes(1);

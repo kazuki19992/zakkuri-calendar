@@ -1,3 +1,4 @@
+import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Radii, Spacing, Typography } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,24 +27,26 @@ export function FormattedNoteToolbar({
 }: Props) {
   const theme = useTheme();
   const actions = [
-    { label: '太字', text: '太字', selected: state.bold, onPress: onToggleBold },
-    { label: '斜体', text: '斜体', selected: state.italic, onPress: onToggleItalic },
-    { label: '箇条書き', text: '箇条書き', selected: state.bulletList, onPress: onToggleBulletList },
-    { label: '番号付きリスト', text: '番号付き', selected: state.orderedList, onPress: onToggleOrderedList },
-    { label: 'チェックリスト', text: 'チェック', selected: state.taskList, onPress: onToggleTaskList },
+    { id: 'bold', label: '太字', name: { ios: 'bold', android: 'format_bold', web: 'format_bold' },
+      selected: state.bold, onPress: onToggleBold },
+    { id: 'italic', label: '斜体', name: { ios: 'italic', android: 'format_italic', web: 'format_italic' },
+      selected: state.italic, onPress: onToggleItalic },
+    { id: 'bullet-list', label: '箇条書き', name: { ios: 'list.bullet', android: 'format_list_bulleted', web: 'format_list_bulleted' },
+      selected: state.bulletList, onPress: onToggleBulletList },
+    { id: 'ordered-list', label: '番号付きリスト', name: { ios: 'list.number', android: 'format_list_numbered', web: 'format_list_numbered' },
+      selected: state.orderedList, onPress: onToggleOrderedList },
+    { id: 'check-list', label: 'チェックリスト', name: { ios: 'checklist', android: 'checklist', web: 'checklist' },
+      selected: state.taskList, onPress: onToggleTaskList },
   ] as const;
   return (
     <View style={[styles.toolbar, { borderBottomColor: theme.calendarBorder }]}>
       {actions.map((action) => (
-        <Pressable key={action.label} accessibilityRole="button" accessibilityLabel={action.label}
+        <Pressable key={action.id} accessibilityRole="button" accessibilityLabel={action.label}
           accessibilityState={{ disabled, selected: action.selected }} disabled={disabled}
           onPress={action.onPress} style={({ pressed }) => [styles.button,
             (action.selected || pressed) && { backgroundColor: theme.backgroundSelected }]}>
-          <Text style={[styles.label, {
-            color: disabled ? theme.textDisabled : action.selected ? theme.calendarAccentText : theme.text,
-            fontStyle: action.label === '斜体' ? 'italic' : 'normal',
-            fontWeight: action.label === '太字' ? '700' : '500',
-          }]}>{action.text}</Text>
+          <SymbolView testID={`note-toolbar.${action.id}-icon`} name={action.name} size={20} accessible={false}
+            tintColor={disabled ? theme.textDisabled : action.selected ? theme.calendarAccentText : theme.text} />
         </Pressable>
       ))}
       <Pressable accessibilityRole="button" accessibilityLabel="選択したリンクを開く"
@@ -77,7 +80,6 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: Spacing.two,
   },
-  label: { fontSize: Typography.caption },
   linkButton: { paddingHorizontal: Spacing.twelve },
   linkLabel: { fontSize: Typography.body, fontWeight: '600' },
 });

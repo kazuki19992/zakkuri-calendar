@@ -1,5 +1,3 @@
-import { DEFAULT_CALENDAR_COLOR_ID } from '@/domain/calendar/calendar-color';
-import { getCalendarColorPreset } from './calendar-color-presets';
 import {
   DEFAULT_EVENT_COLOR_ID,
   EVENT_COLOR_IDS,
@@ -24,8 +22,7 @@ export const EVENT_COLOR_PALETTE: readonly Readonly<{
   { id: 'gray', label: '灰', light: '#5F6368', dark: '#BDC1C6' },
 ];
 
-export function getEventColor(id: EventColorId | null, colorScheme: 'light' | 'dark'): string {
-  if (id === null) return getCalendarColorPreset(DEFAULT_CALENDAR_COLOR_ID)[colorScheme].accent;
+export function getEventColor(id: EventColorId, colorScheme: 'light' | 'dark'): string {
   return (EVENT_COLOR_PALETTE.find((color) => color.id === id) ?? EVENT_COLOR_PALETTE[0])[colorScheme];
 }
 

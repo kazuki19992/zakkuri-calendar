@@ -1,6 +1,6 @@
 import { DEFAULT_UNDETERMINED_MINUTES, parseUndeterminedMinutes } from '@/domain/temporal/temporal-preferences';
 import { defaultReminderTiming, defaultTimingIsValid, parseReminderTiming, type NotificationCategory, type ReminderTiming } from '@/domain/notifications/reminder-timing';
-import { parseExactDuration, type EventEditorTab, type ExactDuration } from '@/domain/calendar/event';
+import { parseExactDuration, type ExactDuration } from '@/domain/calendar/event';
 import { isPrimaryCalendarColorId, parsePrimaryCalendarColorId, type PrimaryCalendarColorId } from '@/domain/calendar/calendar-color';
 import {
   DEFAULT_CALENDAR_VIEW_MODE,
@@ -18,7 +18,6 @@ import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-re
 type SettingRow = Readonly<{ value_json: string }>;
 
 const DEFAULT_FADE_MINUTES = DEFAULT_UNDETERMINED_MINUTES;
-const DEFAULT_EVENT_EDITOR_TAB: EventEditorTab = 'fuzzy';
 const DEFAULT_THIS_WEEK_DEADLINE: ThisWeekDeadlineWeekday = 5;
 const PRIMARY_CALENDAR_COLOR_KEY = 'primary_calendar_color';
 
@@ -33,10 +32,6 @@ function parseJson(value: string): unknown {
 function getCalendarVisibilityKey(calendarId: string): string {
   if (calendarId.trim().length === 0) throw new Error('calendarId must not be empty');
   return `calendar_visible:${calendarId}`;
-}
-
-function parseEventEditorTab(value: unknown): EventEditorTab | null {
-  return value === 'fuzzy' || value === 'exact' ? value : null;
 }
 
 export class SqliteSettingsRepository implements SettingsRepository {
@@ -190,29 +185,6 @@ export class SqliteSettingsRepository implements SettingsRepository {
       {
         $key: getCalendarVisibilityKey(calendarId),
         $valueJson: JSON.stringify(visible),
-        $updatedAt: updatedAt,
-      },
-    );
-  }
-
-  async getLastEventEditorTab(): Promise<EventEditorTab> {
-    const row = await this.database.first<SettingRow>(
-      'SELECT value_json FROM app_settings WHERE key = $key',
-      { $key: 'last_event_editor_tab' },
-    );
-    if (!row) return DEFAULT_EVENT_EDITOR_TAB;
-    return parseEventEditorTab(parseJson(row.value_json)) ?? DEFAULT_EVENT_EDITOR_TAB;
-  }
-
-  async setLastEventEditorTab(tab: EventEditorTab, updatedAt: string): Promise<void> {
-    if (parseEventEditorTab(tab) === null) throw new Error('Invalid event editor tab');
-    await this.database.run(
-      `INSERT INTO app_settings (key, value_json, updated_at)
-       VALUES ($key, $valueJson, $updatedAt)
-       ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
-      {
-        $key: 'last_event_editor_tab',
-        $valueJson: JSON.stringify(tab),
         $updatedAt: updatedAt,
       },
     );

@@ -27,7 +27,7 @@ function createRepositories(): Readonly<{ calendars: jest.Mocked<CalendarReposit
       deleteOccurrenceException: jest.fn(), applyRecurrenceMutation: jest.fn(), update: jest.fn(), delete: jest.fn() },
     settings: {
       getPrimaryCalendarColor: jest.fn().mockResolvedValue(null), setPrimaryCalendarColor: jest.fn().mockResolvedValue(undefined),
-      getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastEventEditorTab: jest.fn().mockResolvedValue('fuzzy'), setLastEventEditorTab: jest.fn().mockResolvedValue(undefined), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn(),
+      getNotificationDefault: jest.fn().mockResolvedValue(null), setNotificationDefault: jest.fn(), getHolidayPreferences: jest.fn().mockResolvedValue({ version: 1, calendarId: 'jp', adjustThisWeekDeadline: false }), setHolidayPreferences: jest.fn().mockResolvedValue(undefined), getCalendarWeekStartsOn: jest.fn().mockResolvedValue(1), setCalendarWeekStartsOn: jest.fn(), getDefaultExactDuration: jest.fn(), setDefaultExactDuration: jest.fn(), setUndeterminedFadeMinutes: jest.fn(), getUndeterminedFadeMinutes: jest.fn(), getCalendarVisible: jest.fn(), setCalendarVisible: jest.fn(), getLastCalendarViewMode: jest.fn().mockResolvedValue('twoDay'), setLastCalendarViewMode: jest.fn().mockResolvedValue(undefined), getThisWeekDeadlineWeekday: jest.fn().mockResolvedValue(5), setThisWeekDeadlineWeekday: jest.fn(),
     },
     temporalDefinitions: { listEditable: jest.fn(), previewUpdate: jest.fn(), updateDefinition: jest.fn(), listEnabled: jest.fn().mockResolvedValue([morning]), getById: jest.fn(), disable: jest.fn() },
   };
@@ -298,9 +298,8 @@ describe('予定編集の主要状態', () => {
       }),
     }));
   });
-  it('端末にきっちりが保存済みでも新規作成はざっくりで開き、タブ往復では入力を保持する', async () => {
+  it('新規作成はざっくりで開き、タブ往復では入力を保持する', async () => {
     const repositories = createRepositories();
-    repositories.settings.getLastEventEditorTab.mockResolvedValue('exact');
     const { result } = await renderHook(() => useEventEditor({ ...repositories, initial }));
     await waitFor(() => expect(result.current.status).toBe('ready'));
     expect(result.current.editorTab).toBe('fuzzy');
@@ -309,8 +308,6 @@ describe('予定編集の主要状態', () => {
     await act(() => result.current.setEditorTab('fuzzy'));
     await act(() => result.current.setEditorTab('exact'));
     expect(result.current.startTime).toBe('08:15');
-    expect(repositories.settings.getLastEventEditorTab).not.toHaveBeenCalled();
-    expect(repositories.settings.setLastEventEditorTab).not.toHaveBeenCalled();
   });
 
   it.each(['保存', '破棄'] as const)('新規作成をきっちりにして%sしても次はざっくりで開く', async (action) => {
@@ -331,7 +328,6 @@ describe('予定編集の主要状態', () => {
     const reopened = await renderHook(() => useEventEditor({ ...repositories, initial }));
     await waitFor(() => expect(reopened.result.current.status).toBe('ready'));
     expect(reopened.result.current.editorTab).toBe('fuzzy');
-    expect(repositories.settings.setLastEventEditorTab).not.toHaveBeenCalled();
   });
 
   it.each([

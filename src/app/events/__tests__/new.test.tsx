@@ -53,7 +53,7 @@ describe('予定作成ルート', () => {
     const repositories = {
       calendars: { getDefault: jest.fn() },
       events: { create: jest.fn() },
-      settings: { getLastEventEditorTab: jest.fn() },
+      settings: {},
       temporalDefinitions: { listEditable: jest.fn(), previewUpdate: jest.fn(), updateDefinition: jest.fn(), listEnabled: jest.fn() },
     };
     const back = jest.fn();

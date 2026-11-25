@@ -308,25 +308,6 @@ describe('SQLite repositories', () => {
     await expect(calendars.setColor('personal-default', 'unknown-color' as never, now)).rejects.toThrow('Invalid calendar color');
   });
 
-  it.each([null, { value_json: 'broken' }, { value_json: '"allDay"' }])(
-    '最後の編集タブの欠損・不正値をfuzzyへfallbackする',
-    async (row) => {
-      const db = createDatabaseDouble();
-      db.first.mockResolvedValue(row);
-      await expect(new SqliteSettingsRepository(db.database).getLastEventEditorTab()).resolves.toBe('fuzzy');
-    },
-  );
-
-  it('最後の編集タブを検証してupsertする', async () => {
-    const db = createDatabaseDouble();
-    const settings = new SqliteSettingsRepository(db.database);
-    await settings.setLastEventEditorTab('exact', now);
-    expect(db.run).toHaveBeenCalledWith(expect.stringContaining('ON CONFLICT(key) DO UPDATE'), {
-      $key: 'last_event_editor_tab', $valueJson: '"exact"', $updatedAt: now,
-    });
-    await expect(settings.setLastEventEditorTab('allDay' as never, now)).rejects.toThrow('Invalid event editor tab');
-  });
-
   it.each([
     [null, 'twoDay'],
     [{ value_json: '"twoDay"' }, 'twoDay'],

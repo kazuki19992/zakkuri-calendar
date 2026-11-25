@@ -81,7 +81,6 @@ describe('実SQLiteによるMVP保存回帰', () => {
     await migrateDatabase(database, environment);
     let repositories = createRepositoryContainer(database);
     await repositories.events.create(aggregate);
-    await repositories.settings.setLastEventEditorTab('exact', now);
     await repositories.settings.setLastCalendarViewMode('week', now);
     await repositories.settings.setCalendarWeekStartsOn(0, now);
     await repositories.settings.setCalendarVisible('personal-default', false, now);
@@ -91,7 +90,6 @@ describe('実SQLiteによるMVP保存回帰', () => {
     await migrateDatabase(database, environment);
     repositories = createRepositoryContainer(database);
     expect(await repositories.events.getById(event.id)).toEqual(aggregate);
-    expect(await repositories.settings.getLastEventEditorTab()).toBe('exact');
     expect(await repositories.settings.getLastCalendarViewMode()).toBe('week');
     expect(await repositories.settings.getCalendarWeekStartsOn()).toBe(0);
     expect(await repositories.settings.getCalendarVisible('personal-default')).toBe(false);

@@ -5,7 +5,7 @@ import type { Calendar } from './calendar';
 import type { CalendarViewMode } from './calendar-view-mode';
 import type { WeekStartsOn } from './month';
 import type { HolidayPreferencesV1 } from './holiday-preferences';
-import type { CalendarEvent, EventEditorTab, ExactDuration } from './event';
+import type { CalendarEvent, ExactDuration } from './event';
 import type { EventColorId } from './event-color';
 import type { PrimaryCalendarColorId } from './calendar-color';
 import type { ThisWeekDeadlineWeekday } from '@/domain/temporal/relative-date-resolution';
@@ -100,8 +100,6 @@ export interface SettingsRepository {
   setPrimaryCalendarColor(colorId: PrimaryCalendarColorId, updatedAt: string): Promise<void>;
   getCalendarVisible(calendarId: string): Promise<boolean>;
   setCalendarVisible(calendarId: string, visible: boolean, updatedAt: string): Promise<void>;
-  getLastEventEditorTab(): Promise<EventEditorTab>;
-  setLastEventEditorTab(tab: EventEditorTab, updatedAt: string): Promise<void>;
   getLastCalendarViewMode(): Promise<CalendarViewMode>;
   setLastCalendarViewMode(mode: CalendarViewMode, updatedAt: string): Promise<void>;
   getThisWeekDeadlineWeekday(): Promise<ThisWeekDeadlineWeekday>;

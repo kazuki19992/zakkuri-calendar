@@ -8,25 +8,37 @@ import {
   useState,
 } from 'react';
 import { DatabaseErrorState } from '@/shared/components/database-error-state';
+import { writeCalendarBackup } from './calendar-backup';
 import { createExpoDatabaseAdapter } from './database';
 import { DATABASE_NAME, migrateDatabase } from './migrations';
 import { createRepositoryContainer, type RepositoryContainer } from './repository-container';
 
-const RepositoryContext = createContext<RepositoryContainer | null>(null);
+type DatabaseAccess = Readonly<{
+  repositories: RepositoryContainer;
+  writeBackup(): Promise<void>;
+}>;
 
-function RepositoryBoundary({ children }: PropsWithChildren) {
+const DatabaseContext = createContext<DatabaseAccess | null>(null);
+
+function DatabaseBoundary({ children }: PropsWithChildren) {
   const database = useSQLiteContext();
-  const repositories = useMemo(
-    () => createRepositoryContainer(createExpoDatabaseAdapter(database)),
-    [database],
-  );
-  return <RepositoryContext.Provider value={repositories}>{children}</RepositoryContext.Provider>;
+  const access = useMemo<DatabaseAccess>(() => ({
+    repositories: createRepositoryContainer(createExpoDatabaseAdapter(database)),
+    writeBackup: () => writeCalendarBackup(database),
+  }), [database]);
+  return <DatabaseContext.Provider value={access}>{children}</DatabaseContext.Provider>;
 }
 
 export function useRepositories(): RepositoryContainer {
-  const repositories = useContext(RepositoryContext);
-  if (!repositories) throw new Error('useRepositories must be used within AppDatabaseProvider');
-  return repositories;
+  const access = useContext(DatabaseContext);
+  if (!access) throw new Error('useRepositories must be used within AppDatabaseProvider');
+  return access.repositories;
+}
+
+export function useCalendarBackupWriter(): DatabaseAccess['writeBackup'] {
+  const access = useContext(DatabaseContext);
+  if (!access) throw new Error('useCalendarBackupWriter must be used within AppDatabaseProvider');
+  return access.writeBackup;
 }
 
 export function AppDatabaseProvider({ children }: PropsWithChildren) {
@@ -54,7 +66,7 @@ export function AppDatabaseProvider({ children }: PropsWithChildren) {
       onInit={initialize}
       onError={() => setHasError(true)}
     >
-      <RepositoryBoundary>{children}</RepositoryBoundary>
+      <DatabaseBoundary>{children}</DatabaseBoundary>
     </SQLiteProvider>
   );
 }

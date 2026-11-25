@@ -6,7 +6,7 @@ jest.mock('@/features/notifications/notification-context', () => ({ useNotificat
 jest.mock('@/features/settings/hooks/use-notification-defaults', () => ({ useNotificationDefaults: () => ({entries:{}}) }));
 jest.mock('@/features/settings/hooks/use-calendar-backup', () => ({ useCalendarBackup: () => undefined }));
 jest.mock('@/global.css', () => ({}));
-jest.mock('@/data/sqlite/app-database-provider', () => ({ useRepositories: jest.fn() }));
+jest.mock('@/data/sqlite/app-database-provider', () => ({ useRepositories: jest.fn(), useCalendarBackupWriter: () => jest.fn() }));
 jest.mock('@/features/settings/hooks/use-undetermined-duration-settings', () => ({ useUndeterminedDurationSettings: () => ({ minutes: 120, isSaving: false }) }));
 jest.mock('@/features/settings/hooks/use-settings-leave-guard', () => ({ useSettingsLeaveGuard: jest.fn() }));
 jest.mock('@/features/settings/hooks/use-week-start-settings', () => ({ useWeekStartSettings: jest.fn() }));

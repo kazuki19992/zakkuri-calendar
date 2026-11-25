@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { useRepositories } from '@/data/sqlite/app-database-provider';
+import { useCalendarBackupWriter, useRepositories } from '@/data/sqlite/app-database-provider';
 import { useCalendarRefresh } from '@/features/calendar/calendar-refresh-context';
 import { useCalendarBackup } from '@/features/settings/hooks/use-calendar-backup';
 import { useNotifications } from '@/features/notifications/notification-context';
@@ -17,7 +17,8 @@ export default function SettingsRoute() {
   const router = useRouter();
   const { settings } = useRepositories();
   const notificationRuntime = useNotifications();
-  const backup = useCalendarBackup();
+  const writeBackup = useCalendarBackupWriter();
+  const backup = useCalendarBackup(writeBackup);
   const { notifyChanged } = useCalendarRefresh();
   const duration = useDefaultExactDurationSettings({ settings });
   const weekStart = useWeekStartSettings({ settings, onSaved: notifyChanged });

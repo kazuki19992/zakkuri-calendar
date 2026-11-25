@@ -1,8 +1,9 @@
 import type { PropsWithChildren } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
-import { AppDatabaseProvider, useRepositories } from '../app-database-provider';
+import { AppDatabaseProvider, useCalendarBackupWriter, useRepositories } from '../app-database-provider';
 import { DATABASE_NAME } from '../migrations';
+import { writeCalendarBackup } from '../calendar-backup';
 
 const mockExpoDatabase = {
   execAsync: jest.fn(), runAsync: jest.fn(), getFirstAsync: jest.fn(), getAllAsync: jest.fn(),
@@ -13,6 +14,7 @@ let mockLatestProviderProps: Record<string, unknown> = {};
 let mockProviderMounts = 0;
 
 jest.mock('@/global.css', () => ({}));
+jest.mock('../calendar-backup', () => ({ writeCalendarBackup: jest.fn().mockResolvedValue(undefined) }));
 
 jest.mock('../migrations', () => ({
   ...jest.requireActual('../migrations'),
@@ -55,6 +57,12 @@ describe('AppDatabaseProvider', () => {
     await waitFor(() => expect(mockMigrateDatabase).toHaveBeenCalledTimes(1));
     expect(mockMigrateDatabase.mock.calls[0][0]).not.toBe(mockExpoDatabase);
     expect(mockMigrateDatabase.mock.calls[0][0]).toEqual(expect.objectContaining({ exec: expect.any(Function) }));
+  });
+
+  it('バックアップの関数を公開し、起動中のデータベースをデータ層で渡す', async () => {
+    const hook = await renderHook(useCalendarBackupWriter, { wrapper: AppDatabaseProvider });
+    await expect(hook.result.current()).resolves.toBeUndefined();
+    expect(writeCalendarBackup).toHaveBeenCalledWith(mockExpoDatabase);
   });
 
   it('rejects repository access outside the provider', async () => {

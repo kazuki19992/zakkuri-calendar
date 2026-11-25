@@ -30,6 +30,18 @@ it('稼働中のDBから整合した複製を作り、閉じてから共有し�
   expect(mockDelete).toHaveBeenCalledTimes(1);
 });
 
+it('ファイル名に端末のローカル日付を使う', async () => {
+  jest.useFakeTimers({ now: new Date(2026, 8, 8, 0, 30) });
+  try {
+    await writeCalendarBackup(source);
+
+    expect(openDatabaseAsync).toHaveBeenCalledWith('zakkuri-calendar-2026-09-08.sqlite', {}, expect.any(String));
+    expect(shareAsync).toHaveBeenCalledWith(expect.stringMatching(/zakkuri-calendar-2026-09-08\.sqlite$/), expect.any(Object));
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 it('複製に失敗したら共有せず、一時ファイルを片付ける', async () => {
   jest.mocked(backupDatabaseAsync).mockRejectedValueOnce(new Error('copy failed'));
   await expect(writeCalendarBackup(source)).rejects.toThrow('copy failed');

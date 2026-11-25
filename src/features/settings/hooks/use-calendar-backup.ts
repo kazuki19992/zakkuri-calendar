@@ -1,10 +1,7 @@
-import { useSQLiteContext } from 'expo-sqlite';
 import { useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
-import { writeCalendarBackup } from '@/data/sqlite/calendar-backup';
 
-export function useCalendarBackup() {
-  const database = useSQLiteContext();
+export function useCalendarBackup(writeBackup: () => Promise<void>) {
   const busy = useRef(false);
   const [isExporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +22,7 @@ export function useCalendarBackup() {
             busy.current = true;
             setError(null);
             setExporting(true);
-            void writeCalendarBackup(database)
+            void writeBackup()
               .catch(() => setError('バックアップを書き出せませんでした。もう一度お試しください。'))
               .finally(() => {
                 busy.current = false;

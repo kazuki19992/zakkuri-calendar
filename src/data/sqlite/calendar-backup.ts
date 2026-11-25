@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import { Directory, File, Paths } from 'expo-file-system';
 import { isAvailableAsync, shareAsync } from 'expo-sharing';
 import { backupDatabaseAsync, openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
@@ -7,7 +8,7 @@ export async function writeCalendarBackup(sourceDatabase: SQLiteDatabase): Promi
 
   const now = new Date();
   const folder = new Directory(Paths.cache, `zakkuri-backup-${now.getTime()}-${Math.random().toString(36).slice(2)}`);
-  const filename = `zakkuri-calendar-${now.toISOString().slice(0, 10)}.sqlite`;
+  const filename = `zakkuri-calendar-${format(now, 'yyyy-MM-dd')}.sqlite`;
   folder.create();
   try {
     const destDatabase = await openDatabaseAsync(filename, {}, folder.uri);
